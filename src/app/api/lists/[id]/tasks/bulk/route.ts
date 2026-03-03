@@ -6,11 +6,28 @@ import { eq, and } from "drizzle-orm";
 import { z } from "zod";
 import { runAutomations } from "@/lib/automations";
 
+// Accept description as either a string or a TipTap JSON object
+const descriptionSchema = z.union([
+  z.string(),
+  z.record(z.string(), z.unknown()),
+]).optional();
+
+// Convert a string description to a TipTap-compatible document object
+function toDescriptionDoc(desc: string | Record<string, unknown> | undefined): Record<string, unknown> {
+  if (!desc) return {};
+  if (typeof desc === "object") return desc;
+  if (desc.trim() === "") return {};
+  return {
+    type: "doc",
+    content: [{ type: "paragraph", content: [{ type: "text", text: desc }] }],
+  };
+}
+
 const bulkCreateTaskSchema = z.object({
   tasks: z.array(
     z.object({
       title: z.string().min(1).max(500),
-      description: z.record(z.string(), z.unknown()).optional(),
+      description: descriptionSchema,
       status: z.string().max(50).optional(),
       priority: z.enum(["urgent", "high", "medium", "low", "none"]).optional(),
       dueDate: z.string().datetime().optional(),
@@ -78,7 +95,7 @@ export async function POST(
           .values({
             listId,
             title: taskData.title,
-            description: taskData.description ?? {},
+            description: toDescriptionDoc(taskData.description),
             status: taskData.status ?? "todo",
             priority: taskData.priority ?? "none",
             creatorId: session.user.id,
