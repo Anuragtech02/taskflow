@@ -837,9 +837,15 @@ export function TaskDetailPanel({ task, taskId, open, onClose, onTaskSelect, sta
           <div className="flex-1 overflow-y-auto">
             <div className="p-5 space-y-5">
               {/* Task Title */}
-              <Input
+              <Textarea
                 value={title}
-                onChange={(e) => { setTitle(e.target.value); debouncedSave(); }}
+                onChange={(e) => {
+                  setTitle(e.target.value);
+                  debouncedSave();
+                  // Auto-resize
+                  e.target.style.height = "auto";
+                  e.target.style.height = e.target.scrollHeight + "px";
+                }}
                 onBlur={() => {
                   if (isDirtyRef.current) {
                     if (autoSaveTimeoutRef.current) clearTimeout(autoSaveTimeoutRef.current)
@@ -848,7 +854,14 @@ export function TaskDetailPanel({ task, taskId, open, onClose, onTaskSelect, sta
                     isDirtyRef.current = false
                   }
                 }}
-                className="text-2xl font-bold border-0 px-0 focus-visible:ring-0 bg-transparent"
+                ref={(el) => {
+                  if (el) {
+                    el.style.height = "auto";
+                    el.style.height = el.scrollHeight + "px";
+                  }
+                }}
+                rows={1}
+                className="text-2xl font-bold border-0 px-0 focus-visible:ring-0 bg-transparent resize-none overflow-hidden min-h-0"
                 placeholder="Task title"
               />
 
