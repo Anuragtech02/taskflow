@@ -1515,14 +1515,19 @@ export default function ListPage({
           </div>
         ) : viewMode === "board" ? (
           <div className="h-full">
-            {/* Kanban fallback statuses */}
+            {/* Kanban: merge defaults with custom statuses */}
             {(() => {
-              const kanbanStatuses = statuses && statuses.length > 0 ? statuses : [
+              const defaultKanbanStatuses: typeof statuses & object[] = [
                 { id: "default-todo", listId: listId, name: "To Do", color: "#94a3b8", order: 0, isDefault: true },
                 { id: "default-ip", listId: listId, name: "In Progress", color: "#3b82f6", order: 1, isDefault: false },
                 { id: "default-review", listId: listId, name: "In Review", color: "#f59e0b", order: 2, isDefault: false },
                 { id: "default-done", listId: listId, name: "Done", color: "#10b981", order: 3, isDefault: false },
               ]
+              const normalizeKanban = (name: string) => name.toLowerCase().replace(/\s+/g, "_")
+              const customStatuses = statuses || []
+              const customValues = new Set(customStatuses.map((s) => normalizeKanban(s.name)))
+              const kept = defaultKanbanStatuses.filter((d) => !customValues.has(normalizeKanban(d.name)))
+              const kanbanStatuses = customStatuses.length > 0 ? [...kept, ...customStatuses] : defaultKanbanStatuses
               return (
                 <KanbanBoard
                   tasks={tasks || []}
