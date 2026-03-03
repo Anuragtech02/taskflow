@@ -2,7 +2,6 @@ node_modules
 .next
 .git
 *.md
-drizzle/*.json
 .env
 .env.local
 .env.*.local

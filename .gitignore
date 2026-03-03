@@ -43,8 +43,5 @@ next-env.d.ts
 *.swp
 *.swo
 
-# Drizzle
-drizzle/meta/_journal.json
-
 # Docker
 docker-compose.override.yml
