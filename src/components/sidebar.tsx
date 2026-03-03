@@ -264,7 +264,7 @@ function SidebarFolderItem({
                       expanded && "rotate-90"
                     )}
                   />
-                  <FolderClosed className="h-3.5 w-3.5 text-muted-foreground" />
+                  <FolderClosed className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
                   {isRenaming ? (
                     <Input
                       value={renameValue}

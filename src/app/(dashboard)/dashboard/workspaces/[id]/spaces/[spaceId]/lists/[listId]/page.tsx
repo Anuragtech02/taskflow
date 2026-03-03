@@ -1149,7 +1149,7 @@ export default function ListPage({
             />
 
             {/* Manage Statuses */}
-            <Popover>
+            <Popover onOpenChange={(open) => { if (!open) setColorPickerForId(null) }}>
               <PopoverTrigger asChild>
                 <Button variant="outline" size="sm" className="gap-1.5">
                   <Settings2 className="h-3.5 w-3.5" />
@@ -1241,6 +1241,7 @@ export default function ListPage({
                                 onClick={() => {
                                   updateStatusMutation.mutate({ listId, statusId: s.id, color: c }, {
                                     onSuccess: () => { toast.success("Color updated"); setColorPickerForId(null) },
+                                    onError: () => { toast.error("Failed to update color"); setColorPickerForId(null) },
                                   })
                                 }}
                               />
@@ -1272,6 +1273,7 @@ export default function ListPage({
                               toast.success("Status created")
                               setNewStatusName("")
                               setNewStatusColor("#6366f1")
+                              setColorPickerForId(null)
                             },
                           })
                         }
@@ -1288,6 +1290,7 @@ export default function ListPage({
                             toast.success("Status created")
                             setNewStatusName("")
                             setNewStatusColor("#6366f1")
+                            setColorPickerForId(null)
                           },
                         })
                       }}

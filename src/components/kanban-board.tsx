@@ -56,13 +56,7 @@ export interface KanbanBoardProps {
  * Handles common variations: "To Do" → "todo", "In Progress" → "in_progress", etc.
  */
 function normalizeStatusName(name: string): string {
-  const slug = name.toLowerCase().replace(/\s+/g, "_")
-  // Handle common variations
-  const aliases: Record<string, string> = {
-    "to_do": "todo",
-    "in_review": "review",
-  }
-  return aliases[slug] ?? slug
+  return name.toLowerCase().replace(/\s+/g, "_")
 }
 
 // Smooth drop animation config

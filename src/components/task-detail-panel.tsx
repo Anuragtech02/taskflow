@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react"
-import { X, Calendar, Clock, CheckSquare, MessageSquare, Play, Pause, Square, Trash2, Plus, Check, Search, Link2, ChevronRight, Tag, Paperclip, AlertCircle, ArrowUpRight, MoreHorizontal, CircleCheckBig, Flag, Users, Timer, Gauge, ChevronDown, FolderKanban, FileText, Edit3, Eye, Lock, ExternalLink } from "lucide-react"
+import { X, Calendar, Clock, CheckSquare, MessageSquare, Play, Pause, Square, Trash2, Plus, Check, Search, Link2, ChevronRight, Tag, Paperclip, AlertCircle, ArrowUpRight, MoreHorizontal, CircleCheckBig, Flag, Users, Timer, Gauge, ChevronDown, FolderKanban, FileText, Edit3, Lock, ExternalLink } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -286,7 +286,7 @@ function getActivityIcon(action: string): React.ReactNode {
 export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTaskSelect, statuses, workspaceId, labels: propLabels }: TaskDetailPanelProps) {
   // Always fetch the full task (includes activities, comments, etc.)
   const effectiveTaskId = taskIdProp || task?.id
-  const { data: fetchedTask, isLoading: taskLoading } = useTask(effectiveTaskId)
+  const { data: fetchedTask } = useTask(effectiveTaskId)
   // Prefer fetchedTask (richer data with activities) once loaded; use task prop for instant display while loading
   const currentTask = fetchedTask || task
 
@@ -507,6 +507,19 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
     }
   }
 
+  // Snapshot of the pending save data so we can flush it even after the task changes.
+  // Updated every time debouncedSave is called (i.e. user makes an edit).
+  const pendingSaveDataRef = useRef<{
+    taskId: string
+    title: string
+    description: Record<string, unknown> | undefined
+    status: string
+    priority: string
+    dueDate: string | undefined
+    startDate: string | undefined
+    timeEstimate: number | undefined
+  } | null>(null)
+
   // Flush pending save for the OLD task before switching, then populate new task data
   const prevTaskIdRef = useRef<string | undefined>(undefined)
 
@@ -518,8 +531,11 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
     if (oldId && newId !== oldId && isDirtyRef.current && autoSaveTimeoutRef.current) {
       clearTimeout(autoSaveTimeoutRef.current)
       autoSaveTimeoutRef.current = null
-      // handleSave still has the old task's state in its closure — flush it
-      handleSave()
+      // Use the snapshot — it has the correct task ID and form values from before the switch
+      if (pendingSaveDataRef.current) {
+        updateTaskMutation.mutate(pendingSaveDataRef.current)
+        pendingSaveDataRef.current = null
+      }
       isDirtyRef.current = false
     }
 
@@ -530,6 +546,7 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
         autoSaveTimeoutRef.current = null
       }
       isDirtyRef.current = false
+      pendingSaveDataRef.current = null
       prevTaskIdRef.current = newId
 
       setTitle(currentTask.title || "")
@@ -590,6 +607,20 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
   // Debounced auto-save — only fires if user actually made changes
   const debouncedSave = useCallback(() => {
     isDirtyRef.current = true
+    // Snapshot current form data so flush-on-switch can use it even after task changes
+    const effectiveId = currentTask?.id || task?.id
+    if (effectiveId) {
+      pendingSaveDataRef.current = {
+        taskId: effectiveId,
+        title,
+        description: (description ?? undefined) as Record<string, unknown> | undefined,
+        status,
+        priority,
+        dueDate: dueDate ? dueDate.toISOString() : undefined,
+        startDate: startDate ? startDate.toISOString() : undefined,
+        timeEstimate: timeEstimate ?? undefined,
+      }
+    }
     if (autoSaveTimeoutRef.current) {
       clearTimeout(autoSaveTimeoutRef.current)
     }
@@ -597,9 +628,10 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
       if (isDirtyRef.current) {
         handleSave()
         isDirtyRef.current = false
+        pendingSaveDataRef.current = null
       }
     }, 1000)
-  }, [handleSave])
+  }, [handleSave, currentTask, task, title, description, status, priority, dueDate, startDate, timeEstimate])
 
   // Flush pending save on panel close
   useEffect(() => {
