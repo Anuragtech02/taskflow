@@ -33,9 +33,6 @@ services:
       S3_REGION: us-east-1
     expose:
       - "3000"
-    networks:
-      - default
-      - coolify
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
       interval: 30s
@@ -76,7 +73,3 @@ services:
 volumes:
   postgres_data:
   minio_data:
-
-networks:
-  coolify:
-    external: true
