@@ -5,12 +5,18 @@ import {
   fetchSpaces,
   fetchSpace,
   createSpace,
+  updateSpace,
+  deleteSpace,
   fetchFolders,
   createFolder,
+  updateFolder,
+  deleteFolder,
   fetchFolderLists,
   fetchSpaceLists,
   fetchList,
   createList,
+  updateList,
+  deleteList,
   fetchTasks,
   createTask,
   updateTask,
@@ -153,6 +159,39 @@ export function useCreateSpace() {
   })
 }
 
+export function useUpdateSpace() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      spaceId,
+      ...data
+    }: {
+      spaceId: string
+      name?: string
+      color?: string
+      icon?: string
+    }) => updateSpace(spaceId, data),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["spaces"] })
+      queryClient.invalidateQueries({ queryKey: ["space", variables.spaceId] })
+    },
+  })
+}
+
+export function useDeleteSpace() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (spaceId: string) => deleteSpace(spaceId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["spaces"] })
+      queryClient.invalidateQueries({ queryKey: ["space"] })
+      queryClient.invalidateQueries({ queryKey: ["folders"] })
+      queryClient.invalidateQueries({ queryKey: ["lists"] })
+      queryClient.invalidateQueries({ queryKey: ["list"] })
+    },
+  })
+}
+
 // ── Folder Hooks ────────────────────────────────────────────────────────────
 
 export function useFolders(spaceId: string | undefined) {
@@ -175,6 +214,34 @@ export function useCreateFolder() {
     }) => createFolder(spaceId, data),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["folders", variables.spaceId] })
+    },
+  })
+}
+
+export function useUpdateFolder() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      folderId,
+      ...data
+    }: {
+      folderId: string
+      name?: string
+    }) => updateFolder(folderId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["folders"] })
+    },
+  })
+}
+
+export function useDeleteFolder() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (folderId: string) => deleteFolder(folderId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["folders"] })
+      queryClient.invalidateQueries({ queryKey: ["lists"] })
+      queryClient.invalidateQueries({ queryKey: ["list"] })
     },
   })
 }
@@ -219,6 +286,34 @@ export function useCreateList() {
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["lists", "folder", variables.folderId] })
       queryClient.invalidateQueries({ queryKey: ["lists", "space", variables.spaceId] })
+    },
+  })
+}
+
+export function useUpdateList() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      listId,
+      ...data
+    }: {
+      listId: string
+      name?: string
+    }) => updateList(listId, data),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["lists"] })
+      queryClient.invalidateQueries({ queryKey: ["list", variables.listId] })
+    },
+  })
+}
+
+export function useDeleteList() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (listId: string) => deleteList(listId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["lists"] })
+      queryClient.invalidateQueries({ queryKey: ["list"] })
     },
   })
 }

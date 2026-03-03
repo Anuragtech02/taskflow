@@ -81,6 +81,20 @@ export async function createSpace(
   })
 }
 
+export async function updateSpace(
+  spaceId: string,
+  data: { name?: string; color?: string; icon?: string }
+): Promise<{ space: SpaceResponse }> {
+  return fetchJSON(`/spaces/${spaceId}`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  })
+}
+
+export async function deleteSpace(spaceId: string): Promise<void> {
+  await fetchJSON(`/spaces/${spaceId}`, { method: "DELETE" })
+}
+
 // ── Folders ─────────────────────────────────────────────────────────────────
 export interface FolderResponse {
   id: string
@@ -103,6 +117,20 @@ export async function createFolder(
     method: "POST",
     body: JSON.stringify(data),
   })
+}
+
+export async function updateFolder(
+  folderId: string,
+  data: { name?: string }
+): Promise<{ folder: FolderResponse }> {
+  return fetchJSON(`/folders/${folderId}`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  })
+}
+
+export async function deleteFolder(folderId: string): Promise<void> {
+  await fetchJSON(`/folders/${folderId}`, { method: "DELETE" })
 }
 
 // ── Lists ───────────────────────────────────────────────────────────────────
@@ -139,6 +167,20 @@ export async function createList(
     method: "POST",
     body: JSON.stringify(data),
   })
+}
+
+export async function updateList(
+  listId: string,
+  data: { name?: string }
+): Promise<{ list: ListResponse }> {
+  return fetchJSON(`/lists/${listId}`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  })
+}
+
+export async function deleteList(listId: string): Promise<void> {
+  await fetchJSON(`/lists/${listId}`, { method: "DELETE" })
 }
 
 // ── Tasks ───────────────────────────────────────────────────────────────────

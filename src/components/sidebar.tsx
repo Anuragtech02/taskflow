@@ -23,6 +23,8 @@ import {
   Bot,
   LogOut,
   Target,
+  Pencil,
+  Trash2,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -36,6 +38,24 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { Input } from "@/components/ui/input"
+import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
@@ -47,7 +67,13 @@ import { CreateFolderDialog } from "@/components/create-folder-dialog"
 import { CreateListDialog } from "@/components/create-list-dialog"
 import { SearchCommand } from "@/components/search-command"
 import { useSidebarStore } from "@/store"
-import { useWorkspaces, useSpaces, useFolders, useFolderLists, useCreateWorkspace, useCreateSpace, useCreateFolder, useCreateList } from "@/hooks/useQueries"
+import {
+  useWorkspaces, useSpaces, useFolders, useFolderLists,
+  useCreateWorkspace, useCreateSpace, useCreateFolder, useCreateList,
+  useUpdateSpace, useDeleteSpace,
+  useUpdateFolder, useDeleteFolder,
+  useUpdateList, useDeleteList,
+} from "@/hooks/useQueries"
 import { cn } from "@/lib/utils"
 import type { SpaceResponse, FolderResponse, ListResponse } from "@/lib/api"
 
@@ -66,21 +92,109 @@ function SidebarListItem({
   const pathname = usePathname()
   const isActive = pathname?.includes(`/lists/${list.id}`)
 
+  const [isRenaming, setIsRenaming] = useState(false)
+  const [renameValue, setRenameValue] = useState(list.name)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+
+  const updateListMutation = useUpdateList()
+  const deleteListMutation = useDeleteList()
+
+  const handleRenameSubmit = () => {
+    const trimmed = renameValue.trim()
+    if (trimmed && trimmed !== list.name) {
+      updateListMutation.mutate({ listId: list.id, name: trimmed })
+    } else {
+      setRenameValue(list.name)
+    }
+    setIsRenaming(false)
+  }
+
+  const handleDelete = () => {
+    deleteListMutation.mutate(list.id, {
+      onSuccess: () => {
+        if (pathname?.includes(`/lists/${list.id}`)) {
+          router.push(`/dashboard/workspaces/${workspaceId}`)
+        }
+      },
+    })
+    setShowDeleteConfirm(false)
+  }
+
   return (
-    <button
-      onClick={() =>
-        router.push(
-          `/dashboard/workspaces/${workspaceId}/spaces/${spaceId}/lists/${list.id}`
-        )
-      }
-      className={cn(
-        "flex items-center gap-2 w-full px-2 py-1 rounded-md text-sm transition-colors hover:bg-accent/50 text-left",
-        isActive && "bg-accent text-accent-foreground"
-      )}
-    >
-      <ListTodo className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-      <span className="truncate">{list.name}</span>
-    </button>
+    <>
+      <ContextMenu>
+        <ContextMenuTrigger asChild>
+          <button
+            onClick={() =>
+              router.push(
+                `/dashboard/workspaces/${workspaceId}/spaces/${spaceId}/lists/${list.id}`
+              )
+            }
+            className={cn(
+              "flex items-center gap-2 w-full px-2 py-1 rounded-md text-sm transition-colors hover:bg-accent/50 text-left",
+              isActive && "bg-accent text-accent-foreground"
+            )}
+          >
+            <ListTodo className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+            {isRenaming ? (
+              <Input
+                value={renameValue}
+                onChange={(e) => setRenameValue(e.target.value)}
+                onBlur={handleRenameSubmit}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleRenameSubmit()
+                  if (e.key === "Escape") {
+                    setRenameValue(list.name)
+                    setIsRenaming(false)
+                  }
+                }}
+                onClick={(e) => e.stopPropagation()}
+                className="h-5 px-1 py-0 text-sm"
+                autoFocus
+              />
+            ) : (
+              <span className="truncate">{list.name}</span>
+            )}
+          </button>
+        </ContextMenuTrigger>
+        <ContextMenuContent>
+          <ContextMenuItem
+            onClick={() => {
+              setRenameValue(list.name)
+              setIsRenaming(true)
+            }}
+          >
+            <Pencil className="h-4 w-4 mr-2" />
+            Rename
+          </ContextMenuItem>
+          <ContextMenuSeparator />
+          <ContextMenuItem
+            className="text-destructive focus:text-destructive"
+            onClick={() => setShowDeleteConfirm(true)}
+          >
+            <Trash2 className="h-4 w-4 mr-2" />
+            Delete
+          </ContextMenuItem>
+        </ContextMenuContent>
+      </ContextMenu>
+
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete &ldquo;{list.name}&rdquo;?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete this list and all its tasks. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   )
 }
 
@@ -103,36 +217,105 @@ function SidebarFolderItem({
   const [showCreateList, setShowCreateList] = useState(false)
   const createListMutation = useCreateList()
 
+  const [isRenaming, setIsRenaming] = useState(false)
+  const [renameValue, setRenameValue] = useState(folder.name)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+
+  const updateFolderMutation = useUpdateFolder()
+  const deleteFolderMutation = useDeleteFolder()
+
+  const handleRenameSubmit = () => {
+    const trimmed = renameValue.trim()
+    if (trimmed && trimmed !== folder.name) {
+      updateFolderMutation.mutate({ folderId: folder.id, name: trimmed })
+    } else {
+      setRenameValue(folder.name)
+    }
+    setIsRenaming(false)
+  }
+
+  const handleDelete = () => {
+    deleteFolderMutation.mutate(folder.id, {
+      onSuccess: () => {
+        if (pathname?.includes(`/folders/${folder.id}`)) {
+          router.push(`/dashboard/workspaces/${workspaceId}`)
+        }
+      },
+    })
+    setShowDeleteConfirm(false)
+  }
+
   return (
     <>
       <Collapsible open={expanded} onOpenChange={() => toggleFolder(folder.id)}>
-        <div className="group flex items-center">
-          <CollapsibleTrigger asChild>
-            <button
-              className={cn(
-                "flex items-center gap-1 flex-1 px-2 py-1 rounded-md text-sm transition-colors hover:bg-accent/50",
-                isActive && "bg-accent text-accent-foreground"
-              )}
+        <ContextMenu>
+          <ContextMenuTrigger asChild>
+            <div className="group flex items-center">
+              <CollapsibleTrigger asChild>
+                <button
+                  className={cn(
+                    "flex items-center gap-1 flex-1 px-2 py-1 rounded-md text-sm transition-colors hover:bg-accent/50",
+                    isActive && "bg-accent text-accent-foreground"
+                  )}
+                >
+                  <ChevronRight
+                    className={cn(
+                      "h-3.5 w-3.5 text-muted-foreground transition-transform duration-200",
+                      expanded && "rotate-90"
+                    )}
+                  />
+                  <FolderClosed className="h-3.5 w-3.5 text-muted-foreground" />
+                  {isRenaming ? (
+                    <Input
+                      value={renameValue}
+                      onChange={(e) => setRenameValue(e.target.value)}
+                      onBlur={handleRenameSubmit}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleRenameSubmit()
+                        if (e.key === "Escape") {
+                          setRenameValue(folder.name)
+                          setIsRenaming(false)
+                        }
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      className="h-5 px-1 py-0 text-sm"
+                      autoFocus
+                    />
+                  ) : (
+                    <span className="truncate">{folder.name}</span>
+                  )}
+                </button>
+              </CollapsibleTrigger>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                onClick={() => setShowCreateList(true)}
+              >
+                <Plus className="h-3 w-3" />
+              </Button>
+            </div>
+          </ContextMenuTrigger>
+          <ContextMenuContent>
+            <ContextMenuItem
+              onClick={() => {
+                setRenameValue(folder.name)
+                setIsRenaming(true)
+              }}
             >
-              <ChevronRight
-                className={cn(
-                  "h-3.5 w-3.5 text-muted-foreground transition-transform duration-200",
-                  expanded && "rotate-90"
-                )}
-              />
-              <FolderClosed className="h-3.5 w-3.5 text-muted-foreground" />
-              <span className="truncate">{folder.name}</span>
-            </button>
-          </CollapsibleTrigger>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-            onClick={() => setShowCreateList(true)}
-          >
-            <Plus className="h-3 w-3" />
-          </Button>
-        </div>
+              <Pencil className="h-4 w-4 mr-2" />
+              Rename
+            </ContextMenuItem>
+            <ContextMenuSeparator />
+            <ContextMenuItem
+              className="text-destructive focus:text-destructive"
+              onClick={() => setShowDeleteConfirm(true)}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete
+            </ContextMenuItem>
+          </ContextMenuContent>
+        </ContextMenu>
         <CollapsibleContent>
           <div className="ml-6 mt-0.5 space-y-0.5">
             {lists?.map((list) => (
@@ -146,6 +329,24 @@ function SidebarFolderItem({
           </div>
         </CollapsibleContent>
       </Collapsible>
+
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete &ldquo;{folder.name}&rdquo;?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete this folder and all its lists and tasks. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <CreateListDialog
         open={showCreateList}
         onOpenChange={setShowCreateList}
@@ -179,39 +380,108 @@ function SidebarSpaceItem({
   const [showCreateFolder, setShowCreateFolder] = useState(false)
   const createFolderMutation = useCreateFolder()
 
+  const [isRenaming, setIsRenaming] = useState(false)
+  const [renameValue, setRenameValue] = useState(space.name)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+
+  const updateSpaceMutation = useUpdateSpace()
+  const deleteSpaceMutation = useDeleteSpace()
+
+  const handleRenameSubmit = () => {
+    const trimmed = renameValue.trim()
+    if (trimmed && trimmed !== space.name) {
+      updateSpaceMutation.mutate({ spaceId: space.id, name: trimmed })
+    } else {
+      setRenameValue(space.name)
+    }
+    setIsRenaming(false)
+  }
+
+  const handleDelete = () => {
+    deleteSpaceMutation.mutate(space.id, {
+      onSuccess: () => {
+        if (pathname?.includes(`/spaces/${space.id}`)) {
+          router.push(`/dashboard/workspaces/${workspaceId}`)
+        }
+      },
+    })
+    setShowDeleteConfirm(false)
+  }
+
   return (
     <>
       <Collapsible open={expanded} onOpenChange={() => toggleSpace(space.id)}>
-        <div className="group flex items-center">
-          <CollapsibleTrigger asChild>
-            <button
-              className={cn(
-                "flex items-center gap-2 flex-1 px-2 py-1.5 rounded-md text-sm font-medium transition-colors hover:bg-accent/50",
-                isActive && "bg-accent text-accent-foreground"
-              )}
+        <ContextMenu>
+          <ContextMenuTrigger asChild>
+            <div className="group flex items-center">
+              <CollapsibleTrigger asChild>
+                <button
+                  className={cn(
+                    "flex items-center gap-2 flex-1 px-2 py-1.5 rounded-md text-sm font-medium transition-colors hover:bg-accent/50",
+                    isActive && "bg-accent text-accent-foreground"
+                  )}
+                >
+                  <ChevronRight
+                    className={cn(
+                      "h-4 w-4 text-muted-foreground transition-transform duration-200",
+                      expanded && "rotate-90"
+                    )}
+                  />
+                  <div
+                    className="w-3 h-3 rounded-sm flex-shrink-0"
+                    style={{ backgroundColor: space.color || "#6366f1" }}
+                  />
+                  {isRenaming ? (
+                    <Input
+                      value={renameValue}
+                      onChange={(e) => setRenameValue(e.target.value)}
+                      onBlur={handleRenameSubmit}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleRenameSubmit()
+                        if (e.key === "Escape") {
+                          setRenameValue(space.name)
+                          setIsRenaming(false)
+                        }
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      className="h-5 px-1 py-0 text-sm font-medium"
+                      autoFocus
+                    />
+                  ) : (
+                    <span className="truncate">{space.name}</span>
+                  )}
+                </button>
+              </CollapsibleTrigger>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                onClick={() => setShowCreateFolder(true)}
+              >
+                <Plus className="h-3 w-3" />
+              </Button>
+            </div>
+          </ContextMenuTrigger>
+          <ContextMenuContent>
+            <ContextMenuItem
+              onClick={() => {
+                setRenameValue(space.name)
+                setIsRenaming(true)
+              }}
             >
-              <ChevronRight
-                className={cn(
-                  "h-4 w-4 text-muted-foreground transition-transform duration-200",
-                  expanded && "rotate-90"
-                )}
-              />
-              <div
-                className="w-3 h-3 rounded-sm flex-shrink-0"
-                style={{ backgroundColor: space.color || "#6366f1" }}
-              />
-              <span className="truncate">{space.name}</span>
-            </button>
-          </CollapsibleTrigger>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-            onClick={() => setShowCreateFolder(true)}
-          >
-            <Plus className="h-3 w-3" />
-          </Button>
-        </div>
+              <Pencil className="h-4 w-4 mr-2" />
+              Rename
+            </ContextMenuItem>
+            <ContextMenuSeparator />
+            <ContextMenuItem
+              className="text-destructive focus:text-destructive"
+              onClick={() => setShowDeleteConfirm(true)}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete
+            </ContextMenuItem>
+          </ContextMenuContent>
+        </ContextMenu>
         <CollapsibleContent>
           <div className="ml-4 mt-0.5 space-y-0.5">
             {folders?.map((folder) => (
@@ -225,6 +495,24 @@ function SidebarSpaceItem({
           </div>
         </CollapsibleContent>
       </Collapsible>
+
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete &ldquo;{space.name}&rdquo;?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete this space, all its folders, lists, and tasks. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <CreateFolderDialog
         open={showCreateFolder}
         onOpenChange={setShowCreateFolder}
