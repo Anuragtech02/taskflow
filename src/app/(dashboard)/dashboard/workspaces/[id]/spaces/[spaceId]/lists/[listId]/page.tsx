@@ -1537,7 +1537,11 @@ export default function ListPage({
                 { id: "default-review", listId: listId, name: "In Review", color: "#f59e0b", order: 2, isDefault: false },
                 { id: "default-done", listId: listId, name: "Done", color: "#10b981", order: 3, isDefault: false },
               ]
-              const normalizeKanban = (name: string) => name.toLowerCase().replace(/\s+/g, "_")
+              const normalizeKanban = (name: string) => {
+                const slug = name.toLowerCase().replace(/\s+/g, "_")
+                const aliases: Record<string, string> = { "to_do": "todo", "in_review": "review" }
+                return aliases[slug] ?? slug
+              }
               const customStatuses = statuses || []
               const customValues = new Set(customStatuses.map((s) => normalizeKanban(s.name)))
               const kept = defaultKanbanStatuses.filter((d) => !customValues.has(normalizeKanban(d.name)))
