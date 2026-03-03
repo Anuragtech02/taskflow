@@ -120,17 +120,22 @@ export function useSSE(workspaceId?: string) {
   }, [queryClient, workspaceId])
 
   useEffect(() => {
+    // Don't connect until we have a workspace to subscribe to
+    if (!workspaceId) return
+
     connect()
 
     return () => {
       if (eventSourceRef.current) {
         eventSourceRef.current.close()
+        eventSourceRef.current = null
       }
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current)
+        reconnectTimeoutRef.current = null
       }
     }
-  }, [connect])
+  }, [connect, workspaceId])
 
   const reconnect = useCallback(() => {
     reconnectAttemptsRef.current = 0
