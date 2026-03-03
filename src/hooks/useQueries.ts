@@ -62,6 +62,7 @@ import {
   removeTaskFromAllSprints,
   fetchLabels,
   createLabel,
+  updateLabel,
   deleteLabel,
   fetchTaskLabels,
   addTaskLabel,
@@ -1022,6 +1023,19 @@ export function useCreateLabel() {
       createLabel(workspaceId, data),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["labels", variables.workspaceId] })
+    },
+  })
+}
+
+export function useUpdateLabel() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ workspaceId, labelId, ...data }: { workspaceId: string; labelId: string; name?: string; color?: string }) =>
+      updateLabel(workspaceId, labelId, data),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["labels", variables.workspaceId] })
+      queryClient.invalidateQueries({ queryKey: ["task-labels"] })
+      queryClient.invalidateQueries({ queryKey: ["all-task-labels"] })
     },
   })
 }

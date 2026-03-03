@@ -40,6 +40,19 @@ export interface TaskTableRowProps {
   childCount?: number
   isExpanded?: boolean
   onToggleExpand?: (taskId: string) => void
+  // Available statuses for the dropdown (custom or default)
+  availableStatuses?: { value: string; label: string; color: string }[]
+  // Resizable column widths
+  columnWidths?: {
+    status?: number
+    priority?: number
+    dueDate?: number
+    assignee?: number
+    list?: number
+    tags?: number
+    created?: number
+    updated?: number
+  }
 }
 
 const MAX_NESTING_DEPTH = 3
@@ -84,6 +97,8 @@ export function TaskTableRow({
   childCount = 0,
   isExpanded = false,
   onToggleExpand,
+  availableStatuses,
+  columnWidths,
 }: TaskTableRowProps) {
   const status = task.status || "todo"
   const priority = task.priority || "none"
@@ -96,10 +111,23 @@ export function TaskTableRow({
   const isBlocked = (deps?.blockedBy?.length ?? 0) > 0
   const hasDeps = isBlocked || (deps?.blocks?.length ?? 0) > 0
 
+  // Resolve the matched custom status for display
+  const hasCustomStatuses = availableStatuses && availableStatuses.length > 0
+  const matchedStatus = hasCustomStatuses
+    ? (availableStatuses.find(s => s.value === status) ?? availableStatuses[0])
+    : null
+
   const cycleStatus = () => {
-    const currentIndex = STATUS_ORDER.indexOf(status)
-    const nextStatus = STATUS_ORDER[(currentIndex + 1) % STATUS_ORDER.length]
-    onStatusChange(task.id, nextStatus)
+    if (hasCustomStatuses) {
+      const values = availableStatuses.map(s => s.value)
+      const currentIndex = values.indexOf(status)
+      const nextStatus = values[(currentIndex + 1) % values.length]
+      onStatusChange(task.id, nextStatus)
+    } else {
+      const currentIndex = STATUS_ORDER.indexOf(status)
+      const nextStatus = STATUS_ORDER[(currentIndex + 1) % STATUS_ORDER.length]
+      onStatusChange(task.id, nextStatus)
+    }
   }
 
   const formatDate = (dateStr: string | null) => {
@@ -180,8 +208,10 @@ export function TaskTableRow({
         <div
           className="w-4 h-4 rounded-full border-2"
           style={{
-            borderColor: STATUS_COLORS[status] || STATUS_COLORS.todo,
-            backgroundColor: status === "done" ? STATUS_COLORS.done : "transparent",
+            borderColor: matchedStatus?.color || STATUS_COLORS[status] || STATUS_COLORS.todo,
+            backgroundColor: (status === "done" || status === "closed" || status === "completed")
+              ? (matchedStatus?.color || STATUS_COLORS.done)
+              : "transparent",
           }}
         />
       </button>
@@ -288,40 +318,55 @@ export function TaskTableRow({
       </div>
 
       {/* Status badge */}
-      <div className="w-28 flex-shrink-0">
+      <div className="flex-shrink-0" style={{ width: `${columnWidths?.status ?? 112}px` }}>
         {onStatusChange ? (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button className="w-full flex items-center justify-start cursor-pointer hover:bg-accent/50 rounded px-1 py-0.5">
-                <StatusBadge variant="status" status={status as "todo" | "in_progress" | "review" | "done" | null} />
+                {matchedStatus ? (
+                  <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded-md border" style={{
+                    backgroundColor: `${matchedStatus.color}20`,
+                    borderColor: `${matchedStatus.color}30`,
+                    color: matchedStatus.color,
+                  }}>
+                    {matchedStatus.label}
+                  </span>
+                ) : (
+                  <StatusBadge variant="status" status={status as "todo" | "in_progress" | "review" | "done" | null} />
+                )}
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start">
-              <DropdownMenuItem onClick={() => onStatusChange(task.id, "todo")}>
-                <div className="w-2 h-2 rounded-full mr-2" style={{ backgroundColor: STATUS_COLORS.todo }} />
-                To Do
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onStatusChange(task.id, "in_progress")}>
-                <div className="w-2 h-2 rounded-full mr-2" style={{ backgroundColor: STATUS_COLORS.in_progress }} />
-                In Progress
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onStatusChange(task.id, "review")}>
-                <div className="w-2 h-2 rounded-full mr-2" style={{ backgroundColor: STATUS_COLORS.review }} />
-                Review
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onStatusChange(task.id, "done")}>
-                <div className="w-2 h-2 rounded-full mr-2" style={{ backgroundColor: STATUS_COLORS.done }} />
-                Done
-              </DropdownMenuItem>
+              {(hasCustomStatuses ? availableStatuses : [
+                { value: "todo", label: "To Do", color: STATUS_COLORS.todo },
+                { value: "in_progress", label: "In Progress", color: STATUS_COLORS.in_progress },
+                { value: "review", label: "Review", color: STATUS_COLORS.review },
+                { value: "done", label: "Done", color: STATUS_COLORS.done },
+              ]).map((s) => (
+                <DropdownMenuItem key={s.value} onClick={() => onStatusChange(task.id, s.value)}>
+                  <div className="w-2 h-2 rounded-full mr-2" style={{ backgroundColor: s.color }} />
+                  {s.label}
+                </DropdownMenuItem>
+              ))}
             </DropdownMenuContent>
           </DropdownMenu>
         ) : (
-          <StatusBadge variant="status" status={status as "todo" | "in_progress" | "review" | "done" | null} />
+          matchedStatus ? (
+            <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded-md border" style={{
+              backgroundColor: `${matchedStatus.color}20`,
+              borderColor: `${matchedStatus.color}30`,
+              color: matchedStatus.color,
+            }}>
+              {matchedStatus.label}
+            </span>
+          ) : (
+            <StatusBadge variant="status" status={status as "todo" | "in_progress" | "review" | "done" | null} />
+          )
         )}
       </div>
 
       {/* Priority */}
-      <div className="w-24 flex-shrink-0">
+      <div className="flex-shrink-0" style={{ width: `${columnWidths?.priority ?? 96}px` }}>
         {onPriorityChange ? (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -371,9 +416,10 @@ export function TaskTableRow({
           <PopoverTrigger asChild>
             <button
               className={cn(
-                "w-24 flex-shrink-0 text-xs flex items-center gap-1 cursor-pointer hover:bg-accent/50 rounded px-1 py-0.5",
+                "flex-shrink-0 text-xs flex items-center gap-1 cursor-pointer hover:bg-accent/50 rounded px-1 py-0.5",
                 isOverdue && "text-red-500 font-medium"
               )}
+              style={{ width: `${columnWidths?.dueDate ?? 96}px` }}
             >
               {task.dueDate ? (
                 <>
@@ -397,9 +443,10 @@ export function TaskTableRow({
       ) : (
         <div
           className={cn(
-            "w-24 flex-shrink-0 text-xs flex items-center gap-1",
+            "flex-shrink-0 text-xs flex items-center gap-1",
             isOverdue && "text-red-500 font-medium"
           )}
+          style={{ width: `${columnWidths?.dueDate ?? 96}px` }}
         >
           {task.dueDate ? (
             <>
@@ -416,7 +463,7 @@ export function TaskTableRow({
       {onAssigneeAdd && onAssigneeRemove ? (
         <Popover>
           <PopoverTrigger asChild>
-            <button className="w-24 flex-shrink-0 flex items-center gap-1 cursor-pointer hover:bg-accent/50 rounded px-1 py-0.5">
+            <button className="flex-shrink-0 flex items-center gap-1 cursor-pointer hover:bg-accent/50 rounded px-1 py-0.5" style={{ width: `${columnWidths?.assignee ?? 96}px` }}>
               {assignees.length > 0 ? (
                 <div className="flex -space-x-2">
                   {assignees.slice(0, 3).map((a) => (
@@ -484,7 +531,7 @@ export function TaskTableRow({
           </PopoverContent>
         </Popover>
       ) : (
-        <div className="w-24 flex-shrink-0 flex items-center gap-1">
+        <div className="flex-shrink-0 flex items-center gap-1" style={{ width: `${columnWidths?.assignee ?? 96}px` }}>
           {assignees.length > 0 ? (
             <div className="flex -space-x-2">
               {assignees.slice(0, 3).map((a) => (
@@ -508,12 +555,12 @@ export function TaskTableRow({
       )}
 
       {/* List */}
-      <div className="w-24 flex-shrink-0 text-xs text-muted-foreground truncate" title={listName}>
+      <div className="flex-shrink-0 text-xs text-muted-foreground truncate" style={{ width: `${columnWidths?.list ?? 96}px` }} title={listName}>
         {listName || "-"}
       </div>
 
       {/* Tags */}
-      <div className="w-24 flex-shrink-0 flex flex-wrap gap-1">
+      <div className="flex-shrink-0 flex flex-wrap gap-1" style={{ width: `${columnWidths?.tags ?? 96}px` }}>
         {tags.slice(0, 2).map((tag) => (
           <span
             key={tag.id}
@@ -530,12 +577,12 @@ export function TaskTableRow({
       </div>
 
       {/* Created */}
-      <div className="w-20 flex-shrink-0 text-xs text-muted-foreground">
+      <div className="flex-shrink-0 text-xs text-muted-foreground" style={{ width: `${columnWidths?.created ?? 80}px` }}>
         {formatDate(task.createdAt)}
       </div>
 
       {/* Updated */}
-      <div className="w-20 flex-shrink-0 text-xs text-muted-foreground">
+      <div className="flex-shrink-0 text-xs text-muted-foreground" style={{ width: `${columnWidths?.updated ?? 80}px` }}>
         {formatDate(task.updatedAt)}
       </div>
     </div>

@@ -24,6 +24,19 @@ interface TaskTableRowWrapperProps {
   childCount?: number
   isExpanded?: boolean
   onToggleExpand?: (taskId: string) => void
+  // Available statuses for the dropdown
+  availableStatuses?: { value: string; label: string; color: string }[]
+  // Resizable column widths
+  columnWidths?: {
+    status?: number
+    priority?: number
+    dueDate?: number
+    assignee?: number
+    list?: number
+    tags?: number
+    created?: number
+    updated?: number
+  }
 }
 
 export function TaskTableRowWrapper(props: TaskTableRowWrapperProps) {

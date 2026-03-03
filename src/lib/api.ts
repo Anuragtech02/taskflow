@@ -790,6 +790,17 @@ export async function createLabel(
   })
 }
 
+export async function updateLabel(
+  workspaceId: string,
+  labelId: string,
+  data: { name?: string; color?: string }
+): Promise<{ label: LabelResponse }> {
+  return fetchJSON(`/workspaces/${workspaceId}/labels/${labelId}`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  })
+}
+
 export async function deleteLabel(workspaceId: string, labelId: string): Promise<void> {
   return fetchJSON(`/workspaces/${workspaceId}/labels/${labelId}`, {
     method: "DELETE",

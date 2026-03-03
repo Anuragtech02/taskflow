@@ -133,7 +133,7 @@ export function RichTextEditor({ content, onChange, placeholder, minHeight = "15
 
   const editor = useEditor({
     extensions,
-    content: typeof content === "string" ? content : (content || ""),
+    content: content || "",
     editable,
     immediatelyRender: false,
     editorProps: {

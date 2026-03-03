@@ -78,6 +78,7 @@ import {
   useSearchWorkspaceTasks,
   useLabels,
   useCreateLabel,
+  useUpdateLabel,
   useDeleteLabel,
   useTaskLabels,
   useAddTaskLabel,
@@ -751,6 +752,7 @@ export function TaskDetailPanel({ task, taskId, open, onClose, onTaskSelect, sta
   const workspaceLabels = propLabels && propLabels.length > 0 ? propLabels : fetchedLabels
   const { data: taskLabels = [] } = useTaskLabels(currentTask?.id)
   const createLabelMutation = useCreateLabel()
+  const updateLabelMutation = useUpdateLabel()
   const deleteLabelMutation = useDeleteLabel()
   const addTaskLabelMutation = useAddTaskLabel()
   const removeTaskLabelMutation = useRemoveTaskLabel()
@@ -1189,24 +1191,61 @@ export function TaskDetailPanel({ task, taskId, open, onClose, onTaskSelect, sta
                           {workspaceLabels && workspaceLabels.length > 0 && (
                             <div className="space-y-1">
                               <p className="text-xs text-muted-foreground font-medium">Workspace Labels</p>
-                              <div className="flex flex-wrap gap-1">
-                                {workspaceLabels
-                                  .filter((l) => !taskLabels.some((tl) => tl.id === l.id))
-                                  .map((label) => (
-                                    <button
-                                      key={label.id}
-                                      onClick={() => {
-                                        const effectiveId = currentTask?.id || task?.id
-                                        if (effectiveId) {
-                                          addTaskLabelMutation.mutate({ taskId: effectiveId, labelId: label.id })
-                                        }
-                                      }}
-                                      className="px-2 py-1 text-xs rounded-full border transition-colors hover:opacity-80"
-                                      style={{ backgroundColor: label.color + "20", color: label.color, borderColor: label.color }}
-                                    >
-                                      {label.name}
-                                    </button>
-                                  ))}
+                              <div className="flex flex-col gap-1">
+                                {workspaceLabels.map((label) => {
+                                  const isOnTask = taskLabels.some((tl) => tl.id === label.id)
+                                  return (
+                                    <div key={label.id} className="flex items-center gap-1 group/label">
+                                      <button
+                                        onClick={() => {
+                                          const effectiveId = currentTask?.id || task?.id
+                                          if (!effectiveId) return
+                                          if (isOnTask) {
+                                            removeTaskLabelMutation.mutate({ taskId: effectiveId, labelId: label.id })
+                                          } else {
+                                            addTaskLabelMutation.mutate({ taskId: effectiveId, labelId: label.id })
+                                          }
+                                        }}
+                                        className="flex-1 px-2 py-1 text-xs rounded-full border transition-colors hover:opacity-80 text-left"
+                                        style={{ backgroundColor: label.color + "20", color: label.color, borderColor: label.color }}
+                                      >
+                                        {isOnTask && <Check className="h-3 w-3 inline mr-1" />}
+                                        {label.name}
+                                      </button>
+                                      <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                          <button className="p-0.5 rounded opacity-0 group-hover/label:opacity-100 hover:bg-muted transition-opacity">
+                                            <MoreHorizontal className="h-3 w-3 text-muted-foreground" />
+                                          </button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end" className="w-40">
+                                          <DropdownMenuItem
+                                            onClick={() => {
+                                              const newName = window.prompt("Rename label:", label.name)
+                                              if (newName && newName.trim() && newName.trim() !== label.name && workspaceId) {
+                                                updateLabelMutation.mutate({ workspaceId, labelId: label.id, name: newName.trim() })
+                                              }
+                                            }}
+                                          >
+                                            <Edit3 className="h-4 w-4 mr-2" />
+                                            Rename
+                                          </DropdownMenuItem>
+                                          <DropdownMenuItem
+                                            className="text-destructive focus:text-destructive"
+                                            onClick={() => {
+                                              if (workspaceId) {
+                                                deleteLabelMutation.mutate({ workspaceId, labelId: label.id })
+                                              }
+                                            }}
+                                          >
+                                            <Trash2 className="h-4 w-4 mr-2" />
+                                            Delete
+                                          </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                      </DropdownMenu>
+                                    </div>
+                                  )
+                                })}
                               </div>
                             </div>
                           )}

@@ -1,6 +1,6 @@
 "use client"
 
-import React, { use, useState, useCallback, useMemo, useEffect } from "react"
+import React, { use, useState, useCallback, useMemo, useEffect, useRef } from "react"
 import {
   Plus,
   List,
@@ -9,19 +9,23 @@ import {
   Calendar as CalendarIcon,
   ChevronDown,
   ChevronRight,
-  Check,
   Sparkles,
+  ArrowUp,
+  ArrowDown,
+  Settings2,
+  Trash2,
+  Pencil,
+  Palette,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Breadcrumb } from "@/components/breadcrumb"
-import { StatusBadge } from "@/components/status-badge"
 // TimeTracker removed - was global timer not tied to any task
 import { KanbanBoard } from "@/components/kanban-board"
 import { TaskDetailPanel } from "@/components/task-detail-panel"
 import { useTaskPanel } from "@/store/useTaskPanel"
-import { useTasks, useCreateTask, useUpdateTask, useDeleteTask, useStatuses, useWorkspaceMembers, useAddTaskAssignee, useRemoveTaskAssignee, useList, useLabels, useAllTaskAssignees, useAllTaskLabels } from "@/hooks/useQueries"
+import { useTasks, useCreateTask, useUpdateTask, useDeleteTask, useStatuses, useCreateStatus, useUpdateStatus, useDeleteStatus, useWorkspaceMembers, useAddTaskAssignee, useRemoveTaskAssignee, useList, useLabels, useAllTaskAssignees, useAllTaskLabels } from "@/hooks/useQueries"
 import { cn } from "@/lib/utils"
 import type { TaskResponse } from "@/lib/api"
 import { buildTaskTree, flattenTree, type TaskTreeNode } from "@/lib/task-tree"
@@ -35,6 +39,8 @@ import { BulkActionsBar } from "@/components/list-view/bulk-actions-bar"
 import { AIGenerateModal } from "@/components/ai/aigenerate-modal"
 import { TimelineView } from "@/components/timeline-view/TimelineView"
 import { CalendarView } from "@/components/calendar-view"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { toast } from "sonner"
 
 type ViewMode = "list" | "board" | "gantt" | "calendar"
 type GroupByOption = "status" | "priority" | "assignee" | "dueDate" | "label" | null
@@ -82,6 +88,85 @@ function GroupHeader({
       <span className="font-medium text-sm">{title}</span>
       <span className="text-xs text-muted-foreground">({count})</span>
     </button>
+  )
+}
+
+// Column sort map for header click sorting
+const HEADER_SORT_MAP: Record<string, SortByOption> = {
+  name: "name",
+  dueDate: "dueDate",
+  priority: "priority",
+  created: "createdAt",
+  updated: "updatedAt",
+}
+
+// Resizable + sortable column header
+function ColumnHeader({
+  label,
+  sortKey,
+  sortBy,
+  sortOrder,
+  onSort,
+  width,
+  onResize,
+  className,
+}: {
+  label: string
+  sortKey: string
+  sortBy: string
+  sortOrder: string
+  onSort: (key: string) => void
+  width?: number
+  onResize?: (delta: number) => void
+  className?: string
+}) {
+  const sortField = HEADER_SORT_MAP[sortKey]
+  const isSorted = sortField && sortBy === sortField
+
+  const handleMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      if (!onResize) return
+      e.preventDefault()
+      e.stopPropagation()
+      let lastX = e.clientX
+      const handleMouseMove = (e: MouseEvent) => {
+        onResize(e.clientX - lastX)
+        lastX = e.clientX
+      }
+      const handleMouseUp = () => {
+        document.removeEventListener("mousemove", handleMouseMove)
+        document.removeEventListener("mouseup", handleMouseUp)
+      }
+      document.addEventListener("mousemove", handleMouseMove)
+      document.addEventListener("mouseup", handleMouseUp)
+    },
+    [onResize]
+  )
+
+  return (
+    <div
+      className={cn("flex-shrink-0 relative group/col", className)}
+      style={width ? { width: `${width}px` } : undefined}
+    >
+      <button
+        onClick={() => onSort(sortKey)}
+        className={cn(
+          "flex items-center gap-1 hover:text-foreground transition-colors w-full text-left",
+          isSorted && "text-foreground"
+        )}
+      >
+        <span className="truncate">{label}</span>
+        {isSorted && (
+          sortOrder === "asc" ? <ArrowUp className="h-3 w-3 flex-shrink-0" /> : <ArrowDown className="h-3 w-3 flex-shrink-0" />
+        )}
+      </button>
+      {onResize && (
+        <div
+          onMouseDown={handleMouseDown}
+          className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize opacity-0 group-hover/col:opacity-100 bg-border hover:bg-primary transition-opacity"
+        />
+      )}
+    </div>
   )
 }
 
@@ -392,13 +477,19 @@ export default function ListPage({
   const { data: workspaceMembers } = useWorkspaceMembers(workspaceId)
   const addTaskAssigneeMutation = useAddTaskAssignee()
   const removeTaskAssigneeMutation = useRemoveTaskAssignee()
+  const createStatusMutation = useCreateStatus()
+  const updateStatusMutation = useUpdateStatus()
+  const deleteStatusMutation = useDeleteStatus()
 
   // Fetch all task assignees and labels for filtering/grouping
   const taskIds = useMemo(() => (tasks || []).map((t) => t.id), [tasks])
   const { data: allTaskAssignees } = useAllTaskAssignees(taskIds)
   const { data: allTaskLabels } = useAllTaskLabels(taskIds)
 
-  // View mode state
+  // SessionStorage key prefix for this list
+  const storageKey = `listView:${listId}`
+
+  // View mode state (persisted via sessionStorage)
   const [viewMode, setViewMode] = useState<ViewMode>("list")
 
   // New task input state
@@ -406,7 +497,7 @@ export default function ListPage({
   const [showNewTask, setShowNewTask] = useState(false)
   const [showAIGenerate, setShowAIGenerate] = useState(false)
 
-  // List view state
+  // List view state (persisted via sessionStorage)
   const [groupBy, setGroupBy] = useState<GroupByOption>(null)
   const [sortBy, setSortBy] = useState<SortByOption>("dueDate")
   const [sortOrder, setSortOrder] = useState<SortOrder>("asc")
@@ -420,7 +511,75 @@ export default function ListPage({
   const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set())
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set())
+  const [newStatusName, setNewStatusName] = useState("")
+  const [newStatusColor, setNewStatusColor] = useState("#6366f1")
+  const [editingStatusId, setEditingStatusId] = useState<string | null>(null)
+  const [editingStatusName, setEditingStatusName] = useState("")
   const { selectedTaskId, setSelectedTask, isOpen: isTaskPanelOpen, close: closeTaskPanel } = useTaskPanel()
+
+  // Column widths for resizable columns (in px, persisted via sessionStorage)
+  const defaultColumnWidths = { status: 112, priority: 96, dueDate: 96, assignee: 96, list: 96, tags: 96, created: 80, updated: 80 }
+  const [columnWidths, setColumnWidths] = useState(defaultColumnWidths)
+
+  // Restore persisted preferences from sessionStorage on mount (avoids hydration mismatch)
+  const [hydrated, setHydrated] = useState(false)
+  useEffect(() => {
+    const vm = sessionStorage.getItem(`${storageKey}:viewMode`) as ViewMode
+    if (vm) setViewMode(vm)
+    const gb = sessionStorage.getItem(`${storageKey}:groupBy`) as GroupByOption
+    if (gb) setGroupBy(gb)
+    const sb = sessionStorage.getItem(`${storageKey}:sortBy`) as SortByOption
+    if (sb) setSortBy(sb)
+    const so = sessionStorage.getItem(`${storageKey}:sortOrder`) as SortOrder
+    if (so) setSortOrder(so)
+    try {
+      const cw = sessionStorage.getItem(`${storageKey}:columnWidths`)
+      if (cw) setColumnWidths({ ...defaultColumnWidths, ...JSON.parse(cw) })
+    } catch { /* ignore corrupted data */ }
+    setHydrated(true)
+  }, [storageKey]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Persist view preferences to sessionStorage after hydration
+  useEffect(() => {
+    if (!hydrated) return
+    sessionStorage.setItem(`${storageKey}:viewMode`, viewMode)
+  }, [storageKey, viewMode, hydrated])
+  useEffect(() => {
+    if (!hydrated) return
+    if (groupBy) sessionStorage.setItem(`${storageKey}:groupBy`, groupBy)
+    else sessionStorage.removeItem(`${storageKey}:groupBy`)
+  }, [storageKey, groupBy, hydrated])
+  useEffect(() => {
+    if (!hydrated) return
+    sessionStorage.setItem(`${storageKey}:sortBy`, sortBy)
+  }, [storageKey, sortBy, hydrated])
+  useEffect(() => {
+    if (!hydrated) return
+    sessionStorage.setItem(`${storageKey}:sortOrder`, sortOrder)
+  }, [storageKey, sortOrder, hydrated])
+  useEffect(() => {
+    if (!hydrated) return
+    sessionStorage.setItem(`${storageKey}:columnWidths`, JSON.stringify(columnWidths))
+  }, [storageKey, columnWidths, hydrated])
+
+  const handleColumnSort = useCallback((column: string) => {
+    const sortField = HEADER_SORT_MAP[column]
+    if (!sortField) return
+    if (sortBy === sortField) {
+      setSortOrder(sortOrder === "asc" ? "desc" : "asc")
+    } else {
+      setSortBy(sortField)
+      setSortOrder("asc")
+    }
+  }, [sortBy, sortOrder])
+
+  // Column resize handler
+  const handleColumnResize = useCallback((column: string, delta: number) => {
+    setColumnWidths((prev: typeof defaultColumnWidths) => ({
+      ...prev,
+      [column]: Math.max(60, (prev[column as keyof typeof prev] || 80) + delta),
+    }))
+  }, [])
 
   // Sync panel state with browser back/forward
   useEffect(() => {
@@ -981,6 +1140,159 @@ export default function ListPage({
                 color: l.color,
               }))}
             />
+
+            {/* Manage Statuses */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-1.5">
+                  <Settings2 className="h-3.5 w-3.5" />
+                  Statuses
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-72 p-3" align="start">
+                <div className="space-y-3">
+                  <h4 className="font-medium text-sm">Manage Statuses</h4>
+                  <div className="space-y-1">
+                    {(statuses && statuses.length > 0 ? statuses : []).map((s) => (
+                      <div key={s.id} className="flex items-center gap-2 group/status py-1">
+                        <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: s.color || "#6366f1" }} />
+                        {editingStatusId === s.id ? (
+                          <Input
+                            value={editingStatusName}
+                            onChange={(e) => setEditingStatusName(e.target.value)}
+                            className="h-7 text-sm flex-1"
+                            autoFocus
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" && editingStatusName.trim()) {
+                                setEditingStatusId(null)
+                                updateStatusMutation.mutate({ listId, statusId: s.id, name: editingStatusName.trim() }, {
+                                  onSuccess: () => toast.success("Status renamed"),
+                                })
+                              }
+                              if (e.key === "Escape") setEditingStatusId(null)
+                            }}
+                            onBlur={() => {
+                              if (editingStatusId !== s.id) return
+                              if (editingStatusName.trim() && editingStatusName !== s.name) {
+                                setEditingStatusId(null)
+                                updateStatusMutation.mutate({ listId, statusId: s.id, name: editingStatusName.trim() }, {
+                                  onSuccess: () => toast.success("Status renamed"),
+                                })
+                              } else {
+                                setEditingStatusId(null)
+                              }
+                            }}
+                          />
+                        ) : (
+                          <span className="text-sm flex-1 truncate">{s.name}</span>
+                        )}
+                        <div className="hidden group-hover/status:flex items-center gap-0.5">
+                          <button
+                            onClick={() => { setEditingStatusId(s.id); setEditingStatusName(s.name) }}
+                            className="p-1 rounded hover:bg-accent text-muted-foreground"
+                            title="Rename"
+                          >
+                            <Pencil className="h-3 w-3" />
+                          </button>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <button className="p-1 rounded hover:bg-accent text-muted-foreground" title="Change color">
+                                <Palette className="h-3 w-3" />
+                              </button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-2" side="right">
+                              <div className="grid grid-cols-4 gap-1.5">
+                                {["#6b7280","#3b82f6","#eab308","#22c55e","#ef4444","#8b5cf6","#ec4899","#f97316"].map((c) => (
+                                  <button
+                                    key={c}
+                                    className={cn("w-6 h-6 rounded-full border-2", s.color === c ? "border-foreground" : "border-transparent")}
+                                    style={{ backgroundColor: c }}
+                                    onClick={() => updateStatusMutation.mutate({ listId, statusId: s.id, color: c }, {
+                                      onSuccess: () => toast.success("Color updated"),
+                                    })}
+                                  />
+                                ))}
+                              </div>
+                            </PopoverContent>
+                          </Popover>
+                          <button
+                            onClick={() => {
+                              if (statuses && statuses.length <= 1) {
+                                toast.error("Cannot delete the last status")
+                                return
+                              }
+                              deleteStatusMutation.mutate({ listId, statusId: s.id }, {
+                                onSuccess: () => toast.success("Status deleted"),
+                              })
+                            }}
+                            className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
+                            title="Delete"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                    {(!statuses || statuses.length === 0) && (
+                      <p className="text-xs text-muted-foreground py-1">No custom statuses yet. Add one below.</p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 pt-1 border-t">
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <button className="w-5 h-5 rounded-full flex-shrink-0 border" style={{ backgroundColor: newStatusColor }} title="Pick color" />
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-2" side="right">
+                        <div className="grid grid-cols-4 gap-1.5">
+                          {["#6b7280","#3b82f6","#eab308","#22c55e","#ef4444","#8b5cf6","#ec4899","#f97316"].map((c) => (
+                            <button
+                              key={c}
+                              className={cn("w-6 h-6 rounded-full border-2", newStatusColor === c ? "border-foreground" : "border-transparent")}
+                              style={{ backgroundColor: c }}
+                              onClick={() => setNewStatusColor(c)}
+                            />
+                          ))}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                    <Input
+                      value={newStatusName}
+                      onChange={(e) => setNewStatusName(e.target.value)}
+                      placeholder="New status..."
+                      className="h-7 text-sm flex-1"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && newStatusName.trim()) {
+                          createStatusMutation.mutate({ listId, name: newStatusName.trim(), color: newStatusColor }, {
+                            onSuccess: () => {
+                              toast.success("Status created")
+                              setNewStatusName("")
+                              setNewStatusColor("#6366f1")
+                            },
+                          })
+                        }
+                      }}
+                    />
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 px-2"
+                      disabled={!newStatusName.trim()}
+                      onClick={() => {
+                        createStatusMutation.mutate({ listId, name: newStatusName.trim(), color: newStatusColor }, {
+                          onSuccess: () => {
+                            toast.success("Status created")
+                            setNewStatusName("")
+                            setNewStatusColor("#6366f1")
+                          },
+                        })
+                      }}
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
           </div>
           <FilterChips filters={filters} onRemoveFilter={handleRemoveFilter} />
         </>
@@ -1034,23 +1346,24 @@ export default function ListPage({
             {flatTasks.length > 0 ? (
               <div>
                 {/* Table Header */}
-                <div className="flex items-center gap-2 px-4 py-2 border-b bg-muted/30 text-xs font-medium text-muted-foreground">
-                  <div style={{ width: "8px" }} className="flex-shrink-0" /> {/* Indent spacer matching depth-0 rows */}
+                <div className="flex items-center gap-2 px-4 py-2 border-b bg-muted/30 text-xs font-medium text-muted-foreground select-none">
+                  <div style={{ width: "8px" }} className="flex-shrink-0" />
                   <Checkbox
                     checked={selectedTasks.size === flatTasks.length && flatTasks.length > 0}
                     onCheckedChange={(checked) => handleSelectAll(!!checked)}
                     className="flex-shrink-0"
                   />
-                  <div className="w-5 flex-shrink-0" /> {/* Expand/collapse button space */}
-                  <div className="flex-1 min-w-[200px]">Name</div>
-                  <div className="w-28 flex-shrink-0">Status</div>
-                  <div className="w-24 flex-shrink-0">Priority</div>
-                  <div className="w-24 flex-shrink-0">Due Date</div>
-                  <div className="w-24 flex-shrink-0">Assignee</div>
-                  <div className="w-24 flex-shrink-0">List</div>
-                  <div className="w-24 flex-shrink-0">Tags</div>
-                  <div className="w-20 flex-shrink-0">Created</div>
-                  <div className="w-20 flex-shrink-0">Updated</div>
+                  <div className="w-5 flex-shrink-0" />
+                  <div className="w-4 flex-shrink-0" /> {/* Status circle space */}
+                  <ColumnHeader label="Name" sortKey="name" sortBy={sortBy} sortOrder={sortOrder} onSort={handleColumnSort} className="flex-1 min-w-[200px]" />
+                  <ColumnHeader label="Status" sortKey="status" sortBy={sortBy} sortOrder={sortOrder} onSort={handleColumnSort} width={columnWidths.status} onResize={(d) => handleColumnResize("status", d)} />
+                  <ColumnHeader label="Priority" sortKey="priority" sortBy={sortBy} sortOrder={sortOrder} onSort={handleColumnSort} width={columnWidths.priority} onResize={(d) => handleColumnResize("priority", d)} />
+                  <ColumnHeader label="Due Date" sortKey="dueDate" sortBy={sortBy} sortOrder={sortOrder} onSort={handleColumnSort} width={columnWidths.dueDate} onResize={(d) => handleColumnResize("dueDate", d)} />
+                  <ColumnHeader label="Assignee" sortKey="assignee" sortBy={sortBy} sortOrder={sortOrder} onSort={handleColumnSort} width={columnWidths.assignee} onResize={(d) => handleColumnResize("assignee", d)} />
+                  <ColumnHeader label="List" sortKey="list" sortBy={sortBy} sortOrder={sortOrder} onSort={handleColumnSort} width={columnWidths.list} onResize={(d) => handleColumnResize("list", d)} />
+                  <ColumnHeader label="Tags" sortKey="tags" sortBy={sortBy} sortOrder={sortOrder} onSort={handleColumnSort} width={columnWidths.tags} onResize={(d) => handleColumnResize("tags", d)} />
+                  <ColumnHeader label="Created" sortKey="created" sortBy={sortBy} sortOrder={sortOrder} onSort={handleColumnSort} width={columnWidths.created} onResize={(d) => handleColumnResize("created", d)} />
+                  <ColumnHeader label="Updated" sortKey="updated" sortBy={sortBy} sortOrder={sortOrder} onSort={handleColumnSort} width={columnWidths.updated} onResize={(d) => handleColumnResize("updated", d)} />
                 </div>
 
                 {/* Tasks or Groups */}
@@ -1090,6 +1403,8 @@ export default function ListPage({
                                   onAssigneeRemove={handleAssigneeRemove}
                                   onRename={handleRename}
                                   onAddSubtask={handleAddSubtask}
+                                  columnWidths={columnWidths}
+                                  availableStatuses={availableStatuses}
                                 />
                                 {addingSubtaskFor === task.id && (
                                   <InlineSubtaskInput
@@ -1137,6 +1452,8 @@ export default function ListPage({
                             onAssigneeRemove={handleAssigneeRemove}
                             onRename={handleRename}
                             onAddSubtask={handleAddSubtask}
+                            columnWidths={columnWidths}
+                            availableStatuses={availableStatuses}
                           />
                           {addingSubtaskFor === task.id && (
                             <InlineSubtaskInput
