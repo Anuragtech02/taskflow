@@ -131,7 +131,7 @@ function SidebarListItem({
               )
             }
             className={cn(
-              "flex items-center gap-2 w-full px-2 py-1 rounded-md text-sm transition-colors hover:bg-accent/50 text-left",
+              "flex items-center gap-2 w-full min-w-0 px-2 py-1 rounded-md text-sm transition-colors hover:bg-accent/50 text-left",
               isActive && "bg-accent text-accent-foreground"
             )}
           >
@@ -153,7 +153,7 @@ function SidebarListItem({
                 autoFocus
               />
             ) : (
-              <span className="truncate">{list.name}</span>
+              <span className="truncate" title={list.name}>{list.name}</span>
             )}
           </button>
         </ContextMenuTrigger>
@@ -250,11 +250,11 @@ function SidebarFolderItem({
       <Collapsible open={expanded} onOpenChange={() => toggleFolder(folder.id)}>
         <ContextMenu>
           <ContextMenuTrigger asChild>
-            <div className="group flex items-center">
+            <div className="group flex items-center min-w-0">
               <CollapsibleTrigger asChild>
                 <button
                   className={cn(
-                    "flex items-center gap-1 flex-1 px-2 py-1 rounded-md text-sm transition-colors hover:bg-accent/50",
+                    "flex items-center gap-1 flex-1 min-w-0 px-2 py-1 rounded-md text-sm transition-colors hover:bg-accent/50",
                     isActive && "bg-accent text-accent-foreground"
                   )}
                 >
@@ -282,7 +282,7 @@ function SidebarFolderItem({
                       autoFocus
                     />
                   ) : (
-                    <span className="truncate">{folder.name}</span>
+                    <span className="truncate" title={folder.name}>{folder.name}</span>
                   )}
                 </button>
               </CollapsibleTrigger>
@@ -413,11 +413,11 @@ function SidebarSpaceItem({
       <Collapsible open={expanded} onOpenChange={() => toggleSpace(space.id)}>
         <ContextMenu>
           <ContextMenuTrigger asChild>
-            <div className="group flex items-center">
+            <div className="group flex items-center min-w-0">
               <CollapsibleTrigger asChild>
                 <button
                   className={cn(
-                    "flex items-center gap-2 flex-1 px-2 py-1.5 rounded-md text-sm font-medium transition-colors hover:bg-accent/50",
+                    "flex items-center gap-2 flex-1 min-w-0 px-2 py-1.5 rounded-md text-sm font-medium transition-colors hover:bg-accent/50",
                     isActive && "bg-accent text-accent-foreground"
                   )}
                 >
@@ -448,7 +448,7 @@ function SidebarSpaceItem({
                       autoFocus
                     />
                   ) : (
-                    <span className="truncate">{space.name}</span>
+                    <span className="truncate" title={space.name}>{space.name}</span>
                   )}
                 </button>
               </CollapsibleTrigger>

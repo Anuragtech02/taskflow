@@ -452,6 +452,10 @@ export function KanbanBoard({ tasks, statuses, listId, workspaceId }: KanbanBoar
 
   // Column action handlers
   const handleStatusRename = (statusId: string, newName: string) => {
+    if (statusId.startsWith("default-")) {
+      toast.error("Default columns cannot be renamed. Create a custom status instead.")
+      return
+    }
     updateStatusMutation.mutate({
       listId,
       statusId,
@@ -467,6 +471,10 @@ export function KanbanBoard({ tasks, statuses, listId, workspaceId }: KanbanBoar
   }
 
   const handleStatusColorChange = (statusId: string, color: string) => {
+    if (statusId.startsWith("default-")) {
+      toast.error("Default columns cannot be customized. Create a custom status instead.")
+      return
+    }
     updateStatusMutation.mutate({
       listId,
       statusId,
@@ -482,6 +490,10 @@ export function KanbanBoard({ tasks, statuses, listId, workspaceId }: KanbanBoar
   }
 
   const handleStatusDelete = (statusId: string) => {
+    if (statusId.startsWith("default-")) {
+      toast.error("Default columns cannot be deleted. Create custom statuses to customize your workflow.")
+      return
+    }
     deleteStatusMutation.mutate({
       listId,
       statusId,
@@ -506,20 +518,32 @@ export function KanbanBoard({ tasks, statuses, listId, workspaceId }: KanbanBoar
     const newOrder = [...localStatuses]
     const [moved] = newOrder.splice(currentIndex, 1)
     newOrder.splice(newIndex, 0, moved)
-    
-    const statusIds = newOrder.map(s => s.id)
-    
-    reorderStatusesMutation.mutate({
-      listId,
-      statusIds,
-    }, {
-      onSuccess: () => {
-        toast.success("Column moved")
-      },
-      onError: () => {
-        toast.error("Failed to move column")
-      },
-    })
+
+    // Optimistic update
+    columnReorderPendingRef.current = true
+    setLocalStatuses(newOrder)
+
+    // Only send real (non-default) status IDs to the API
+    const realStatusIds = newOrder.filter((s) => !s.id.startsWith("default-")).map((s) => s.id)
+    if (realStatusIds.length > 0) {
+      reorderStatusesMutation.mutate({
+        listId,
+        statusIds: realStatusIds,
+      }, {
+        onSuccess: () => {
+          columnReorderPendingRef.current = false
+          toast.success("Column moved")
+        },
+        onError: () => {
+          columnReorderPendingRef.current = false
+          setLocalStatuses(statuses)
+          toast.error("Failed to move column")
+        },
+      })
+    } else {
+      // Only default statuses — reorder is local only
+      columnReorderPendingRef.current = false
+    }
   }
 
   // Quick add task handler

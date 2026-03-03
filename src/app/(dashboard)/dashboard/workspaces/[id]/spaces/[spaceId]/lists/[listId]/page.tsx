@@ -515,6 +515,7 @@ export default function ListPage({
   const [newStatusColor, setNewStatusColor] = useState("#6366f1")
   const [editingStatusId, setEditingStatusId] = useState<string | null>(null)
   const [editingStatusName, setEditingStatusName] = useState("")
+  const [colorPickerForId, setColorPickerForId] = useState<string | null>(null)
   const { selectedTaskId, setSelectedTask, isOpen: isTaskPanelOpen, close: closeTaskPanel } = useTaskPanel()
 
   // Column widths for resizable columns (in px, persisted via sessionStorage)
@@ -1160,83 +1161,92 @@ export default function ListPage({
                   <h4 className="font-medium text-sm">Manage Statuses</h4>
                   <div className="space-y-1">
                     {(statuses && statuses.length > 0 ? statuses : []).map((s) => (
-                      <div key={s.id} className="flex items-center gap-2 group/status py-1">
-                        <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: s.color || "#6366f1" }} />
-                        {editingStatusId === s.id ? (
-                          <Input
-                            value={editingStatusName}
-                            onChange={(e) => setEditingStatusName(e.target.value)}
-                            className="h-7 text-sm flex-1"
-                            autoFocus
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter" && editingStatusName.trim()) {
-                                setEditingStatusId(null)
-                                updateStatusMutation.mutate({ listId, statusId: s.id, name: editingStatusName.trim() }, {
-                                  onSuccess: () => toast.success("Status renamed"),
-                                })
-                              }
-                              if (e.key === "Escape") setEditingStatusId(null)
-                            }}
-                            onBlur={() => {
-                              if (editingStatusId !== s.id) return
-                              if (editingStatusName.trim() && editingStatusName !== s.name) {
-                                setEditingStatusId(null)
-                                updateStatusMutation.mutate({ listId, statusId: s.id, name: editingStatusName.trim() }, {
-                                  onSuccess: () => toast.success("Status renamed"),
-                                })
-                              } else {
-                                setEditingStatusId(null)
-                              }
-                            }}
+                      <div key={s.id}>
+                        <div className="flex items-center gap-2 group/status py-1">
+                          <button
+                            className="w-3 h-3 rounded-full flex-shrink-0 hover:ring-2 hover:ring-offset-1 hover:ring-primary/50 transition-all"
+                            style={{ backgroundColor: s.color || "#6366f1" }}
+                            onClick={() => setColorPickerForId(colorPickerForId === s.id ? null : s.id)}
+                            title="Change color"
                           />
-                        ) : (
-                          <span className="text-sm flex-1 truncate">{s.name}</span>
-                        )}
-                        <div className="hidden group-hover/status:flex items-center gap-0.5">
-                          <button
-                            onClick={() => { setEditingStatusId(s.id); setEditingStatusName(s.name) }}
-                            className="p-1 rounded hover:bg-accent text-muted-foreground"
-                            title="Rename"
-                          >
-                            <Pencil className="h-3 w-3" />
-                          </button>
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <button className="p-1 rounded hover:bg-accent text-muted-foreground" title="Change color">
-                                <Palette className="h-3 w-3" />
-                              </button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-2" side="right">
-                              <div className="grid grid-cols-4 gap-1.5">
-                                {["#6b7280","#3b82f6","#eab308","#22c55e","#ef4444","#8b5cf6","#ec4899","#f97316"].map((c) => (
-                                  <button
-                                    key={c}
-                                    className={cn("w-6 h-6 rounded-full border-2", s.color === c ? "border-foreground" : "border-transparent")}
-                                    style={{ backgroundColor: c }}
-                                    onClick={() => updateStatusMutation.mutate({ listId, statusId: s.id, color: c }, {
-                                      onSuccess: () => toast.success("Color updated"),
-                                    })}
-                                  />
-                                ))}
-                              </div>
-                            </PopoverContent>
-                          </Popover>
-                          <button
-                            onClick={() => {
-                              if (statuses && statuses.length <= 1) {
-                                toast.error("Cannot delete the last status")
-                                return
-                              }
-                              deleteStatusMutation.mutate({ listId, statusId: s.id }, {
-                                onSuccess: () => toast.success("Status deleted"),
-                              })
-                            }}
-                            className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
-                            title="Delete"
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </button>
+                          {editingStatusId === s.id ? (
+                            <Input
+                              value={editingStatusName}
+                              onChange={(e) => setEditingStatusName(e.target.value)}
+                              className="h-7 text-sm flex-1"
+                              autoFocus
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter" && editingStatusName.trim()) {
+                                  setEditingStatusId(null)
+                                  updateStatusMutation.mutate({ listId, statusId: s.id, name: editingStatusName.trim() }, {
+                                    onSuccess: () => toast.success("Status renamed"),
+                                  })
+                                }
+                                if (e.key === "Escape") setEditingStatusId(null)
+                              }}
+                              onBlur={() => {
+                                if (editingStatusId !== s.id) return
+                                if (editingStatusName.trim() && editingStatusName !== s.name) {
+                                  setEditingStatusId(null)
+                                  updateStatusMutation.mutate({ listId, statusId: s.id, name: editingStatusName.trim() }, {
+                                    onSuccess: () => toast.success("Status renamed"),
+                                  })
+                                } else {
+                                  setEditingStatusId(null)
+                                }
+                              }}
+                            />
+                          ) : (
+                            <span className="text-sm flex-1 truncate">{s.name}</span>
+                          )}
+                          <div className="hidden group-hover/status:flex items-center gap-0.5">
+                            <button
+                              onClick={() => { setEditingStatusId(s.id); setEditingStatusName(s.name) }}
+                              className="p-1 rounded hover:bg-accent text-muted-foreground"
+                              title="Rename"
+                            >
+                              <Pencil className="h-3 w-3" />
+                            </button>
+                            <button
+                              onClick={() => setColorPickerForId(colorPickerForId === s.id ? null : s.id)}
+                              className="p-1 rounded hover:bg-accent text-muted-foreground"
+                              title="Change color"
+                            >
+                              <Palette className="h-3 w-3" />
+                            </button>
+                            <button
+                              onClick={() => {
+                                if (statuses && statuses.length <= 1) {
+                                  toast.error("Cannot delete the last status")
+                                  return
+                                }
+                                deleteStatusMutation.mutate({ listId, statusId: s.id }, {
+                                  onSuccess: () => toast.success("Status deleted"),
+                                })
+                              }}
+                              className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
+                              title="Delete"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </button>
+                          </div>
                         </div>
+                        {colorPickerForId === s.id && (
+                          <div className="grid grid-cols-8 gap-1.5 pl-5 pb-1">
+                            {["#6b7280","#3b82f6","#eab308","#22c55e","#ef4444","#8b5cf6","#ec4899","#f97316"].map((c) => (
+                              <button
+                                key={c}
+                                className={cn("w-5 h-5 rounded-full border-2 transition-transform hover:scale-110", s.color === c ? "border-foreground" : "border-transparent")}
+                                style={{ backgroundColor: c }}
+                                onClick={() => {
+                                  updateStatusMutation.mutate({ listId, statusId: s.id, color: c }, {
+                                    onSuccess: () => { toast.success("Color updated"); setColorPickerForId(null) },
+                                  })
+                                }}
+                              />
+                            ))}
+                          </div>
+                        )}
                       </div>
                     ))}
                     {(!statuses || statuses.length === 0) && (
@@ -1244,23 +1254,12 @@ export default function ListPage({
                     )}
                   </div>
                   <div className="flex items-center gap-2 pt-1 border-t">
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <button className="w-5 h-5 rounded-full flex-shrink-0 border" style={{ backgroundColor: newStatusColor }} title="Pick color" />
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-2" side="right">
-                        <div className="grid grid-cols-4 gap-1.5">
-                          {["#6b7280","#3b82f6","#eab308","#22c55e","#ef4444","#8b5cf6","#ec4899","#f97316"].map((c) => (
-                            <button
-                              key={c}
-                              className={cn("w-6 h-6 rounded-full border-2", newStatusColor === c ? "border-foreground" : "border-transparent")}
-                              style={{ backgroundColor: c }}
-                              onClick={() => setNewStatusColor(c)}
-                            />
-                          ))}
-                        </div>
-                      </PopoverContent>
-                    </Popover>
+                    <button
+                      className="w-5 h-5 rounded-full flex-shrink-0 border hover:ring-2 hover:ring-offset-1 hover:ring-primary/50 transition-all"
+                      style={{ backgroundColor: newStatusColor }}
+                      onClick={() => setColorPickerForId(colorPickerForId === "new" ? null : "new")}
+                      title="Pick color"
+                    />
                     <Input
                       value={newStatusName}
                       onChange={(e) => setNewStatusName(e.target.value)}
@@ -1296,6 +1295,18 @@ export default function ListPage({
                       <Plus className="h-3.5 w-3.5" />
                     </Button>
                   </div>
+                  {colorPickerForId === "new" && (
+                    <div className="grid grid-cols-8 gap-1.5 pt-1">
+                      {["#6b7280","#3b82f6","#eab308","#22c55e","#ef4444","#8b5cf6","#ec4899","#f97316"].map((c) => (
+                        <button
+                          key={c}
+                          className={cn("w-5 h-5 rounded-full border-2 transition-transform hover:scale-110", newStatusColor === c ? "border-foreground" : "border-transparent")}
+                          style={{ backgroundColor: c }}
+                          onClick={() => { setNewStatusColor(c); setColorPickerForId(null) }}
+                        />
+                      ))}
+                    </div>
+                  )}
                 </div>
               </PopoverContent>
             </Popover>

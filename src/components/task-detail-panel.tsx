@@ -283,10 +283,12 @@ function getActivityIcon(action: string): React.ReactNode {
   }
 }
 
-export function TaskDetailPanel({ task, taskId, open, onClose, onTaskSelect, statuses, workspaceId, labels: propLabels }: TaskDetailPanelProps) {
-  // If taskId is passed but task is not, fetch the task (for subtask navigation)
-  const { data: fetchedTask, isLoading: taskLoading } = useTask(taskId)
-  const currentTask = task || fetchedTask
+export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTaskSelect, statuses, workspaceId, labels: propLabels }: TaskDetailPanelProps) {
+  // Always fetch the full task (includes activities, comments, etc.)
+  const effectiveTaskId = taskIdProp || task?.id
+  const { data: fetchedTask, isLoading: taskLoading } = useTask(effectiveTaskId)
+  // Prefer fetchedTask (richer data with activities) once loaded; use task prop for instant display while loading
+  const currentTask = fetchedTask || task
 
   const { data: session } = useSession()
   const currentUserId = session?.user?.id
@@ -505,15 +507,31 @@ export function TaskDetailPanel({ task, taskId, open, onClose, onTaskSelect, sta
     }
   }
 
-  // Populate form when task changes (from server — NOT user edits)
+  // Flush pending save for the OLD task before switching, then populate new task data
+  const prevTaskIdRef = useRef<string | undefined>(undefined)
+
   useEffect(() => {
+    const newId = currentTask?.id
+    const oldId = prevTaskIdRef.current
+
+    // If switching to a different task, flush pending save for the old one first
+    if (oldId && newId !== oldId && isDirtyRef.current && autoSaveTimeoutRef.current) {
+      clearTimeout(autoSaveTimeoutRef.current)
+      autoSaveTimeoutRef.current = null
+      // handleSave still has the old task's state in its closure — flush it
+      handleSave()
+      isDirtyRef.current = false
+    }
+
     if (currentTask) {
-      // Clear any pending auto-save — server data is authoritative
+      // Clear any remaining timeout without saving (already flushed above if needed)
       if (autoSaveTimeoutRef.current) {
         clearTimeout(autoSaveTimeoutRef.current)
         autoSaveTimeoutRef.current = null
       }
       isDirtyRef.current = false
+      prevTaskIdRef.current = newId
+
       setTitle(currentTask.title || "")
       setDescription(currentTask.description as Record<string, unknown> | null)
       setStatus(currentTask.status || "todo")
@@ -523,8 +541,9 @@ export function TaskDetailPanel({ task, taskId, open, onClose, onTaskSelect, sta
       setTimeEstimate(currentTask.timeEstimate)
       setTimerSeconds(currentTask.timeSpent || 0)
       setIsTimerRunning(false)
+      setNewComment(null)
     }
-  }, [currentTask?.id]) // Only re-populate when switching to a different task
+  }, [currentTask?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Timer cleanup
   useEffect(() => {
@@ -538,20 +557,20 @@ export function TaskDetailPanel({ task, taskId, open, onClose, onTaskSelect, sta
   
   useEffect(() => {
     if (!workspaceId || typeof window === "undefined") return
-    
-    if (open && taskId) {
-      const taskUrl = `/dashboard/workspaces/${workspaceId}/tasks/${taskId}`
+
+    if (open && effectiveTaskId) {
+      const taskUrl = `/dashboard/workspaces/${workspaceId}/tasks/${effectiveTaskId}`
       // Only push if we're not already on a task URL
       if (!window.location.pathname.includes("/tasks/")) {
         prevPathRef.current = window.location.pathname + window.location.search
-        window.history.pushState({ taskId }, "", taskUrl)
+        window.history.pushState({ taskId: effectiveTaskId }, "", taskUrl)
       }
     } else if (!open && prevPathRef.current) {
       // Restore previous URL when panel closes
       window.history.pushState({}, "", prevPathRef.current)
       prevPathRef.current = ""
     }
-  }, [open, taskId, workspaceId])
+  }, [open, effectiveTaskId, workspaceId])
 
   const handleSave = useCallback(() => {
     const effectiveId = currentTask?.id || task?.id
@@ -1804,6 +1823,7 @@ export function TaskDetailPanel({ task, taskId, open, onClose, onTaskSelect, sta
                   Description
                 </label>
                 <RichTextEditor
+                  key={currentTask?.id || task?.id || "new"}
                   content={description}
                   onChange={(json) => { setDescription(json); debouncedSave(); }}
                   placeholder="Add a description..."
@@ -2319,6 +2339,7 @@ export function TaskDetailPanel({ task, taskId, open, onClose, onTaskSelect, sta
               </Avatar>
               <div className="flex-1 min-w-0">
                 <RichTextEditor
+                  key={`comment-${currentTask?.id || task?.id || "new"}`}
                   content={newComment}
                   onChange={(json) => setNewComment(json)}
                   placeholder="Write a comment... Use @ to mention someone"
