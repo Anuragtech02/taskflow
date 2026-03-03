@@ -611,14 +611,20 @@ export default function ListPage({
     "closed": "closed",
   }
 
-  // Available filter options (from API or defaults)
-  const availableStatuses = statuses && statuses.length > 0
-    ? statuses.map((s) => {
-        const normalizedName = s.name.toLowerCase().trim()
-        const value = STATUS_VALUE_MAP[normalizedName] || normalizedName.replace(" ", "_")
-        return { value, label: s.name, color: s.color || "#6b7280" }
-      })
-    : DEFAULT_STATUSES
+  // Available statuses: always include defaults, plus any custom statuses
+  // Custom statuses with the same normalized value override the default
+  const availableStatuses = useMemo(() => {
+    const customMapped = (statuses || []).map((s) => {
+      const normalizedName = s.name.toLowerCase().trim()
+      const value = STATUS_VALUE_MAP[normalizedName] || normalizedName.replace(/\s+/g, "_")
+      return { value, label: s.name, color: s.color || "#6b7280" }
+    })
+    if (customMapped.length === 0) return DEFAULT_STATUSES
+    // Keep defaults that don't conflict with custom statuses, then append custom ones
+    const customValues = new Set(customMapped.map((s) => s.value))
+    const kept = DEFAULT_STATUSES.filter((d) => !customValues.has(d.value))
+    return [...kept, ...customMapped]
+  }, [statuses])
   const availablePriorities = DEFAULT_PRIORITIES
 
   // Filter tasks (including subtasks)

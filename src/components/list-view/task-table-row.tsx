@@ -111,10 +111,10 @@ export function TaskTableRow({
   const isBlocked = (deps?.blockedBy?.length ?? 0) > 0
   const hasDeps = isBlocked || (deps?.blocks?.length ?? 0) > 0
 
-  // Resolve the matched custom status for display
+  // Resolve the matched custom status for display (no fallback to [0] — show actual status if unmatched)
   const hasCustomStatuses = availableStatuses && availableStatuses.length > 0
   const matchedStatus = hasCustomStatuses
-    ? (availableStatuses.find(s => s.value === status) ?? availableStatuses[0])
+    ? (availableStatuses.find(s => s.value === status) ?? null)
     : null
 
   const cycleStatus = () => {
