@@ -7,15 +7,17 @@ import { TooltipProvider } from "@/components/ui/tooltip"
 import { Toaster } from "sonner"
 import { useSSE } from "@/hooks/useSSE"
 import { usePathname } from "next/navigation"
+import { useSession } from "next-auth/react"
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
+  const { data: session } = useSession()
   // Extract workspaceId from URL: /dashboard/workspaces/[id]/...
   const workspaceMatch = pathname.match(/\/dashboard\/workspaces\/([^/]+)/)
   const workspaceId = workspaceMatch?.[1]
 
   // Initialize SSE connection for real-time updates
-  useSSE(workspaceId)
+  useSSE(workspaceId, session?.user?.id)
 
   return (
     <TooltipProvider delayDuration={0}>

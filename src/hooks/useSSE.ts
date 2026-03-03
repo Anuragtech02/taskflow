@@ -19,7 +19,7 @@ const showErrorOnce = () => {
   }
 }
 
-export function useSSE(workspaceId?: string) {
+export function useSSE(workspaceId?: string, currentUserId?: string) {
   const queryClient = useQueryClient()
   const eventSourceRef = useRef<EventSource | null>(null)
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null)
@@ -67,9 +67,13 @@ export function useSSE(workspaceId?: string) {
         try {
           const data = JSON.parse(event.data)
           queryClient.invalidateQueries({ queryKey: ["tasks"] })
-          toast.info("Task updated", {
-            description: data.title || "A task was updated",
-          })
+          queryClient.invalidateQueries({ queryKey: ["task"] })
+          // Only show toast for changes made by OTHER users
+          if (!currentUserId || data.userId !== currentUserId) {
+            toast.info("Task updated", {
+              description: data.task?.title || "A task was updated",
+            })
+          }
         } catch (error) {
           console.error("Error parsing task_updated event:", error)
         }
@@ -79,9 +83,11 @@ export function useSSE(workspaceId?: string) {
         try {
           const data = JSON.parse(event.data)
           queryClient.invalidateQueries({ queryKey: ["tasks"] })
-          toast.success("Task created", {
-            description: data.title || "A new task was created",
-          })
+          if (!currentUserId || data.userId !== currentUserId) {
+            toast.success("Task created", {
+              description: data.task?.title || "A new task was created",
+            })
+          }
         } catch (error) {
           console.error("Error parsing task_created event:", error)
         }
@@ -117,7 +123,7 @@ export function useSSE(workspaceId?: string) {
     } catch (error) {
       console.error("SSE: Failed to create EventSource:", error)
     }
-  }, [queryClient, workspaceId])
+  }, [queryClient, workspaceId, currentUserId])
 
   useEffect(() => {
     // Don't connect until we have a workspace to subscribe to
