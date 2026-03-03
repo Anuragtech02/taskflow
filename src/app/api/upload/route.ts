@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate file type
-    const allowedTypes = ["image/jpeg", "image/png", "image/gif", "image/webp", "image/svg+xml"];
+    const allowedTypes = ["image/jpeg", "image/png", "image/gif", "image/webp", "image/svg+xml", "image/avif", "image/bmp", "image/tiff"];
     if (!allowedTypes.includes(file.type)) {
       return NextResponse.json({ error: "Invalid file type. Only images are allowed." }, { status: 400 });
     }

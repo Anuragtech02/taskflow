@@ -43,6 +43,60 @@ async function uploadImage(file: File): Promise<string | null> {
   }
 }
 
+/** Fetch an external image URL and re-upload it to our storage */
+async function reuploadExternalImage(src: string): Promise<string | null> {
+  try {
+    // Handle data: URIs
+    if (src.startsWith("data:")) {
+      const match = src.match(/^data:(image\/\w+);base64,(.+)$/)
+      if (!match) return null
+      const mimeType = match[1]
+      const base64 = match[2]
+      const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0))
+      const ext = mimeType.split("/")[1] || "png"
+      const file = new File([bytes], `pasted.${ext}`, { type: mimeType })
+      return uploadImage(file)
+    }
+    // Fetch external URL
+    const res = await fetch(src)
+    if (!res.ok) return null
+    const blob = await res.blob()
+    if (!blob.type.startsWith("image/")) return null
+    const ext = blob.type.split("/")[1]?.replace("+xml", "") || "png"
+    const file = new File([blob], `pasted.${ext}`, { type: blob.type })
+    return uploadImage(file)
+  } catch (e) {
+    console.error("Failed to re-upload image:", e)
+    return null
+  }
+}
+
+/** Process pasted HTML: find <img> tags and re-upload their sources */
+async function processHtmlImages(html: string): Promise<string> {
+  const parser = new DOMParser()
+  const doc = parser.parseFromString(html, "text/html")
+  const imgs = doc.querySelectorAll("img")
+  if (imgs.length === 0) return html
+
+  await Promise.all(
+    Array.from(imgs).map(async (img) => {
+      const src = img.getAttribute("src")
+      if (!src) return
+      // Skip images already on our domain
+      if (src.startsWith("/api/") || src.startsWith(window.location.origin)) return
+      const newUrl = await reuploadExternalImage(src)
+      if (newUrl) {
+        img.setAttribute("src", newUrl)
+      } else {
+        // Remove broken images rather than keeping expired external URLs
+        img.remove()
+      }
+    })
+  )
+
+  return doc.body.innerHTML
+}
+
 export function RichTextEditor({ content, onChange, placeholder, minHeight = "150px", className, editable = true, mentions, showToolbar = false }: RichTextEditorProps) {
   const editorRef = useRef<ReturnType<typeof useEditor>>(null)
 
@@ -52,7 +106,7 @@ export function RichTextEditor({ content, onChange, placeholder, minHeight = "15
       heading: { levels: [1, 2, 3] },
     }),
     Placeholder.configure({ placeholder: placeholder || "Type something..." }),
-    Image.configure({ inline: false, allowBase64: false }),
+    Image.configure({ inline: false, allowBase64: true }),
     Link.configure({ openOnClick: false, autolink: true }),
     Underline,
     Typography,
@@ -105,6 +159,7 @@ export function RichTextEditor({ content, onChange, placeholder, minHeight = "15
       handlePaste: (_view, event) => {
         const items = event.clipboardData?.items
         if (items) {
+          // 1. Check for raw image files (e.g. screenshot paste)
           for (const item of items) {
             if (item.type.startsWith("image/")) {
               const file = item.getAsFile()
@@ -118,6 +173,19 @@ export function RichTextEditor({ content, onChange, placeholder, minHeight = "15
                 return true
               }
             }
+          }
+          // 2. Check for HTML with embedded <img> tags (e.g. Google Docs paste)
+          const html = event.clipboardData?.getData("text/html")
+          if (html && /<img\s/i.test(html)) {
+            event.preventDefault()
+            processHtmlImages(html).then((cleanHtml) => {
+              if (editorRef.current) {
+                editorRef.current.commands.insertContent(cleanHtml, {
+                  parseOptions: { preserveWhitespace: false },
+                })
+              }
+            })
+            return true
           }
         }
         return false
