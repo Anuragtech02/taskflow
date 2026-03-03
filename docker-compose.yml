@@ -34,20 +34,12 @@ services:
       S3_REGION: us-east-1
     ports:
       - "3000:3000"
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.taskflow.rule=Host(`taskflow.anuragtech.com`)"
-      - "traefik.http.services.taskflow.loadbalancer.server.port=3000"
-      - "traefik.http.routers.taskflow.entrypoints=https"
-      - "traefik.http.routers.taskflow.tls=true"
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 40s
-    networks:
-      - taskflow-network
+      retries: 5
+      start_period: 60s
 
   postgres:
     image: postgres:16-alpine
@@ -64,10 +56,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    networks:
-      - taskflow-network
-    labels:
-      - "traefik.enable=false"
 
   minio:
     image: minio/minio:latest
@@ -84,15 +72,7 @@ services:
       interval: 30s
       timeout: 20s
       retries: 3
-    networks:
-      - taskflow-network
-    labels:
-      - "traefik.enable=false"
 
 volumes:
   postgres_data:
   minio_data:
-
-networks:
-  taskflow-network:
-    driver: bridge
