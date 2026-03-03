@@ -5,8 +5,10 @@ import { useDroppable } from "@dnd-kit/core"
 import {
   SortableContext,
   verticalListSortingStrategy,
+  useSortable,
 } from "@dnd-kit/sortable"
-import { Plus, MoreHorizontal, Pencil, Palette, Trash2, ArrowLeft, ArrowRight } from "lucide-react"
+import { CSS } from "@dnd-kit/utilities"
+import { Plus, MoreHorizontal, Pencil, Palette, Trash2, ArrowLeft, ArrowRight, GripVertical } from "lucide-react"
 import { TaskCard } from "@/components/task-card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -70,9 +72,26 @@ export function KanbanColumn({
   isDragOver = false,
   isDragging = false,
 }: KanbanColumnProps) {
-  const { setNodeRef } = useDroppable({
+  const { setNodeRef: setDroppableRef } = useDroppable({
     id: status.id,
   })
+
+  const {
+    attributes,
+    listeners,
+    setNodeRef: setSortableRef,
+    transform,
+    transition,
+    isDragging: isColumnDragging,
+  } = useSortable({
+    id: `column-${status.id}`,
+    data: { type: "column", status },
+  })
+
+  const sortableStyle = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  }
 
   const taskIds = useMemo(() => tasks.map((t) => t.id), [tasks])
 
@@ -90,14 +109,25 @@ export function KanbanColumn({
 
   return (
     <div
+      ref={setSortableRef}
+      style={sortableStyle}
       className={cn(
         "flex flex-col w-80 min-w-[320px] bg-muted/30 rounded-lg border-2 border-transparent transition-all duration-200",
         isDragOver && "bg-primary/10 ring-2 ring-primary/50 border-primary scale-[1.02] shadow-lg shadow-primary/10",
-        isDragging && !isDragOver && "opacity-80"
+        isDragging && !isDragOver && "opacity-80",
+        isColumnDragging && "opacity-50 shadow-2xl ring-2 ring-primary/30"
       )}
     >
       {/* Column Header */}
       <div className="flex items-center gap-2 px-4 py-3 border-b">
+        <button
+          {...attributes}
+          {...listeners}
+          className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground p-0.5 -ml-1 rounded hover:bg-accent transition-colors"
+          title="Drag to reorder"
+        >
+          <GripVertical className="h-4 w-4" />
+        </button>
         <div
           className="w-3 h-3 rounded-full flex-shrink-0"
           style={{ backgroundColor: status.color || "#6366f1" }}
@@ -200,7 +230,7 @@ export function KanbanColumn({
 
       {/* Task List */}
       <div
-        ref={setNodeRef}
+        ref={setDroppableRef}
         className={cn(
           "flex-1 p-2 space-y-2 overflow-auto min-h-[200px] transition-all duration-200",
           isDragOver && "bg-primary/5"

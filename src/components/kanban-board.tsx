@@ -17,6 +17,8 @@ import {
 import {
   arrayMove,
   sortableKeyboardCoordinates,
+  SortableContext,
+  horizontalListSortingStrategy,
 } from "@dnd-kit/sortable"
 import { useQueryClient } from "@tanstack/react-query"
 import { Plus } from "lucide-react"
@@ -82,7 +84,9 @@ export function KanbanBoard({ tasks, statuses, listId, workspaceId }: KanbanBoar
 
   // Local state for optimistic updates
   const [localTasks, setLocalTasks] = useState<TaskResponse[]>(tasks)
+  const [localStatuses, setLocalStatuses] = useState<StatusResponse[]>(statuses)
   const reorderPendingRef = useRef(false)
+  const columnReorderPendingRef = useRef(false)
 
   // Sync localTasks from props when not pending
   useEffect(() => {
@@ -90,6 +94,13 @@ export function KanbanBoard({ tasks, statuses, listId, workspaceId }: KanbanBoar
       setLocalTasks(tasks)
     }
   }, [tasks])
+
+  // Sync localStatuses from props when not pending
+  useEffect(() => {
+    if (!columnReorderPendingRef.current) {
+      setLocalStatuses(statuses)
+    }
+  }, [statuses])
 
   // Add column state
   const [showAddColumn, setShowAddColumn] = useState(false)
@@ -127,16 +138,16 @@ export function KanbanBoard({ tasks, statuses, listId, workspaceId }: KanbanBoar
   // Build a mapping from normalized status name → status object
   const statusMap = useMemo(() => {
     const map: Record<string, StatusResponse> = {}
-    statuses.forEach((s) => {
+    localStatuses.forEach((s) => {
       map[normalizeStatusName(s.name)] = s
     })
     return map
-  }, [statuses])
+  }, [localStatuses])
 
   // Group tasks by their status column (using localTasks for optimistic updates)
   const tasksByColumn = useMemo(() => {
     const grouped: Record<string, TaskResponse[]> = {}
-    statuses.forEach((status) => {
+    localStatuses.forEach((status) => {
       const normalizedName = normalizeStatusName(status.name)
       grouped[status.id] = localTasks
         .filter((task) => {
@@ -146,19 +157,37 @@ export function KanbanBoard({ tasks, statuses, listId, workspaceId }: KanbanBoar
         .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
     })
     return grouped
-  }, [localTasks, statuses])
+  }, [localTasks, localStatuses])
 
   const [activeTask, setActiveTask] = useState<TaskResponse | null>(null)
+  const [activeColumn, setActiveColumn] = useState<StatusResponse | null>(null)
   const [overColumnId, setOverColumnId] = useState<string | null>(null)
 
   const handleDragStart = (event: DragStartEvent) => {
-    const task = localTasks.find((t) => t.id === event.active.id)
+    const { active } = event
+    const activeId = active.id as string
+
+    // Check if dragging a column (prefixed with "column-")
+    if (activeId.startsWith("column-")) {
+      const statusId = activeId.replace("column-", "")
+      const col = localStatuses.find((s) => s.id === statusId)
+      if (col) {
+        setActiveColumn(col)
+        return
+      }
+    }
+
+    // Otherwise dragging a task
+    const task = localTasks.find((t) => t.id === activeId)
     if (task) {
       setActiveTask(task)
     }
   }
 
   const handleDragOver = (event: DragOverEvent) => {
+    // Skip column-level highlights when dragging a column
+    if (activeColumn) return
+
     const { over } = event
     if (!over) {
       setOverColumnId(null)
@@ -168,7 +197,7 @@ export function KanbanBoard({ tasks, statuses, listId, workspaceId }: KanbanBoar
     const overId = over.id as string
 
     // Check if hovering over a column directly
-    const overStatus = statuses.find((s) => s.id === overId)
+    const overStatus = localStatuses.find((s) => s.id === overId)
     if (overStatus) {
       setOverColumnId(overStatus.id)
       return
@@ -178,7 +207,7 @@ export function KanbanBoard({ tasks, statuses, listId, workspaceId }: KanbanBoar
     const overTask = localTasks.find((t) => t.id === overId)
     if (overTask) {
       const taskStatus = overTask.status || "todo"
-      const column = statuses.find((s) => normalizeStatusName(s.name) === taskStatus)
+      const column = localStatuses.find((s) => normalizeStatusName(s.name) === taskStatus)
       if (column) {
         setOverColumnId(column.id)
         return
@@ -241,7 +270,9 @@ export function KanbanBoard({ tasks, statuses, listId, workspaceId }: KanbanBoar
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event
+    const wasColumnDrag = !!activeColumn
     setActiveTask(null)
+    setActiveColumn(null)
     setOverColumnId(null)
 
     if (!over) return
@@ -249,11 +280,47 @@ export function KanbanBoard({ tasks, statuses, listId, workspaceId }: KanbanBoar
     const activeId = active.id as string
     const overId = over.id as string
 
+    // Handle column reorder
+    if (wasColumnDrag && activeId.startsWith("column-") && overId.startsWith("column-")) {
+      const activeStatusId = activeId.replace("column-", "")
+      const overStatusId = overId.replace("column-", "")
+      if (activeStatusId === overStatusId) return
+
+      const oldIndex = localStatuses.findIndex((s) => s.id === activeStatusId)
+      const newIndex = localStatuses.findIndex((s) => s.id === overStatusId)
+      if (oldIndex === -1 || newIndex === -1) return
+
+      const newOrder = arrayMove(localStatuses, oldIndex, newIndex)
+
+      // Optimistic update
+      columnReorderPendingRef.current = true
+      setLocalStatuses(newOrder)
+
+      // Only call API for real (non-default) statuses
+      const realStatusIds = newOrder.filter((s) => !s.id.startsWith("default-")).map((s) => s.id)
+      if (realStatusIds.length > 0) {
+        reorderStatusesMutation.mutate({ listId, statusIds: realStatusIds }, {
+          onSuccess: () => {
+            columnReorderPendingRef.current = false
+            toast.success("Columns reordered")
+          },
+          onError: () => {
+            columnReorderPendingRef.current = false
+            setLocalStatuses(statuses)
+            toast.error("Failed to reorder columns")
+          },
+        })
+      } else {
+        columnReorderPendingRef.current = false
+      }
+      return
+    }
+
     const draggedTask = localTasks.find((t) => t.id === activeId)
     if (!draggedTask) return
 
     // Check if dropped on a column (empty area)
-    const overStatus = statuses.find((s) => s.id === overId)
+    const overStatus = localStatuses.find((s) => s.id === overId)
     if (overStatus) {
       const currentColumn = findColumnForTask(draggedTask.status)
       if (currentColumn?.id !== overStatus.id) {
@@ -430,13 +497,13 @@ export function KanbanBoard({ tasks, statuses, listId, workspaceId }: KanbanBoar
   }
 
   const handleMoveColumn = (statusId: string, direction: "left" | "right") => {
-    const currentIndex = statuses.findIndex(s => s.id === statusId)
+    const currentIndex = localStatuses.findIndex(s => s.id === statusId)
     if (currentIndex === -1) return
-    
+
     const newIndex = direction === "left" ? currentIndex - 1 : currentIndex + 1
-    if (newIndex < 0 || newIndex >= statuses.length) return
-    
-    const newOrder = [...statuses]
+    if (newIndex < 0 || newIndex >= localStatuses.length) return
+
+    const newOrder = [...localStatuses]
     const [moved] = newOrder.splice(currentIndex, 1)
     newOrder.splice(newIndex, 0, moved)
     
@@ -459,7 +526,7 @@ export function KanbanBoard({ tasks, statuses, listId, workspaceId }: KanbanBoar
   const handleQuickAddTask = (statusId: string, title: string) => {
     if (!title.trim()) return
     
-    const status = statuses.find(s => s.id === statusId)
+    const status = localStatuses.find(s => s.id === statusId)
     if (!status) return
     
     createTaskMutation.mutate({
@@ -489,29 +556,31 @@ export function KanbanBoard({ tasks, statuses, listId, workspaceId }: KanbanBoar
         onDragEnd={handleDragEnd}
       >
         <div className="flex gap-4 p-6 overflow-x-auto h-full">
-          {statuses.map((status, index) => {
-            const columnTasks = tasksByColumn[status.id] || []
-            return (
-              <KanbanColumn
-                key={status.id}
-                status={status}
-                tasks={columnTasks}
-                onTaskClick={(taskId) => setSelectedTask(taskId)}
-                onTaskDelete={handleTaskDelete}
-                onTaskAssign={handleTaskAssign}
-                onQuickAdd={(title) => handleQuickAddTask(status.id, title)}
-                onStatusRename={handleStatusRename}
-                onStatusColorChange={handleStatusColorChange}
-                onStatusDelete={handleStatusDelete}
-                onMoveLeft={(statusId) => handleMoveColumn(statusId, "left")}
-                onMoveRight={(statusId) => handleMoveColumn(statusId, "right")}
-                canMoveLeft={index > 0}
-                canMoveRight={index < statuses.length - 1}
-                isDragOver={overColumnId === status.id}
-                isDragging={!!activeTask}
-              />
-            )
-          })}
+          <SortableContext items={localStatuses.map((s) => `column-${s.id}`)} strategy={horizontalListSortingStrategy}>
+            {localStatuses.map((status, index) => {
+              const columnTasks = tasksByColumn[status.id] || []
+              return (
+                <KanbanColumn
+                  key={status.id}
+                  status={status}
+                  tasks={columnTasks}
+                  onTaskClick={(taskId) => setSelectedTask(taskId)}
+                  onTaskDelete={handleTaskDelete}
+                  onTaskAssign={handleTaskAssign}
+                  onQuickAdd={(title) => handleQuickAddTask(status.id, title)}
+                  onStatusRename={handleStatusRename}
+                  onStatusColorChange={handleStatusColorChange}
+                  onStatusDelete={handleStatusDelete}
+                  onMoveLeft={(statusId) => handleMoveColumn(statusId, "left")}
+                  onMoveRight={(statusId) => handleMoveColumn(statusId, "right")}
+                  canMoveLeft={index > 0}
+                  canMoveRight={index < localStatuses.length - 1}
+                  isDragOver={overColumnId === status.id}
+                  isDragging={!!activeTask}
+                />
+              )
+            })}
+          </SortableContext>
 
           {/* Add Column Button */}
           <div className="flex-shrink-0">
@@ -572,8 +641,16 @@ export function KanbanBoard({ tasks, statuses, listId, workspaceId }: KanbanBoar
           </div>
         </div>
 
-        <DragOverlay dropAnimation={dropAnimation}>
+        <DragOverlay dropAnimation={activeColumn ? undefined : dropAnimation}>
           {activeTask && <TaskCardOverlay task={activeTask} />}
+          {activeColumn && (
+            <div className="w-80 min-w-[320px] bg-muted/50 rounded-lg border-2 border-primary/50 shadow-2xl p-4 opacity-90">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: activeColumn.color || "#6366f1" }} />
+                <span className="text-sm font-semibold">{activeColumn.name}</span>
+              </div>
+            </div>
+          )}
         </DragOverlay>
       </DndContext>
 
@@ -581,7 +658,7 @@ export function KanbanBoard({ tasks, statuses, listId, workspaceId }: KanbanBoar
         task={selectedTask}
         open={isOpen}
         onClose={close}
-        statuses={statuses}
+        statuses={localStatuses}
       />
     </>
   )
