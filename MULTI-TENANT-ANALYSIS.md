@@ -76,7 +76,7 @@ TaskForge has a **workspace-based isolation model** but is **NOT truly multi-ten
 ```
                     ┌─────────────────────────────────────────┐
                     │           DNS (Wildcard)                │
-                    │   *.taskforge.dev → Load Balancer       │
+                    │   *.taskflow.dev → Load Balancer       │
                     └─────────────────────────────────────────┘
                                     │
                                     ▼
@@ -91,7 +91,7 @@ TaskForge has a **workspace-based isolation model** but is **NOT truly multi-ten
               ┌─────────────────────┼─────────────────────┐
               ▼                     ▼                     ▼
     ┌─────────────────┐   ┌─────────────────┐   ┌─────────────────┐
-    │  app.taskforge │   │ acme.taskforge │   │  beta.taskforge │
+    │  app.taskflow │   │ acme.taskflow │   │  beta.taskflow │
     │    (main app)  │   │   (tenant A)   │   │   (tenant B)   │
     │   - Login      │   │   - Workspace  │   │   - Workspace  │
     │   - Register   │   │   - All data   │   │   - All data   │
@@ -102,12 +102,12 @@ TaskForge has a **workspace-based isolation model** but is **NOT truly multi-ten
 ### Middleware Flow
 
 ```
-Request: https://acme.taskforge.dev/dashboard
+Request: https://acme.taskflow.dev/dashboard
 
 ┌──────────────────────────────────────────────────────────────┐
 │                    Middleware.ts                             │
 ├──────────────────────────────────────────────────────────────┤
-│ 1. Extract hostname: "acme.taskforge.dev"                   │
+│ 1. Extract hostname: "acme.taskflow.dev"                   │
 │ 2. Extract subdomain: "acme"                                 │
 │ 3. If subdomain === "app" or "www" or empty:               │
 │    → Continue to main app routes                             │
@@ -124,9 +124,9 @@ Request: https://acme.taskforge.dev/dashboard
 
 | Current (Path-Based) | Target (Subdomain-Based) |
 |----------------------|--------------------------|
-| `taskforge.dev/dashboard/workspaces/[id]/spaces/[spaceId]` | `acme.taskforge.dev/` (root shows workspace) |
-| `taskforge.dev/dashboard/workspaces/[id]/members` | `acme.taskforge.dev/members` |
-| `taskforge.dev/login` | `app.taskforge.dev/login` |
+| `taskflow.dev/dashboard/workspaces/[id]/spaces/[spaceId]` | `acme.taskflow.dev/` (root shows workspace) |
+| `taskflow.dev/dashboard/workspaces/[id]/members` | `acme.taskflow.dev/members` |
+| `taskflow.dev/login` | `app.taskflow.dev/login` |
 
 ---
 
@@ -286,7 +286,7 @@ import { workspaces, workspaceMembers } from "@/db/schema";
 import { eq } from "drizzle-orm";
 
 const PUBLIC_HOSTNAMES = new Set(["app", "www", "localhost", "127.0.0.1"]);
-const DOMAIN = process.env.NEXT_PUBLIC_ROOT_DOMAIN || "taskforge.dev";
+const DOMAIN = process.env.NEXT_PUBLIC_ROOT_DOMAIN || "taskflow.dev";
 
 export default auth(async (req) => {
   const hostname = req.nextUrl.hostname;
@@ -295,7 +295,7 @@ export default auth(async (req) => {
   // Extract subdomain
   const subdomain = hostname.replace(`.${DOMAIN}`, "");
 
-  // If main app (app.taskforge.dev, www.taskforge.dev, localhost)
+  // If main app (app.taskflow.dev, www.taskflow.dev, localhost)
   if (PUBLIC_HOSTNAMES.has(subdomain) || subdomain === hostname) {
     // Allow access to public routes
     const isPublicPath =
@@ -313,7 +313,7 @@ export default auth(async (req) => {
     return;
   }
 
-  // Tenant subdomain (e.g., acme.taskforge.dev)
+  // Tenant subdomain (e.g., acme.taskflow.dev)
   // Look up workspace by subdomain
   const workspace = await db.query.workspaces.findFirst({
     where: eq(workspaces.subdomain, subdomain),
@@ -511,7 +511,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         secure: process.env.NODE_ENV === "production",
         // THIS IS CRITICAL for subdomain auth:
         domain: process.env.NODE_ENV === "production" 
-          ? ".taskforge.dev"  // Note the leading dot
+          ? ".taskflow.dev"  // Note the leading dot
           : "localhost",
       },
     },
@@ -641,13 +641,13 @@ For subdomains to work in production:
 
 ```dns
 ; DNS records (example for Cloudflare)
-*.taskforge.dev    A     192.0.2.1    ; Point to your server
-taskforge.dev      A     192.0.2.1    ; Main domain also works
+*.taskflow.dev    A     192.0.2.1    ; Point to your server
+taskflow.dev      A     192.0.2.1    ; Main domain also works
 ```
 
 Or for custom domain:
 ```dns
-acme.com           CNAME taskforge.dev
+acme.com           CNAME taskflow.dev
 ```
 
 ---

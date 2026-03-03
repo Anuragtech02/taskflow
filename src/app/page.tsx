@@ -49,7 +49,7 @@ export default function Home() {
               Start for Free
             </Link>
             <a
-              href="https://github.com/apsimbiot/taskforge"
+              href="https://github.com/apsimbiot/taskflow"
               target="_blank"
               rel="noopener noreferrer"
               className="border border-slate-600 hover:border-slate-400 text-white px-8 py-3 rounded-lg text-lg font-medium transition-colors"
@@ -99,7 +99,7 @@ export default function Home() {
         <p>
           MIT License ·{" "}
           <a
-            href="https://github.com/apsimbiot/taskforge"
+            href="https://github.com/apsimbiot/taskflow"
             className="hover:text-slate-300 transition-colors"
           >
             GitHub

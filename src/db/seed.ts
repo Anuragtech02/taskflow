@@ -5,7 +5,7 @@ import * as schema from "./schema";
 
 const connectionString =
   process.env.DATABASE_URL ||
-  "postgresql://taskforge:taskforge@localhost:5432/taskforge";
+  "postgresql://taskflow:taskflow@localhost:5432/taskflow";
 
 async function seed() {
   const client = postgres(connectionString, { max: 1 });
@@ -19,7 +19,7 @@ async function seed() {
     .insert(schema.users)
     .values({
       name: "Demo User",
-      email: "demo@taskforge.dev",
+      email: "demo@taskflow.dev",
       passwordHash,
     })
     .returning();
@@ -285,7 +285,7 @@ async function seed() {
 
   console.log("\n🎉 Seed completed successfully!");
   console.log("\n📝 Demo credentials:");
-  console.log("   Email: demo@taskforge.dev");
+  console.log("   Email: demo@taskflow.dev");
   console.log("   Password: password123\n");
 
   await client.end();

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 
 // Main domain for multi-tenancy (configure for your environment)
-const MAIN_DOMAIN = process.env.NEXT_PUBLIC_MAIN_DOMAIN || "taskforge.dev";
+const MAIN_DOMAIN = process.env.NEXT_PUBLIC_MAIN_DOMAIN || "taskflow.dev";
 
 export default auth((req) => {
   const { pathname, origin } = req.nextUrl;

@@ -8,13 +8,13 @@ const s3Client = new S3Client({
   endpoint: process.env.S3_ENDPOINT || "http://minio:9000",
   region: process.env.S3_REGION || "us-east-1",
   credentials: {
-    accessKeyId: process.env.S3_ACCESS_KEY || "taskforge",
-    secretAccessKey: process.env.S3_SECRET_KEY || "taskforge123",
+    accessKeyId: process.env.S3_ACCESS_KEY || "taskflow",
+    secretAccessKey: process.env.S3_SECRET_KEY || "taskflow123",
   },
   forcePathStyle: true, // Required for MinIO
 });
 
-const BUCKET = process.env.S3_BUCKET || "taskforge";
+const BUCKET = process.env.S3_BUCKET || "taskflow";
 
 export async function POST(request: NextRequest) {
   try {

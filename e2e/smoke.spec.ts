@@ -97,7 +97,7 @@ test.describe('TaskForge E2E Tests', () => {
     console.log('Workspace element found:', !!workspaceName);
     
     // Take screenshot for visual verification
-    await page.screenshot({ path: '/root/.openclaw/workspace/taskforge/e2e/dashboard.png', fullPage: true });
+    await page.screenshot({ path: '/root/.openclaw/workspace/taskflow/e2e/dashboard.png', fullPage: true });
     console.log('Dashboard screenshot saved');
   });
 
@@ -138,7 +138,7 @@ test.describe('TaskForge E2E Tests', () => {
       }
     } else {
       console.log('No add task button found, checking page structure...');
-      await page.screenshot({ path: '/root/.openclaw/workspace/taskforge/e2e/no-add-task.png' });
+      await page.screenshot({ path: '/root/.openclaw/workspace/taskflow/e2e/no-add-task.png' });
     }
   });
 
@@ -168,7 +168,7 @@ test.describe('TaskForge E2E Tests', () => {
     console.log('Board columns found:', columns.length);
     
     // Take screenshot
-    await page.screenshot({ path: '/root/.openclaw/workspace/taskforge/e2e/board.png', fullPage: true });
+    await page.screenshot({ path: '/root/.openclaw/workspace/taskflow/e2e/board.png', fullPage: true });
     console.log('Board view screenshot saved');
   });
 

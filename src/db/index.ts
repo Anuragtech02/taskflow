@@ -2,7 +2,7 @@ import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import * as schema from './schema';
 
-const connectionString = process.env.DATABASE_URL || 'postgresql://taskforge:taskforge@localhost:5432/taskforge';
+const connectionString = process.env.DATABASE_URL || 'postgresql://taskflow:taskflow@localhost:5432/taskflow';
 
 const client = postgres(connectionString, { 
   max: 10,

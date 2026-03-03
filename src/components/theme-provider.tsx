@@ -11,7 +11,7 @@ type ThemeContextType = {
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined)
 
-const THEME_KEY = "taskforge-theme"
+const THEME_KEY = "taskflow-theme"
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = useState<string>(DEFAULT_THEME)

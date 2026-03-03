@@ -78,6 +78,6 @@
 ## Screenshots
 
 Screenshots saved to:
-- `/root/.openclaw/workspace/taskforge/e2e/dashboard.png`
-- `/root/.openclaw/workspace/taskforge/e2e/no-add-task.png`
-- `/root/.openclaw/workspace/taskforge/e2e/board.png`
+- `/root/.openclaw/workspace/taskflow/e2e/dashboard.png`
+- `/root/.openclaw/workspace/taskflow/e2e/no-add-task.png`
+- `/root/.openclaw/workspace/taskflow/e2e/board.png`

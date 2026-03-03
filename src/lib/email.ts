@@ -4,7 +4,7 @@ const resend = process.env.RESEND_API_KEY
   ? new Resend(process.env.RESEND_API_KEY)
   : null;
 
-const FROM_EMAIL = process.env.EMAIL_FROM || "notifications@taskforge.dev";
+const FROM_EMAIL = process.env.EMAIL_FROM || "notifications@taskflow.dev";
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
 // Helper to generate HTML email template

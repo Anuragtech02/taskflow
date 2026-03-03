@@ -4,11 +4,11 @@ import { eq } from "drizzle-orm";
 
 /**
  * Get the current tenant from request
- * Looks for subdomain in hostname (e.g., acme.taskforge.dev)
+ * Looks for subdomain in hostname (e.g., acme.taskflow.dev)
  */
 export async function getTenantFromRequest(
   hostname: string,
-  domain: string = "taskforge.dev"
+  domain: string = "taskflow.dev"
 ): Promise<{ workspace: typeof workspaces.$inferSelect | null; isMainApp: boolean }> {
   // Remove port if present
   const host = hostname.split(":")[0];
@@ -27,7 +27,7 @@ export async function getTenantFromRequest(
     }
   }
 
-  // Main app (app.taskforge.dev or localhost)
+  // Main app (app.taskflow.dev or localhost)
   return { workspace: null, isMainApp: true };
 }
 

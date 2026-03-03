@@ -36,8 +36,8 @@ An open-source alternative to ClickUp, built with modern web technologies.
 
 ```bash
 # Clone the repository
-git clone https://github.com/apsimbiot/taskforge.git
-cd taskforge
+git clone https://github.com/apsimbiot/taskflow.git
+cd taskflow
 
 # Copy environment variables
 cp .env.example .env.local
@@ -56,7 +56,7 @@ open http://localhost:3000
 ```
 
 **Demo credentials:**
-- Email: `demo@taskforge.dev`
+- Email: `demo@taskflow.dev`
 - Password: `password123`
 
 ## 🛠️ Manual Setup
@@ -71,8 +71,8 @@ open http://localhost:3000
 
 ```bash
 # Clone the repository
-git clone https://github.com/apsimbiot/taskforge.git
-cd taskforge
+git clone https://github.com/apsimbiot/taskflow.git
+cd taskflow
 
 # Install dependencies
 npm install
@@ -112,7 +112,7 @@ Visit [http://localhost:3000](http://localhost:3000).
 ## 📁 Project Structure
 
 ```
-taskforge/
+taskflow/
 ├── src/
 │   ├── app/                  # Next.js App Router
 │   │   ├── api/              # API Route Handlers
