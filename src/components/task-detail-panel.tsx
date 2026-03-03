@@ -747,6 +747,8 @@ export function TaskDetailPanel({ task, taskId, open, onClose, onTaskSelect, sta
   // subtask completion shown via badge (e.g. "2/5") — no progress bar needed
 
   // Labels hooks — must be before early return to avoid "fewer hooks" error
+  const { data: fetchedLabels = [] } = useLabels(workspaceId)
+  const workspaceLabels = propLabels && propLabels.length > 0 ? propLabels : fetchedLabels
   const { data: taskLabels = [] } = useTaskLabels(currentTask?.id)
   const createLabelMutation = useCreateLabel()
   const deleteLabelMutation = useDeleteLabel()
@@ -1184,11 +1186,11 @@ export function TaskDetailPanel({ task, taskId, open, onClose, onTaskSelect, sta
                       <PopoverContent className="w-[240px]" align="start">
                         <div className="space-y-2">
                           {/* Existing workspace labels */}
-                          {propLabels && propLabels.length > 0 && (
+                          {workspaceLabels && workspaceLabels.length > 0 && (
                             <div className="space-y-1">
                               <p className="text-xs text-muted-foreground font-medium">Workspace Labels</p>
                               <div className="flex flex-wrap gap-1">
-                                {propLabels
+                                {workspaceLabels
                                   .filter((l) => !taskLabels.some((tl) => tl.id === l.id))
                                   .map((label) => (
                                     <button
