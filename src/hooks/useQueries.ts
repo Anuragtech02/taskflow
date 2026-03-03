@@ -60,6 +60,9 @@ import {
   fetchTaskLabels,
   addTaskLabel,
   removeTaskLabel,
+  fetchTaskReminders,
+  createTaskReminder,
+  deleteTaskReminder,
   type WorkspaceResponse,
   type SpaceResponse,
   type FolderResponse,
@@ -79,6 +82,18 @@ import {
   type CustomFieldDefinitionResponse,
   type TaskSprintResponse,
   type LabelResponse,
+  type ReminderResponse,
+  fetchGoals,
+  fetchGoal,
+  createGoal,
+  updateGoal,
+  deleteGoal,
+  fetchKeyResults,
+  createKeyResult,
+  updateKeyResult,
+  deleteKeyResult,
+  type GoalResponse,
+  type KeyResultResponse,
 } from "@/lib/api"
 
 // ── Workspace Hooks ─────────────────────────────────────────────────────────
@@ -265,8 +280,8 @@ export function useUpdateTask() {
       description?: string | Record<string, unknown>
       status?: string
       priority?: string
-      dueDate?: string
-      startDate?: string
+      dueDate?: string | null
+      startDate?: string | null
       timeEstimate?: number
       order?: number
       customFields?: Record<string, unknown>
@@ -560,6 +575,42 @@ export function useTaskAssignees(taskId: string | undefined) {
     queryKey: ["task-assignees", taskId],
     queryFn: () => fetchTaskAssignees(taskId!),
     enabled: !!taskId,
+  })
+}
+
+// Fetch all task assignees for a set of tasks (for list-level filtering/grouping)
+export function useAllTaskAssignees(taskIds: string[]) {
+  return useQuery<Record<string, TaskAssigneeResponse[]>>({
+    queryKey: ["all-task-assignees", taskIds.sort().join(",")],
+    queryFn: async () => {
+      const results = await Promise.all(
+        taskIds.map(async (taskId) => {
+          const assignees = await fetchTaskAssignees(taskId)
+          return [taskId, assignees] as const
+        })
+      )
+      return Object.fromEntries(results)
+    },
+    enabled: taskIds.length > 0,
+    staleTime: 30000, // Cache for 30s to avoid refetching on every render
+  })
+}
+
+// Fetch all task labels for a set of tasks (for list-level filtering/grouping)
+export function useAllTaskLabels(taskIds: string[]) {
+  return useQuery<Record<string, LabelResponse[]>>({
+    queryKey: ["all-task-labels", taskIds.sort().join(",")],
+    queryFn: async () => {
+      const results = await Promise.all(
+        taskIds.map(async (taskId) => {
+          const labels = await fetchTaskLabels(taskId)
+          return [taskId, labels] as const
+        })
+      )
+      return Object.fromEntries(results)
+    },
+    enabled: taskIds.length > 0,
+    staleTime: 30000,
   })
 }
 
@@ -917,6 +968,133 @@ export function useRemoveTaskLabel() {
       removeTaskLabel(taskId, labelId),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["task-labels", variables.taskId] })
+    },
+  })
+}
+
+// ── Reminders Hooks ───────────────────────────────────────────────────────
+
+export function useTaskReminders(taskId: string | undefined) {
+  return useQuery<ReminderResponse[]>({
+    queryKey: ["reminders", taskId],
+    queryFn: () => fetchTaskReminders(taskId!),
+    enabled: !!taskId,
+  })
+}
+
+export function useCreateTaskReminder() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ taskId, data }: { taskId: string; data: { remindAt: string; type?: string; preset?: string } }) =>
+      createTaskReminder(taskId, data),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["reminders", variables.taskId] })
+    },
+  })
+}
+
+export function useDeleteTaskReminder() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ taskId, reminderId }: { taskId: string; reminderId: string }) =>
+      deleteTaskReminder(taskId, reminderId),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["reminders", variables.taskId] })
+    },
+  })
+}
+
+// ── Goals / OKR Hooks ──────────────────────────────────────────────────────
+
+export function useGoals(workspaceId: string | undefined) {
+  return useQuery<GoalResponse[]>({
+    queryKey: ["goals", workspaceId],
+    queryFn: () => fetchGoals(workspaceId!),
+    enabled: !!workspaceId,
+  })
+}
+
+export function useGoal(goalId: string | undefined) {
+  return useQuery<GoalResponse>({
+    queryKey: ["goal", goalId],
+    queryFn: () => fetchGoal(goalId!),
+    enabled: !!goalId,
+  })
+}
+
+export function useCreateGoal() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (data: { workspaceId: string; name: string; description?: string; targetDate?: string }) =>
+      createGoal(data),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["goals", variables.workspaceId] })
+    },
+  })
+}
+
+export function useUpdateGoal() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ goalId, ...data }: { goalId: string; name?: string; description?: string; targetDate?: string | null; status?: string }) =>
+      updateGoal(goalId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["goals"] })
+      queryClient.invalidateQueries({ queryKey: ["goal"] })
+    },
+  })
+}
+
+export function useDeleteGoal() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (goalId: string) => deleteGoal(goalId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["goals"] })
+    },
+  })
+}
+
+export function useKeyResults(goalId: string | undefined) {
+  return useQuery<KeyResultResponse[]>({
+    queryKey: ["key-results", goalId],
+    queryFn: () => fetchKeyResults(goalId!),
+    enabled: !!goalId,
+  })
+}
+
+export function useCreateKeyResult() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ goalId, ...data }: { goalId: string; title: string; targetValue: number; linkedTaskId?: string }) =>
+      createKeyResult(goalId, data),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["key-results", variables.goalId] })
+      queryClient.invalidateQueries({ queryKey: ["goals"] })
+    },
+  })
+}
+
+export function useUpdateKeyResult() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ goalId, krId, ...data }: { goalId: string; krId: string; title?: string; targetValue?: number; currentValue?: number; linkedTaskId?: string | null }) =>
+      updateKeyResult(goalId, krId, data),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["key-results", variables.goalId] })
+      queryClient.invalidateQueries({ queryKey: ["goals"] })
+    },
+  })
+}
+
+export function useDeleteKeyResult() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ goalId, krId }: { goalId: string; krId: string }) =>
+      deleteKeyResult(goalId, krId),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["key-results", variables.goalId] })
+      queryClient.invalidateQueries({ queryKey: ["goals"] })
     },
   })
 }

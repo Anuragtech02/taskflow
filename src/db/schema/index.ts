@@ -37,6 +37,7 @@ export const workspaces = pgTable("workspaces", {
   plan: varchar("plan", { length: 20 }).default("free"), // free, pro, enterprise
   status: varchar("status", { length: 20 }).default("active"), // active, suspended, trial
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 // ─── Workspace Members ────────────────────────────────────────────────────────
@@ -50,6 +51,7 @@ export const workspaceMembers = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     role: varchar("role", { length: 50 }).notNull().default("member"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (t) => [
     primaryKey({ columns: [t.workspaceId, t.userId] }),
@@ -302,6 +304,7 @@ export const sprints = pgTable(
     endDate: timestamp("end_date").notNull(),
     status: varchar("status", { length: 20 }).default("planned"),
     goal: text("goal"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (t) => [index("sprints_workspace_idx").on(t.workspaceId)]
 );

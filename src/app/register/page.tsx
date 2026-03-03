@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { signIn } from "next-auth/react";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -64,7 +65,7 @@ export default function RegisterPage() {
             <div className="w-10 h-10 bg-indigo-500 rounded-lg flex items-center justify-center font-bold text-white">
               TF
             </div>
-            <span className="text-white font-semibold text-xl">TaskForge</span>
+            <span className="text-white font-semibold text-xl">TaskFlow</span>
           </Link>
         </div>
 
@@ -174,6 +175,7 @@ export default function RegisterPage() {
           <div className="grid grid-cols-2 gap-3">
             <button
               type="button"
+              onClick={() => signIn("google", { callbackUrl: "/dashboard" })}
               className="flex items-center justify-center gap-2 px-4 py-2.5 border border-slate-600 rounded-lg text-slate-300 hover:bg-slate-700/50 transition-colors"
             >
               <svg className="w-5 h-5" viewBox="0 0 24 24">
@@ -198,6 +200,7 @@ export default function RegisterPage() {
             </button>
             <button
               type="button"
+              onClick={() => signIn("github", { callbackUrl: "/dashboard" })}
               className="flex items-center justify-center gap-2 px-4 py-2.5 border border-slate-600 rounded-lg text-slate-300 hover:bg-slate-700/50 transition-colors"
             >
               <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">

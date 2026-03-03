@@ -6,25 +6,22 @@ import { eq, and } from "drizzle-orm";
 import { z } from "zod";
 
 const createKeyResultSchema = z.object({
-  goalId: z.string().uuid(),
   title: z.string().min(1).max(255),
   targetValue: z.number().int().positive(),
   linkedTaskId: z.string().uuid().optional(),
 });
 
-export async function GET(request: NextRequest) {
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
     const session = await auth();
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { searchParams } = new URL(request.url);
-    const goalId = searchParams.get("goalId");
-
-    if (!goalId) {
-      return NextResponse.json({ error: "goalId is required" }, { status: 400 });
-    }
+    const { id: goalId } = await params;
 
     // Get goal first
     const goal = await db.query.goals.findFirst({
@@ -62,19 +59,23 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function POST(request: NextRequest) {
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
     const session = await auth();
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const { id: goalId } = await params;
     const body = await request.json();
     const validatedData = createKeyResultSchema.parse(body);
 
     // Get goal first
     const goal = await db.query.goals.findFirst({
-      where: eq(goals.id, validatedData.goalId),
+      where: eq(goals.id, goalId),
     });
 
     if (!goal) {
@@ -96,7 +97,7 @@ export async function POST(request: NextRequest) {
     const [keyResult] = await db
       .insert(keyResults)
       .values({
-        goalId: validatedData.goalId,
+        goalId,
         title: validatedData.title,
         targetValue: validatedData.targetValue,
         currentValue: 0,

@@ -1,7 +1,8 @@
 import { db } from "@/db";
-import { notifications, users } from "@/db/schema";
+import { notifications, users, workspaceMembers } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { sendTaskAssignedEmail, sendMentionEmail, sendTaskDueSoonEmail } from "./email";
+import { broadcastToWorkspace } from "./sse";
 
 // Notification types
 export type NotificationType = 
@@ -25,6 +26,7 @@ interface CreateNotificationParams {
   mentionedBy?: string;
   assignedBy?: string;
   dueDate?: Date;
+  workspaceId?: string;
 }
 
 /**
@@ -94,6 +96,42 @@ export async function createNotification(params: CreateNotificationParams) {
 
   sendEmail();
 
+  // Broadcast real-time notification via SSE
+  if (params.workspaceId) {
+    broadcastToWorkspace(params.workspaceId, {
+      type: "notification",
+      data: {
+        id: notification.id,
+        title: notification.title,
+        message: notification.message,
+        type: notification.type,
+        userId: notification.userId,
+      },
+    });
+  } else {
+    // Try to find a workspace for the user to broadcast to
+    try {
+      const memberships = await db
+        .select({ workspaceId: workspaceMembers.workspaceId })
+        .from(workspaceMembers)
+        .where(eq(workspaceMembers.userId, params.userId));
+      for (const m of memberships) {
+        broadcastToWorkspace(m.workspaceId, {
+          type: "notification",
+          data: {
+            id: notification.id,
+            title: notification.title,
+            message: notification.message,
+            type: notification.type,
+            userId: notification.userId,
+          },
+        });
+      }
+    } catch {
+      // Non-critical, skip SSE broadcast
+    }
+  }
+
   return notification;
 }
 
@@ -122,11 +160,11 @@ export async function getUsersByUsernames(usernames: string[]) {
   if (usernames.length === 0) return [];
 
   const { users } = await import("@/db/schema");
-  const { ilike, or } = await import("drizzle-orm");
+  const { eq: eqOp, or } = await import("drizzle-orm");
 
-  // Build OR conditions for each username
-  const conditions = usernames.map((username) => 
-    ilike(users.name, username)
+  // Build OR conditions for each username (exact match)
+  const conditions = usernames.map((username) =>
+    eqOp(users.name, username)
   );
 
   const foundUsers = await db
@@ -149,7 +187,8 @@ export async function notifyMentions(
   mentionedByUserId: string,
   entityType: string,
   entityId: string,
-  taskTitle?: string
+  taskTitle?: string,
+  workspaceId?: string
 ) {
   const usernames = parseMentions(content);
   if (usernames.length === 0) return [];
@@ -177,6 +216,7 @@ export async function notifyMentions(
       entityId,
       taskTitle: taskTitle,
       mentionedBy: mentionedByName,
+      workspaceId,
     });
     createdNotifications.push(notification);
   }

@@ -1,20 +1,47 @@
-import { NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
+import { auth } from "@/auth"
 import { db } from "@/db"
-import { customFieldDefinitions } from "@/db/schema"
+import { customFieldDefinitions, lists, spaces, workspaceMembers } from "@/db/schema"
 import { eq, and } from "drizzle-orm"
 
-export async function PUT(
-  request: Request,
-  { params }: { params: Promise<{ id: string; fieldId: string }> }
-) {
+interface RouteParams {
+  params: Promise<{ id: string; fieldId: string }>
+}
+
+async function checkListAccess(listId: string, userId: string) {
+  const list = await db.query.lists.findFirst({ where: eq(lists.id, listId) })
+  if (!list) return null
+  const space = await db.query.spaces.findFirst({ where: eq(spaces.id, list.spaceId) })
+  if (!space) return null
+  const membership = await db.query.workspaceMembers.findFirst({
+    where: and(
+      eq(workspaceMembers.workspaceId, space.workspaceId),
+      eq(workspaceMembers.userId, userId)
+    ),
+  })
+  return membership ? { list, space, membership } : null
+}
+
+export async function PUT(request: NextRequest, { params }: RouteParams) {
   try {
+    const session = await auth()
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
     const { id: listId, fieldId } = await params
+
+    const access = await checkListAccess(listId, session.user.id)
+    if (!access) {
+      return NextResponse.json({ error: "Access denied" }, { status: 403 })
+    }
+
     const body = await request.json()
     const { name, type, options, order } = body
 
     const validTypes = [
       "text", "textarea", "number", "date", "time", "datetime",
-      "checkbox", "select", "multiSelect", "url", "email", 
+      "checkbox", "select", "multiSelect", "url", "email",
       "phone", "currency", "percentage", "user"
     ]
     if (type && !validTypes.includes(type)) {
@@ -56,12 +83,19 @@ export async function PUT(
   }
 }
 
-export async function DELETE(
-  request: Request,
-  { params }: { params: Promise<{ id: string; fieldId: string }> }
-) {
+export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
+    const session = await auth()
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
     const { id: listId, fieldId } = await params
+
+    const access = await checkListAccess(listId, session.user.id)
+    if (!access) {
+      return NextResponse.json({ error: "Access denied" }, { status: 403 })
+    }
 
     const [deletedField] = await db
       .delete(customFieldDefinitions)

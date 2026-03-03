@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { db } from "@/db";
 import { workspaceMembers, users, workspaces } from "@/db/schema";
 import { eq, and, ilike, or } from "drizzle-orm";
+import { sendInviteEmail } from "@/lib/email";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -180,6 +181,18 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         )
       )
       .limit(1);
+
+    // Send invite email (fire-and-forget — don't block the response)
+    const workspace = await db.query.workspaces.findFirst({
+      where: eq(workspaces.id, workspaceId),
+      columns: { name: true },
+    });
+    const inviterName = session.user.name || session.user.email || "Someone";
+    sendInviteEmail(
+      userToAdd.email!,
+      workspace?.name ?? "a workspace",
+      inviterName
+    ).catch((err) => console.error("[Email] Failed to send invite:", err));
 
     return NextResponse.json({ member: memberWithUser[0] }, { status: 201 });
   } catch (error) {

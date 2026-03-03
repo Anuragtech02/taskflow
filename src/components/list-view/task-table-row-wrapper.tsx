@@ -1,7 +1,7 @@
 "use client"
 
 import { TaskTableRow } from "./task-table-row"
-import { useTaskAssignees } from "@/hooks/useQueries"
+import { useTaskAssignees, useTaskLabels } from "@/hooks/useQueries"
 import type { TaskResponse } from "@/lib/api"
 
 interface TaskTableRowWrapperProps {
@@ -28,6 +28,7 @@ interface TaskTableRowWrapperProps {
 
 export function TaskTableRowWrapper(props: TaskTableRowWrapperProps) {
   const { data: taskAssignees = [] } = useTaskAssignees(props.task.id)
+  const { data: taskLabels = [] } = useTaskLabels(props.task.id)
 
   // Transform TaskAssigneeResponse to the format expected by TaskTableRow's assignees prop
   const assignees = taskAssignees.map((ta) => ({
@@ -38,5 +39,12 @@ export function TaskTableRowWrapper(props: TaskTableRowWrapperProps) {
     },
   }))
 
-  return <TaskTableRow {...props} assignees={assignees} />
+  // Transform labels to the format expected by TaskTableRow's tags prop
+  const tags = taskLabels.map((l) => ({
+    id: l.id,
+    name: l.name,
+    color: l.color,
+  }))
+
+  return <TaskTableRow {...props} assignees={assignees} tags={tags} />
 }

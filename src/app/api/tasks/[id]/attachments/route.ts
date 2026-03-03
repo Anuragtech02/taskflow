@@ -2,9 +2,24 @@ import { NextRequest, NextResponse } from "next/server";
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { auth } from "@/auth";
 import { db } from "@/db";
-import { taskAttachments, taskActivities } from "@/db/schema";
-import { eq, desc } from "drizzle-orm";
+import { taskAttachments, taskActivities, tasks, lists, spaces, workspaceMembers } from "@/db/schema";
+import { eq, and, desc } from "drizzle-orm";
 import { randomUUID } from "crypto";
+
+async function checkTaskAccess(taskId: string, userId: string) {
+  const task = await db.query.tasks.findFirst({
+    where: eq(tasks.id, taskId),
+    with: { list: { with: { space: true } } },
+  });
+  if (!task) return null;
+  const membership = await db.query.workspaceMembers.findFirst({
+    where: and(
+      eq(workspaceMembers.workspaceId, task.list.space.workspaceId),
+      eq(workspaceMembers.userId, userId)
+    ),
+  });
+  return membership ? task : null;
+}
 
 const s3Client = new S3Client({
   endpoint: process.env.S3_ENDPOINT || "http://minio:9000",
@@ -50,6 +65,12 @@ export async function GET(
 
     const { id: taskId } = await params;
 
+    // Check workspace membership
+    const taskAccess = await checkTaskAccess(taskId, session.user.id);
+    if (!taskAccess) {
+      return NextResponse.json({ error: "Access denied" }, { status: 403 });
+    }
+
     const attachments = await db
       .select({
         id: taskAttachments.id,
@@ -93,6 +114,13 @@ export async function POST(
     }
 
     const { id: taskId } = await params;
+
+    // Check workspace membership
+    const taskAccess = await checkTaskAccess(taskId, session.user.id);
+    if (!taskAccess) {
+      return NextResponse.json({ error: "Access denied" }, { status: 403 });
+    }
+
     const formData = await request.formData();
     const file = formData.get("file") as File | null;
 
@@ -191,6 +219,13 @@ export async function DELETE(
     }
 
     const { id: taskId } = await params;
+
+    // Check workspace membership
+    const taskAccess = await checkTaskAccess(taskId, session.user.id);
+    if (!taskAccess) {
+      return NextResponse.json({ error: "Access denied" }, { status: 403 });
+    }
+
     const { searchParams } = new URL(request.url);
     const attachmentId = searchParams.get("attachmentId");
 

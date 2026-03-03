@@ -1,9 +1,10 @@
 "use client"
 
 import { useState } from "react"
-import { useParams, useRouter } from "next/navigation"
-import { Zap, Plus, Trash2, ArrowRight, Settings, Users, Tag, Bell } from "lucide-react"
+import { useParams } from "next/navigation"
+import { Zap, Plus, Trash2, ArrowRight, Settings, Users, Tag, Bell, Pencil } from "lucide-react"
 import { useAutomations, useCreateAutomation, useUpdateAutomation, useDeleteAutomation } from "@/hooks/useAutomations"
+import { useWorkspaceMembers, useLabels } from "@/hooks/useQueries"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Switch } from "@/components/ui/switch"
@@ -12,11 +13,12 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
+import { Textarea } from "@/components/ui/textarea"
 
 const TRIGGER_TYPES = [
   { value: "status_change", label: "Status Change" },
   { value: "task_created", label: "Task Created" },
-  { value: "due_date", label: "Due Date" },
+  { value: "due_date_approaching", label: "Due Date Approaching" },
   { value: "assignment", label: "Assignment" },
 ]
 
@@ -24,24 +26,103 @@ const ACTION_TYPES = [
   { value: "change_status", label: "Change Status", icon: Settings },
   { value: "assign_user", label: "Assign User", icon: Users },
   { value: "add_label", label: "Add Label", icon: Tag },
-  { value: "notify", label: "Send Notification", icon: Bell },
+  { value: "send_notification", label: "Send Notification", icon: Bell },
 ]
+
+interface AutomationFormData {
+  name: string
+  triggerType: string
+  fromStatus: string
+  toStatus: string
+  actionType: string
+  actionStatus: string
+  actionUserId: string
+  actionLabelId: string
+  notifyUserId: string
+  notifyTitle: string
+  notifyMessage: string
+}
+
+const emptyForm: AutomationFormData = {
+  name: "",
+  triggerType: "",
+  fromStatus: "",
+  toStatus: "",
+  actionType: "",
+  actionStatus: "",
+  actionUserId: "",
+  actionLabelId: "",
+  notifyUserId: "",
+  notifyTitle: "",
+  notifyMessage: "",
+}
+
+function buildTriggerConfig(form: AutomationFormData): Record<string, unknown> {
+  switch (form.triggerType) {
+    case "status_change":
+      return { fromStatus: form.fromStatus, toStatus: form.toStatus }
+    case "assignment":
+      return {}
+    case "due_date_approaching":
+      return {}
+    case "task_created":
+      return {}
+    default:
+      return {}
+  }
+}
+
+function buildActionConfig(form: AutomationFormData): Record<string, unknown> {
+  switch (form.actionType) {
+    case "change_status":
+      return { status: form.actionStatus }
+    case "assign_user":
+      return { userId: form.actionUserId }
+    case "add_label":
+      return { labelId: form.actionLabelId }
+    case "send_notification":
+      return { userId: form.notifyUserId, title: form.notifyTitle, message: form.notifyMessage }
+    default:
+      return {}
+  }
+}
+
+function formFromAutomation(automation: {
+  name: string
+  triggerType: string
+  triggerConfig: Record<string, unknown>
+  actionType: string
+  actionConfig: Record<string, unknown>
+}): AutomationFormData {
+  const tc = automation.triggerConfig || {}
+  const ac = automation.actionConfig || {}
+  return {
+    name: automation.name,
+    triggerType: automation.triggerType,
+    fromStatus: (tc.fromStatus as string) || "",
+    toStatus: (tc.toStatus as string) || "",
+    actionType: automation.actionType,
+    actionStatus: (ac.status as string) || "",
+    actionUserId: (ac.userId as string) || "",
+    actionLabelId: (ac.labelId as string) || "",
+    notifyUserId: (ac.userId as string) || "",
+    notifyTitle: (ac.title as string) || "",
+    notifyMessage: (ac.message as string) || "",
+  }
+}
 
 export default function AutomationsPage() {
   const params = useParams()
-  const router = useRouter()
   const workspaceId = params.id as string
 
-  const [open, setOpen] = useState(false)
-  const [formData, setFormData] = useState({
-    name: "",
-    triggerType: "",
-    triggerValue: "",
-    actionType: "",
-    actionValue: "",
-  })
+  const [createOpen, setCreateOpen] = useState(false)
+  const [editOpen, setEditOpen] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [formData, setFormData] = useState<AutomationFormData>(emptyForm)
 
   const { data: automations, isLoading } = useAutomations(workspaceId)
+  const { data: members } = useWorkspaceMembers(workspaceId)
+  const { data: labels } = useLabels(workspaceId)
   const createMutation = useCreateAutomation()
   const updateMutation = useUpdateAutomation()
   const deleteMutation = useDeleteAutomation()
@@ -52,13 +133,38 @@ export default function AutomationsPage() {
       data: {
         name: formData.name,
         triggerType: formData.triggerType,
-        triggerConfig: { value: formData.triggerValue },
+        triggerConfig: buildTriggerConfig(formData),
         actionType: formData.actionType,
-        actionConfig: { value: formData.actionValue },
+        actionConfig: buildActionConfig(formData),
       },
     })
-    setOpen(false)
-    setFormData({ name: "", triggerType: "", triggerValue: "", actionType: "", actionValue: "" })
+    setCreateOpen(false)
+    setFormData(emptyForm)
+  }
+
+  const handleEdit = (automationId: string) => {
+    const automation = automations?.find(a => a.id === automationId)
+    if (!automation) return
+    setEditingId(automationId)
+    setFormData(formFromAutomation(automation))
+    setEditOpen(true)
+  }
+
+  const handleSaveEdit = () => {
+    if (!editingId) return
+    updateMutation.mutate({
+      automationId: editingId,
+      data: {
+        name: formData.name,
+        triggerType: formData.triggerType,
+        triggerConfig: buildTriggerConfig(formData),
+        actionType: formData.actionType,
+        actionConfig: buildActionConfig(formData),
+      },
+    })
+    setEditOpen(false)
+    setEditingId(null)
+    setFormData(emptyForm)
   }
 
   const handleToggle = (automationId: string, enabled: boolean) => {
@@ -71,13 +177,206 @@ export default function AutomationsPage() {
     }
   }
 
-  const getTriggerLabel = (type: string) => {
-    return TRIGGER_TYPES.find((t) => t.value === type)?.label || type
+  const getTriggerLabel = (type: string) =>
+    TRIGGER_TYPES.find((t) => t.value === type)?.label || type
+
+  const getActionLabel = (type: string) =>
+    ACTION_TYPES.find((a) => a.value === type)?.label || type
+
+  const renderTriggerConfig = () => {
+    if (formData.triggerType === "status_change") {
+      return (
+        <div className="grid grid-cols-2 gap-2">
+          <div className="grid gap-1">
+            <Label className="text-xs">From status</Label>
+            <Input
+              placeholder="e.g. todo"
+              value={formData.fromStatus}
+              onChange={(e) => setFormData({ ...formData, fromStatus: e.target.value })}
+            />
+          </div>
+          <div className="grid gap-1">
+            <Label className="text-xs">To status</Label>
+            <Input
+              placeholder="e.g. done"
+              value={formData.toStatus}
+              onChange={(e) => setFormData({ ...formData, toStatus: e.target.value })}
+            />
+          </div>
+        </div>
+      )
+    }
+    return null
   }
 
-  const getActionLabel = (type: string) => {
-    return ACTION_TYPES.find((a) => a.value === type)?.label || type
+  const renderActionConfig = () => {
+    switch (formData.actionType) {
+      case "change_status":
+        return (
+          <div className="grid gap-2">
+            <Label className="text-xs">Change status to</Label>
+            <Input
+              placeholder="e.g. done"
+              value={formData.actionStatus}
+              onChange={(e) => setFormData({ ...formData, actionStatus: e.target.value })}
+            />
+          </div>
+        )
+      case "assign_user":
+        return (
+          <div className="grid gap-2">
+            <Label className="text-xs">Assign user</Label>
+            <Select
+              value={formData.actionUserId}
+              onValueChange={(value) => setFormData({ ...formData, actionUserId: value })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select user" />
+              </SelectTrigger>
+              <SelectContent>
+                {members?.map((m) => (
+                  <SelectItem key={m.id} value={m.id}>
+                    {m.name || m.email}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )
+      case "add_label":
+        return (
+          <div className="grid gap-2">
+            <Label className="text-xs">Add label</Label>
+            <Select
+              value={formData.actionLabelId}
+              onValueChange={(value) => setFormData({ ...formData, actionLabelId: value })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select label" />
+              </SelectTrigger>
+              <SelectContent>
+                {labels?.map((l) => (
+                  <SelectItem key={l.id} value={l.id}>
+                    <div className="flex items-center gap-2">
+                      <div
+                        className="w-3 h-3 rounded-full"
+                        style={{ backgroundColor: l.color }}
+                      />
+                      {l.name}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )
+      case "send_notification":
+        return (
+          <div className="grid gap-2">
+            <div className="grid gap-1">
+              <Label className="text-xs">Notify user</Label>
+              <Select
+                value={formData.notifyUserId}
+                onValueChange={(value) => setFormData({ ...formData, notifyUserId: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select user" />
+                </SelectTrigger>
+                <SelectContent>
+                  {members?.map((m) => (
+                    <SelectItem key={m.id} value={m.id}>
+                      {m.name || m.email}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-1">
+              <Label className="text-xs">Title</Label>
+              <Input
+                placeholder="Notification title"
+                value={formData.notifyTitle}
+                onChange={(e) => setFormData({ ...formData, notifyTitle: e.target.value })}
+              />
+            </div>
+            <div className="grid gap-1">
+              <Label className="text-xs">Message</Label>
+              <Textarea
+                placeholder="Notification message"
+                value={formData.notifyMessage}
+                onChange={(e) => setFormData({ ...formData, notifyMessage: e.target.value })}
+                rows={2}
+              />
+            </div>
+          </div>
+        )
+      default:
+        return null
+    }
   }
+
+  const renderFormContent = () => (
+    <div className="grid gap-4 py-4">
+      <div className="grid gap-2">
+        <Label htmlFor="name">Automation Name</Label>
+        <Input
+          id="name"
+          placeholder="e.g., Move to Done on review approval"
+          value={formData.name}
+          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+        />
+      </div>
+
+      <div className="grid gap-2">
+        <Label>When this happens (Trigger)</Label>
+        <Select
+          value={formData.triggerType}
+          onValueChange={(value) => setFormData({ ...formData, triggerType: value })}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Select trigger" />
+          </SelectTrigger>
+          <SelectContent>
+            {TRIGGER_TYPES.map((trigger) => (
+              <SelectItem key={trigger.value} value={trigger.value}>
+                {trigger.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {renderTriggerConfig()}
+
+      <div className="flex items-center justify-center py-1">
+        <ArrowRight className="h-5 w-5 text-muted-foreground" />
+      </div>
+
+      <div className="grid gap-2">
+        <Label>Do this (Action)</Label>
+        <Select
+          value={formData.actionType}
+          onValueChange={(value) => setFormData({ ...formData, actionType: value })}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Select action" />
+          </SelectTrigger>
+          <SelectContent>
+            {ACTION_TYPES.map((action) => (
+              <SelectItem key={action.value} value={action.value}>
+                <div className="flex items-center gap-2">
+                  <action.icon className="h-4 w-4" />
+                  {action.label}
+                </div>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {renderActionConfig()}
+    </div>
+  )
 
   if (isLoading) {
     return (
@@ -103,7 +402,7 @@ export default function AutomationsPage() {
           <p className="text-muted-foreground">Automate your workflow with triggers and actions</p>
         </div>
 
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog open={createOpen} onOpenChange={setCreateOpen}>
           <DialogTrigger asChild>
             <Button>
               <Plus className="h-4 w-4 mr-2" />
@@ -117,104 +416,9 @@ export default function AutomationsPage() {
                 Set up a trigger and action to automate your tasks
               </DialogDescription>
             </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid gap-2">
-                <Label htmlFor="name">Automation Name</Label>
-                <Input
-                  id="name"
-                  placeholder="e.g., Move to Done"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                />
-              </div>
-
-              <div className="grid gap-2">
-                <Label>When this happens (Trigger)</Label>
-                <Select
-                  value={formData.triggerType}
-                  onValueChange={(value) => setFormData({ ...formData, triggerType: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select trigger" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {TRIGGER_TYPES.map((trigger) => (
-                      <SelectItem key={trigger.value} value={trigger.value}>
-                        {trigger.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {formData.triggerType === "status_change" && (
-                <div className="grid gap-2">
-                  <Label>When status changes to</Label>
-                  <Select
-                    value={formData.triggerValue}
-                    onValueChange={(value) => setFormData({ ...formData, triggerValue: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="done">Done</SelectItem>
-                      <SelectItem value="in_progress">In Progress</SelectItem>
-                      <SelectItem value="todo">To Do</SelectItem>
-                      <SelectItem value="review">In Review</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-
-              <div className="flex items-center justify-center py-2">
-                <ArrowRight className="h-5 w-5 text-muted-foreground" />
-              </div>
-
-              <div className="grid gap-2">
-                <Label>Do this (Action)</Label>
-                <Select
-                  value={formData.actionType}
-                  onValueChange={(value) => setFormData({ ...formData, actionType: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select action" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {ACTION_TYPES.map((action) => (
-                      <SelectItem key={action.value} value={action.value}>
-                        <div className="flex items-center gap-2">
-                          <action.icon className="h-4 w-4" />
-                          {action.label}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {formData.actionType === "change_status" && (
-                <div className="grid gap-2">
-                  <Label>Change status to</Label>
-                  <Select
-                    value={formData.actionValue}
-                    onValueChange={(value) => setFormData({ ...formData, actionValue: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="done">Done</SelectItem>
-                      <SelectItem value="in_progress">In Progress</SelectItem>
-                      <SelectItem value="todo">To Do</SelectItem>
-                      <SelectItem value="review">In Review</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-            </div>
+            {renderFormContent()}
             <DialogFooter>
-              <Button variant="outline" onClick={() => setOpen(false)}>
+              <Button variant="outline" onClick={() => setCreateOpen(false)}>
                 Cancel
               </Button>
               <Button onClick={handleCreate} disabled={!formData.name || !formData.triggerType || !formData.actionType}>
@@ -225,6 +429,27 @@ export default function AutomationsPage() {
         </Dialog>
       </div>
 
+      {/* Edit Dialog */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Edit Automation</DialogTitle>
+            <DialogDescription>
+              Update trigger and action configuration
+            </DialogDescription>
+          </DialogHeader>
+          {renderFormContent()}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveEdit} disabled={!formData.name || !formData.triggerType || !formData.actionType}>
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {(!automations || automations.length === 0) ? (
         <Card className="border-dashed">
           <CardContent className="flex flex-col items-center justify-center py-12">
@@ -233,7 +458,7 @@ export default function AutomationsPage() {
             <p className="text-muted-foreground text-center mb-4">
               Create your first automation to streamline your workflow
             </p>
-            <Button onClick={() => setOpen(true)}>
+            <Button onClick={() => setCreateOpen(true)}>
               <Plus className="h-4 w-4 mr-2" />
               Create Automation
             </Button>
@@ -262,23 +487,35 @@ export default function AutomationsPage() {
                   <ArrowRight className="h-4 w-4 text-muted-foreground" />
                   <span>{getActionLabel(automation.actionType)}</span>
                   {(() => {
-                    const cfg = automation.triggerConfig as Record<string, string> | null
-                    return cfg?.value ? (
+                    const ac = automation.actionConfig as Record<string, string> | null
+                    const displayValue = ac?.status || ac?.title || ""
+                    return displayValue ? (
                       <Badge variant="outline" className="ml-auto text-xs">
-                        {cfg.value}
+                        {displayValue}
                       </Badge>
                     ) : null
                   })()}
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="mt-3 text-muted-foreground hover:text-destructive"
-                  onClick={() => handleDelete(automation.id)}
-                >
-                  <Trash2 className="h-4 w-4 mr-1" />
-                  Delete
-                </Button>
+                <div className="flex gap-1 mt-3">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-muted-foreground"
+                    onClick={() => handleEdit(automation.id)}
+                  >
+                    <Pencil className="h-4 w-4 mr-1" />
+                    Edit
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-muted-foreground hover:text-destructive"
+                    onClick={() => handleDelete(automation.id)}
+                  >
+                    <Trash2 className="h-4 w-4 mr-1" />
+                    Delete
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           ))}

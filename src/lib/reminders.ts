@@ -1,6 +1,7 @@
 import { db } from "@/db";
-import { reminders, notifications } from "@/db/schema";
+import { reminders } from "@/db/schema";
 import { eq, and, lte } from "drizzle-orm";
+import { createNotification } from "@/lib/notifications";
 
 /**
  * Check for pending reminders and create notifications
@@ -46,17 +47,20 @@ export async function checkAndSendReminders(): Promise<number> {
     try {
       // Create a notification for the user
       const taskTitle = reminder.task?.title || "Untitled Task";
-      const dueDateStr = reminder.task?.dueDate 
+      const dueDateStr = reminder.task?.dueDate
         ? new Date(reminder.task.dueDate).toLocaleDateString()
         : "No due date";
 
-      await db.insert(notifications).values({
+      await createNotification({
         userId: reminder.userId,
-        type: "task_reminder",
+        type: "task_due_soon",
         title: `Reminder: ${taskTitle}`,
         message: `Task "${taskTitle}" is due on ${dueDateStr}`,
         entityType: "task",
         entityId: reminder.taskId,
+        taskTitle,
+        dueDate: reminder.task?.dueDate ? new Date(reminder.task.dueDate) : undefined,
+        workspaceId: reminder.task?.list?.space?.workspaceId,
       });
 
       // Mark reminder as sent

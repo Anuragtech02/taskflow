@@ -60,7 +60,7 @@ export function broadcastToWorkspace(workspaceId: string, event: SSEEvent) {
   const connections = workspaceConnections.get(workspaceId);
   if (!connections || connections.size === 0) return;
 
-  const message = `data: ${JSON.stringify(event)}\n\n`;
+  const message = `event: ${event.type}\ndata: ${JSON.stringify(event.data)}\n\n`;
   const encoded = new TextEncoder().encode(message);
 
   for (const controller of connections) {

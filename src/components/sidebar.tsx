@@ -22,6 +22,7 @@ import {
   ClipboardList,
   Bot,
   LogOut,
+  Target,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -248,15 +249,22 @@ export function Sidebar() {
   const [showCreateWorkspace, setShowCreateWorkspace] = useState(false)
   const [showCreateSpace, setShowCreateSpace] = useState(false)
 
+  const pathname = usePathname()
   const { data: workspaces, isLoading: workspacesLoading } = useWorkspaces()
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(null)
 
-  // Pick the first workspace by default
+  // Sync selected workspace from URL path
   useEffect(() => {
+    const match = pathname?.match(/\/dashboard\/workspaces\/([^/]+)/)
+    if (match?.[1] && workspaces?.some((w) => w.id === match[1])) {
+      setSelectedWorkspaceId(match[1])
+      return
+    }
+    // Fallback: pick the first workspace
     if (workspaces && workspaces.length > 0 && !selectedWorkspaceId) {
       setSelectedWorkspaceId(workspaces[0].id)
     }
-  }, [workspaces, selectedWorkspaceId])
+  }, [workspaces, selectedWorkspaceId, pathname])
 
   const { data: spaces } = useSpaces(selectedWorkspaceId ?? undefined)
 
@@ -354,6 +362,20 @@ export function Sidebar() {
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="right">Automations</TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => router.push(`/dashboard/workspaces/${selectedWorkspaceId}/goals`)}
+                  >
+                    <Target className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="right">Goals</TooltipContent>
               </Tooltip>
 
               <Tooltip>
@@ -503,6 +525,15 @@ export function Sidebar() {
               >
                 <Bot className="h-4 w-4" />
                 <span className="text-sm">Automations</span>
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full justify-start gap-2 h-8"
+                onClick={() => router.push(`/dashboard/workspaces/${selectedWorkspaceId}/goals`)}
+              >
+                <Target className="h-4 w-4" />
+                <span className="text-sm">Goals</span>
               </Button>
               <Button
                 variant="ghost"

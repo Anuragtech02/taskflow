@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { db } from "@/db";
 import { sprints, workspaceMembers, sprintTasks, tasks, taskActivities } from "@/db/schema";
-import { eq, and, gte, lte, asc } from "drizzle-orm";
+import { eq, and, gte, lte, asc, inArray } from "drizzle-orm";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -54,52 +54,33 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       });
     }
 
-    // Get status change activities for tasks in sprint
-    const statusChanges = await db.query.taskActivities.findMany({
-      where: and(
-        eq(taskActivities.action, "updated"),
-        eq(taskActivities.field, "status"),
-        eq(taskActivities.newValue, "completed"),
-        eq(taskActivities.taskId, taskIds[0]) // Need to handle multiple tasks
-      ),
-      orderBy: [asc(taskActivities.createdAt)],
-    });
-
-    // For simplicity, let's get task updates in the date range
     // Generate burndown data for each day of the sprint
     const startDate = new Date(sprint.startDate);
     const endDate = new Date(sprint.endDate);
     const burndown: Array<{ date: string; completed: number; remaining: number }> = [];
 
-    // Get all completion activities in the sprint period
-    const completedActivities = await db.query.taskActivities.findMany({
-      where: and(
-        eq(taskActivities.action, "updated"),
-        eq(taskActivities.field, "status"),
-        // Tasks in this sprint
-        // Note: This is simplified, ideally we'd use sql `in` clause
-      ),
-    });
-
-    // Get tasks that were completed during the sprint
-    const allTaskActivities = await db
+    // Get all status-change-to-done activities for sprint tasks within the sprint period
+    const completionActivities = await db
       .select()
       .from(taskActivities)
       .where(
         and(
           eq(taskActivities.action, "updated"),
           eq(taskActivities.field, "status"),
-          eq(taskActivities.newValue, "completed"),
+          eq(taskActivities.newValue, "done"),
+          inArray(taskActivities.taskId, taskIds),
           gte(taskActivities.createdAt, startDate),
           lte(taskActivities.createdAt, endDate)
         )
       )
       .orderBy(asc(taskActivities.createdAt));
 
-    // Count completions per day
+    // Count completions per day (deduplicate by taskId - only first completion counts)
     const completionsByDate = new Map<string, number>();
-    for (const activity of allTaskActivities) {
-      if (taskIds.includes(activity.taskId)) {
+    const completedTaskIds = new Set<string>();
+    for (const activity of completionActivities) {
+      if (!completedTaskIds.has(activity.taskId)) {
+        completedTaskIds.add(activity.taskId);
         const dateKey = activity.createdAt.toISOString().split("T")[0];
         completionsByDate.set(dateKey, (completionsByDate.get(dateKey) || 0) + 1);
       }

@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
     // Calculate progress for each goal
     const goalsWithProgress = goalsList.map((goal) => {
       const totalTarget = goal.keyResults.reduce((sum, kr) => sum + kr.targetValue, 0);
-      const totalCurrent = goal.keyResults.reduce((sum, kr) => sum + kr.currentValue, 0);
+      const totalCurrent = goal.keyResults.reduce((sum, kr) => sum + (kr.currentValue ?? 0), 0);
       const progress = totalTarget > 0 ? Math.round((totalCurrent / totalTarget) * 100) : 0;
 
       return {

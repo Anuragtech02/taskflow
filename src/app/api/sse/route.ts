@@ -1,5 +1,8 @@
 import { NextRequest } from "next/server"
 import { auth } from "@/auth"
+import { db } from "@/db"
+import { workspaceMembers } from "@/db/schema"
+import { eq, and } from "drizzle-orm"
 import { addConnection, removeConnection, type SSEEvent } from "@/lib/sse"
 
 export const dynamic = "force-dynamic"
@@ -13,6 +16,19 @@ export async function GET(request: NextRequest) {
 
   const userId = session.user.id
   const workspaceId = request.nextUrl.searchParams.get("workspaceId")
+
+  // Verify workspace membership if workspaceId is provided
+  if (workspaceId) {
+    const membership = await db.query.workspaceMembers.findFirst({
+      where: and(
+        eq(workspaceMembers.workspaceId, workspaceId),
+        eq(workspaceMembers.userId, userId)
+      ),
+    })
+    if (!membership) {
+      return new Response("Forbidden", { status: 403 })
+    }
+  }
 
   // Create a readable stream for SSE
   const stream = new ReadableStream({

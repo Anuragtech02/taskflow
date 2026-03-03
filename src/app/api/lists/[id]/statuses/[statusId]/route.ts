@@ -1,14 +1,41 @@
-import { NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
+import { auth } from "@/auth"
 import { db } from "@/db"
-import { statuses, tasks } from "@/db/schema"
+import { statuses, tasks, lists, spaces, workspaceMembers } from "@/db/schema"
 import { eq, and } from "drizzle-orm"
 
-export async function PUT(
-  request: Request,
-  { params }: { params: Promise<{ id: string; statusId: string }> }
-) {
+interface RouteParams {
+  params: Promise<{ id: string; statusId: string }>
+}
+
+async function checkListAccess(listId: string, userId: string) {
+  const list = await db.query.lists.findFirst({ where: eq(lists.id, listId) })
+  if (!list) return null
+  const space = await db.query.spaces.findFirst({ where: eq(spaces.id, list.spaceId) })
+  if (!space) return null
+  const membership = await db.query.workspaceMembers.findFirst({
+    where: and(
+      eq(workspaceMembers.workspaceId, space.workspaceId),
+      eq(workspaceMembers.userId, userId)
+    ),
+  })
+  return membership ? { list, space, membership } : null
+}
+
+export async function PUT(request: NextRequest, { params }: RouteParams) {
   try {
+    const session = await auth()
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
     const { id: listId, statusId } = await params
+
+    const access = await checkListAccess(listId, session.user.id)
+    if (!access) {
+      return NextResponse.json({ error: "Access denied" }, { status: 403 })
+    }
+
     const body = await request.json()
     const { name, color, order } = body
 
@@ -62,12 +89,19 @@ export async function PUT(
   }
 }
 
-export async function DELETE(
-  request: Request,
-  { params }: { params: Promise<{ id: string; statusId: string }> }
-) {
+export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
+    const session = await auth()
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
     const { id: listId, statusId } = await params
+
+    const access = await checkListAccess(listId, session.user.id)
+    if (!access) {
+      return NextResponse.json({ error: "Access denied" }, { status: 403 })
+    }
 
     // Check if status exists
     const existingStatus = await db
@@ -83,34 +117,36 @@ export async function DELETE(
       )
     }
 
-    // Check if there are tasks with this status
+    // Only migrate tasks that have the deleted status, not all tasks in the list
     const tasksWithStatus = await db
       .select({ id: tasks.id })
       .from(tasks)
-      .where(eq(tasks.listId, listId))
+      .where(and(
+        eq(tasks.listId, listId),
+        eq(tasks.status, existingStatus[0].name.toLowerCase().replace(/\s+/g, "_"))
+      ))
       .limit(1)
 
-    // If there are tasks, we need to find another status to move them to
     if (tasksWithStatus.length > 0) {
-      // Get remaining statuses
       const remainingStatuses = await db
         .select()
         .from(statuses)
         .where(eq(statuses.listId, listId))
         .orderBy(statuses.order)
 
-      // Filter out the status being deleted
       const otherStatuses = remainingStatuses.filter(s => s.id !== statusId)
-      
+
       if (otherStatuses.length > 0) {
-        // Move tasks to the first remaining status
         const firstStatus = otherStatuses[0]
         const normalizedStatus = firstStatus.name.toLowerCase().replace(/\s+/g, "_")
-        
+
         await db
           .update(tasks)
           .set({ status: normalizedStatus })
-          .where(and(eq(tasks.listId, listId), eq(tasks.status, existingStatus[0].name.toLowerCase().replace(/\s+/g, "_"))))
+          .where(and(
+            eq(tasks.listId, listId),
+            eq(tasks.status, existingStatus[0].name.toLowerCase().replace(/\s+/g, "_"))
+          ))
       }
     }
 

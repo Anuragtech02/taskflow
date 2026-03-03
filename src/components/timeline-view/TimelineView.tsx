@@ -44,9 +44,10 @@ interface TaskBarData {
 }
 
 function convertToTaskBar(task: TaskResponse): TaskBarData | null {
-  if (!task.dueDate && !task.createdAt) return null
-  
-  const startDate = task.createdAt ? parseISO(task.createdAt) : new Date()
+  if (!task.dueDate && !task.startDate && !task.createdAt) return null
+
+  // Prefer startDate over createdAt for timeline positioning
+  const startDate = task.startDate ? parseISO(task.startDate) : task.createdAt ? parseISO(task.createdAt) : new Date()
   let endDate = task.dueDate ? parseISO(task.dueDate) : addDays(startDate, 7)
 
   if (endDate < startDate) {
@@ -74,6 +75,7 @@ export function TimelineView(props: TimelineViewProps) {
   const [hoveredTaskId, setHoveredTaskId] = useState<string | null>(null)
   const [tooltipPosition, setTooltipPosition] = useState<{ x: number; y: number } | null>(null)
   const timelineRef = useRef<HTMLDivElement>(null)
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
 
   const dayWidth = zoom === "Day" ? 80 : zoom === "Week" ? 40 : 20
 
@@ -133,6 +135,19 @@ export function TimelineView(props: TimelineViewProps) {
     }
   }
 
+  function scrollToToday() {
+    const container = scrollContainerRef.current
+    if (!container) return
+    const todayOffset = differenceInDays(new Date(), timelineData.start) * dayWidth
+    container.scrollLeft = Math.max(0, todayOffset - container.clientWidth / 2)
+  }
+
+  function scrollByDays(days: number) {
+    const container = scrollContainerRef.current
+    if (!container) return
+    container.scrollBy({ left: days * dayWidth, behavior: "smooth" })
+  }
+
   function onMouseMove(e: React.MouseEvent, taskId: string) {
     setHoveredTaskId(taskId)
     setTooltipPosition({ x: e.clientX, y: e.clientY })
@@ -178,11 +193,11 @@ export function TimelineView(props: TimelineViewProps) {
             ))}
           </div>
           <div className="flex items-center gap-1">
-            <Button variant="ghost" size="icon" className="h-8 w-8">
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => scrollByDays(zoom === "Day" ? -7 : zoom === "Week" ? -14 : -30)}>
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="sm" className="h-8 px-2 text-xs">Today</Button>
-            <Button variant="ghost" size="icon" className="h-8 w-8">
+            <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={scrollToToday}>Today</Button>
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => scrollByDays(zoom === "Day" ? 7 : zoom === "Week" ? 14 : 30)}>
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
@@ -231,7 +246,7 @@ export function TimelineView(props: TimelineViewProps) {
           </div>
         </div>
 
-        <div className="flex-1 overflow-x-auto overflow-y-hidden">
+        <div className="flex-1 overflow-x-auto overflow-y-hidden" ref={scrollContainerRef}>
           <div style={{ minWidth: totalWidth }}>
             <div className="h-14 flex border-b bg-muted/30 sticky top-0 z-10">
               {timelineData.days.map((day, idx) => {

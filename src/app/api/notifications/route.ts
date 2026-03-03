@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { db } from "@/db";
-import { notifications, tasks, lists, spaces } from "@/db/schema";
+import { notifications, tasks, lists, spaces, workspaceMembers } from "@/db/schema";
 import { eq, desc, and, sql } from "drizzle-orm";
 import { z } from "zod";
 
@@ -28,13 +28,12 @@ export async function GET(request: NextRequest) {
 
     const userId = session.user.id;
 
-    let baseWhere = eq(notifications.userId, userId);
-    if (unreadOnly) {
-      baseWhere = and(
-        eq(notifications.userId, userId),
-        eq(notifications.read, false)
-      );
-    }
+    const baseWhere = unreadOnly
+      ? and(
+          eq(notifications.userId, userId),
+          eq(notifications.read, false)
+        )!
+      : eq(notifications.userId, userId);
 
     const userNotifications = await db
       .select()
@@ -44,12 +43,11 @@ export async function GET(request: NextRequest) {
       .limit(limit)
       .offset(offset);
 
-    // Enrich notifications with navigation context (workspaceId, spaceId, listId)
-    // by joining with tasks -> lists -> spaces when entityType is "task"
+    // Enrich notifications with navigation context
     const enrichedNotifications = await Promise.all(
       userNotifications.map(async (notification) => {
         const enriched = { ...notification } as Record<string, unknown>;
-        
+
         if (notification.entityType === "task" && notification.entityId) {
           try {
             const taskWithContext = await db
@@ -74,7 +72,7 @@ export async function GET(request: NextRequest) {
             console.error("Error enriching notification:", err);
           }
         }
-        
+
         return enriched;
       })
     );
@@ -113,8 +111,35 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const validatedData = createNotificationSchema.parse(body);
 
-    // Verify the requesting user has access to create notifications for this user
-    // (In practice, this would be called internally by other parts of the system)
+    // Validate that the target user shares a workspace with the requesting user
+    const senderWorkspaces = await db
+      .select({ workspaceId: workspaceMembers.workspaceId })
+      .from(workspaceMembers)
+      .where(eq(workspaceMembers.userId, session.user.id));
+
+    const senderWorkspaceIds = senderWorkspaces.map(w => w.workspaceId);
+
+    if (senderWorkspaceIds.length > 0) {
+      const targetMembership = await db.query.workspaceMembers.findFirst({
+        where: and(
+          eq(workspaceMembers.userId, validatedData.userId),
+          sql`${workspaceMembers.workspaceId} IN ${senderWorkspaceIds}`
+        ),
+      });
+
+      if (!targetMembership) {
+        return NextResponse.json(
+          { error: "Cannot create notifications for users outside your workspaces" },
+          { status: 403 }
+        );
+      }
+    } else {
+      return NextResponse.json(
+        { error: "Access denied" },
+        { status: 403 }
+      );
+    }
+
     const [notification] = await db.insert(notifications).values({
       userId: validatedData.userId,
       type: validatedData.type,
@@ -133,6 +158,65 @@ export async function POST(request: NextRequest) {
       );
     }
     console.error("Error creating notification:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PATCH(request: NextRequest) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const body = await request.json();
+    const { notificationId, markAllRead } = body;
+
+    if (markAllRead) {
+      await db
+        .update(notifications)
+        .set({ read: true })
+        .where(
+          and(
+            eq(notifications.userId, session.user.id),
+            eq(notifications.read, false)
+          )
+        );
+
+      return NextResponse.json({ success: true });
+    }
+
+    if (notificationId) {
+      const [updated] = await db
+        .update(notifications)
+        .set({ read: true })
+        .where(
+          and(
+            eq(notifications.id, notificationId),
+            eq(notifications.userId, session.user.id)
+          )
+        )
+        .returning();
+
+      if (!updated) {
+        return NextResponse.json(
+          { error: "Notification not found" },
+          { status: 404 }
+        );
+      }
+
+      return NextResponse.json({ notification: updated });
+    }
+
+    return NextResponse.json(
+      { error: "Provide notificationId or markAllRead: true" },
+      { status: 400 }
+    );
+  } catch (error) {
+    console.error("Error updating notification:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

@@ -37,7 +37,7 @@ function getEmailTemplate(title: string, content: string, cta?: { text: string; 
           <!-- Header -->
           <tr>
             <td style="padding: 24px; border-bottom: 1px solid #e2e8f0;">
-              <h1 style="margin: 0; font-size: 20px; font-weight: 600; color: #1e293b;">TaskForge</h1>
+              <h1 style="margin: 0; font-size: 20px; font-weight: 600; color: #1e293b;">TaskFlow</h1>
             </td>
           </tr>
           <!-- Content -->
@@ -188,8 +188,8 @@ export async function sendWelcomeEmail(to: string, userName: string) {
   }
 
   const html = getEmailTemplate(
-    "Welcome to TaskForge!",
-    `Hi ${userName}, welcome to TaskForge! Get started by creating your first workspace and inviting your team.`,
+    "Welcome to TaskFlow!",
+    `Hi ${userName}, welcome to TaskFlow! Get started by creating your first workspace and inviting your team.`,
     { text: "Get Started", url: APP_URL }
   );
 
@@ -197,7 +197,7 @@ export async function sendWelcomeEmail(to: string, userName: string) {
     const result = await resend!.emails.send({
       from: FROM_EMAIL,
       to,
-      subject: "Welcome to TaskForge!",
+      subject: "Welcome to TaskFlow!",
       html,
     });
     return { success: true, data: result };
@@ -222,7 +222,7 @@ export async function sendInviteEmail(
 
   const html = getEmailTemplate(
     "You've been invited to a workspace",
-    `${invitedBy} invited you to join <strong>${workspaceName}</strong> on TaskForge.`,
+    `${invitedBy} invited you to join <strong>${workspaceName}</strong> on TaskFlow.`,
     { text: "Join Workspace", url: APP_URL }
   );
 

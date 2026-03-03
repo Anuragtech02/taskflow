@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { auth } from "@/auth"
 import { db } from "@/db"
 import { tasks, lists, folders, spaces, taskActivities, workspaceMembers, users } from "@/db/schema"
 import { eq, and, sql, desc, gte } from "drizzle-orm"
@@ -8,7 +9,24 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const session = await auth()
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
     const { id: workspaceId } = await params
+
+    // Check workspace membership
+    const membership = await db.query.workspaceMembers.findFirst({
+      where: and(
+        eq(workspaceMembers.workspaceId, workspaceId),
+        eq(workspaceMembers.userId, session.user.id)
+      ),
+    })
+
+    if (!membership) {
+      return NextResponse.json({ error: "Access denied" }, { status: 403 })
+    }
 
     // Get all spaces in workspace
     const workspaceSpaces = await db

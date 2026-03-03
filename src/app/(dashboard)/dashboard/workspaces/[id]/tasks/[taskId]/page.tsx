@@ -1,7 +1,7 @@
 "use client"
 
-import { use } from "react"
-import { useTask } from "@/hooks/useQueries"
+import { use, useMemo } from "react"
+import { useTask, useList } from "@/hooks/useQueries"
 import { TaskDetailPanel } from "@/components/task-detail-panel"
 import { useStatuses } from "@/hooks/useQueries"
 import { useRouter } from "next/navigation"
@@ -13,7 +13,16 @@ export default function TaskPage({ params }: { params: Promise<{ id: string; tas
   const { id: workspaceId, taskId } = use(params)
   const { data: task, isLoading } = useTask(taskId)
   const { data: statuses = [] } = useStatuses(task?.listId)
+  const { data: list } = useList(task?.listId)
   const router = useRouter()
+
+  // Build back URL using the task's actual spaceId from its list
+  const backUrl = useMemo(() => {
+    if (task?.listId && list?.spaceId) {
+      return `/dashboard/workspaces/${workspaceId}/spaces/${list.spaceId}/lists/${task.listId}`
+    }
+    return `/dashboard/workspaces/${workspaceId}`
+  }, [workspaceId, task?.listId, list?.spaceId])
 
   if (isLoading) {
     return (
@@ -38,17 +47,12 @@ export default function TaskPage({ params }: { params: Promise<{ id: string; tas
     )
   }
 
-  // Build back URL - go to the task's list if we have it, otherwise workspace
-  const backUrl = task.listId 
-    ? `/dashboard/workspaces/${workspaceId}/spaces/${workspaceId}/lists/${task.listId}`
-    : `/dashboard/workspaces/${workspaceId}`
-
   return (
     <>
       {/* Floating Back Button */}
       <div className="fixed top-4 left-4 z-[60]">
-        <Button 
-          variant="outline" 
+        <Button
+          variant="outline"
           size="sm"
           onClick={() => router.push(backUrl)}
           className="gap-2"
@@ -57,7 +61,7 @@ export default function TaskPage({ params }: { params: Promise<{ id: string; tas
           Back to List
         </Button>
       </div>
-      
+
       <TaskDetailPanel
         task={task}
         taskId={taskId}

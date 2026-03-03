@@ -25,7 +25,9 @@ export default auth((req) => {
     pathname === "/register" ||
     pathname.startsWith("/api/auth") ||
     pathname.startsWith("/api/health") ||
-    pathname.startsWith("/api/ai/generate-tasks");
+    pathname.startsWith("/api/ai/generate-tasks") ||
+    pathname.startsWith("/forms/") ||
+    pathname.startsWith("/api/forms/");
 
   // Handle subdomain tenants
   if (!isMainApp && subdomain) {

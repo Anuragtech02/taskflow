@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { useRouter, usePathname } from "next/navigation"
 import {
   Dialog,
   DialogContent,
@@ -31,6 +32,17 @@ const shortcuts = [
 export function KeyboardShortcuts() {
   const [open, setOpen] = React.useState(false)
   const taskPanel = useTaskPanel()
+  const router = useRouter()
+  const pathname = usePathname()
+
+  // Track chord state for G+X shortcuts
+  const chordRef = React.useRef<{ key: string; time: number } | null>(null)
+
+  // Extract workspaceId from current URL
+  const workspaceId = React.useMemo(() => {
+    const match = pathname?.match(/\/dashboard\/workspaces\/([^/]+)/)
+    return match?.[1] ?? null
+  }, [pathname])
 
   React.useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -68,6 +80,39 @@ export function KeyboardShortcuts() {
         return
       }
 
+      // G+X chord navigation
+      const now = Date.now()
+      if (e.key === "g" || e.key === "G") {
+        chordRef.current = { key: "g", time: now }
+        return
+      }
+
+      // Check for second key in G chord (within 1 second)
+      if (chordRef.current?.key === "g" && now - chordRef.current.time < 1000) {
+        chordRef.current = null
+        if (workspaceId) {
+          switch (e.key) {
+            case "h":
+            case "H":
+              e.preventDefault()
+              router.push("/dashboard")
+              return
+            case "d":
+            case "D":
+              e.preventDefault()
+              router.push(`/dashboard/workspaces/${workspaceId}/docs`)
+              return
+            case "s":
+            case "S":
+              e.preventDefault()
+              router.push(`/dashboard/workspaces/${workspaceId}/sprints`)
+              return
+          }
+        }
+      } else {
+        chordRef.current = null
+      }
+
       // N — focus the "new task" input in the current list view
       if (e.key === "n" || e.key === "N") {
         e.preventDefault()
@@ -91,7 +136,7 @@ export function KeyboardShortcuts() {
     }
     document.addEventListener("keydown", handler)
     return () => document.removeEventListener("keydown", handler)
-  }, [open, taskPanel])
+  }, [open, taskPanel, router, workspaceId])
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>

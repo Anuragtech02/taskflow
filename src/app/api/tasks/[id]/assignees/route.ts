@@ -5,6 +5,7 @@ import { tasks, lists, spaces, workspaceMembers, taskAssignees, users, taskActiv
 import { eq, and } from "drizzle-orm";
 import { z } from "zod";
 import { createNotification } from "@/lib/notifications";
+import { runAutomations } from "@/lib/automations";
 
 const addAssigneeSchema = z.object({
   userId: z.string().uuid(),
@@ -157,6 +158,7 @@ export async function POST(
       entityId: taskId,
       taskTitle: access.task.title,
       assignedBy: currentUser?.name || "Someone",
+      workspaceId: access.task.list.space.workspaceId,
     });
 
     // Log activity
@@ -167,6 +169,22 @@ export async function POST(
       field: "assignee",
       newValue: assignedUser?.name || assignedUser?.email || "user",
     });
+
+    // Run assignment automations
+    const previousAssignees = await db.query.taskAssignees.findMany({
+      where: eq(taskAssignees.taskId, taskId),
+    });
+    try {
+      await runAutomations("assignment", {
+        taskId,
+        workspaceId: access.task.list.space.workspaceId,
+        userId: session.user.id,
+        newAssignees: previousAssignees.map(a => a.userId),
+        previousAssignees: previousAssignees.filter(a => a.userId !== validatedData.userId).map(a => a.userId),
+      });
+    } catch (err) {
+      console.error("Error running assignment automations:", err);
+    }
 
     return NextResponse.json({ assignee: { ...assignee, user: assignedUser } }, { status: 201 });
   } catch (error) {

@@ -145,6 +145,7 @@ export async function POST(
           message: `${commentWithUser?.user?.name || "Someone"} commented on a task you're assigned to`,
           entityType: "task",
           entityId: taskId,
+          workspaceId: access.task.list.space.workspaceId,
         });
       }
     }
@@ -160,12 +161,13 @@ export async function POST(
           message: `${commentWithUser?.user?.name || "Someone"} commented on your task`,
           entityType: "task",
           entityId: taskId,
+          workspaceId: access.task.list.space.workspaceId,
         });
       }
     }
 
     // Handle @mentions
-    await notifyMentions(validatedData.content, session.user.id, "task", taskId);
+    await notifyMentions(validatedData.content, session.user.id, "task", taskId, access.task.title, access.task.list.space.workspaceId);
 
     return NextResponse.json({ comment: commentWithUser }, { status: 201 });
   } catch (error) {

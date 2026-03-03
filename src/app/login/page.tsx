@@ -38,7 +38,7 @@ export default function LoginPage() {
             <div className="w-10 h-10 bg-indigo-500 rounded-lg flex items-center justify-center font-bold text-white">
               TF
             </div>
-            <span className="text-white font-semibold text-xl">TaskForge</span>
+            <span className="text-white font-semibold text-xl">TaskFlow</span>
           </Link>
         </div>
 

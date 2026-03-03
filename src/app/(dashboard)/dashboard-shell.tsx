@@ -6,10 +6,16 @@ import { KeyboardShortcuts } from "@/components/keyboard-shortcuts"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { Toaster } from "sonner"
 import { useSSE } from "@/hooks/useSSE"
+import { usePathname } from "next/navigation"
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname()
+  // Extract workspaceId from URL: /dashboard/workspaces/[id]/...
+  const workspaceMatch = pathname.match(/\/dashboard\/workspaces\/([^/]+)/)
+  const workspaceId = workspaceMatch?.[1]
+
   // Initialize SSE connection for real-time updates
-  useSSE()
+  useSSE(workspaceId)
 
   return (
     <TooltipProvider delayDuration={0}>

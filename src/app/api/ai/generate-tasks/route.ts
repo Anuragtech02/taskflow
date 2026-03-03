@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
       try {
         const fetchResponse = await fetch(content, {
           headers: {
-            "User-Agent": "TaskForge-AI/1.0 (AI Task Generator)",
+            "User-Agent": "TaskFlow-AI/1.0 (AI Task Generator)",
           },
         });
 

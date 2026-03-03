@@ -9,7 +9,7 @@ export default function Home() {
           <div className="w-8 h-8 bg-indigo-500 rounded-lg flex items-center justify-center font-bold text-white text-sm">
             TF
           </div>
-          <span className="text-white font-semibold text-lg">TaskForge</span>
+          <span className="text-white font-semibold text-lg">TaskFlow</span>
         </div>
         <nav className="flex items-center gap-4">
           <Link
@@ -37,7 +37,7 @@ export default function Home() {
             </span>
           </h1>
           <p className="text-xl text-slate-300 mb-10 max-w-2xl mx-auto leading-relaxed">
-            TaskForge gives your team the power of ClickUp with the freedom of
+            TaskFlow gives your team the power of ClickUp with the freedom of
             open source. Workspaces, sprints, boards, time tracking — all
             self-hosted.
           </p>

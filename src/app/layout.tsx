@@ -4,7 +4,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "TaskForge — Open Source Project Management",
+  title: "TaskFlow — Open Source Project Management",
   description:
     "An open-source alternative to ClickUp. Manage tasks, sprints, and projects with your team.",
 };

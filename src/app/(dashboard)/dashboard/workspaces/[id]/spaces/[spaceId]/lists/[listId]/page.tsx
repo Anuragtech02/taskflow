@@ -21,7 +21,7 @@ import { StatusBadge } from "@/components/status-badge"
 import { KanbanBoard } from "@/components/kanban-board"
 import { TaskDetailPanel } from "@/components/task-detail-panel"
 import { useTaskPanel } from "@/store/useTaskPanel"
-import { useTasks, useCreateTask, useUpdateTask, useDeleteTask, useStatuses, useWorkspaceMembers, useAddTaskAssignee, useRemoveTaskAssignee, useList, useLabels } from "@/hooks/useQueries"
+import { useTasks, useCreateTask, useUpdateTask, useDeleteTask, useStatuses, useWorkspaceMembers, useAddTaskAssignee, useRemoveTaskAssignee, useList, useLabels, useAllTaskAssignees, useAllTaskLabels } from "@/hooks/useQueries"
 import { cn } from "@/lib/utils"
 import type { TaskResponse } from "@/lib/api"
 import { buildTaskTree, flattenTree, type TaskTreeNode } from "@/lib/task-tree"
@@ -105,6 +105,10 @@ function FilterChips({
     chips.push({ key: "priority", label: priorityInfo?.label || priority, value: priority })
   })
 
+  filters.assigneeIds.forEach((assigneeId) => {
+    chips.push({ key: "assigneeIds", label: `Assignee: ${assigneeId.slice(0, 8)}...`, value: assigneeId })
+  })
+
   if (filters.dueDateRange) {
     chips.push({
       key: "dueDateRange",
@@ -113,7 +117,7 @@ function FilterChips({
   }
 
   filters.labels.forEach((label) => {
-    chips.push({ key: "labels", label, value: label })
+    chips.push({ key: "labels", label: `Label: ${label.slice(0, 8)}...`, value: label })
   })
 
   if (chips.length === 0) return null
@@ -389,6 +393,11 @@ export default function ListPage({
   const addTaskAssigneeMutation = useAddTaskAssignee()
   const removeTaskAssigneeMutation = useRemoveTaskAssignee()
 
+  // Fetch all task assignees and labels for filtering/grouping
+  const taskIds = useMemo(() => (tasks || []).map((t) => t.id), [tasks])
+  const { data: allTaskAssignees } = useAllTaskAssignees(taskIds)
+  const { data: allTaskLabels } = useAllTaskLabels(taskIds)
+
   // View mode state
   const [viewMode, setViewMode] = useState<ViewMode>("list")
 
@@ -466,7 +475,20 @@ export default function ListPage({
     if (filters.priority.length > 0) {
       result = result.filter((t) => filters.priority.includes(t.priority || "none"))
     }
-    // Note: assigneeIds and labels would need API data
+    // Filter by assignees
+    if (filters.assigneeIds.length > 0 && allTaskAssignees) {
+      result = result.filter((t) => {
+        const assignees = allTaskAssignees[t.id] || []
+        return assignees.some((a) => filters.assigneeIds.includes(a.userId))
+      })
+    }
+    // Filter by labels
+    if (filters.labels.length > 0 && allTaskLabels) {
+      result = result.filter((t) => {
+        const taskLabels = allTaskLabels[t.id] || []
+        return taskLabels.some((l) => filters.labels.includes(l.id))
+      })
+    }
     if (filters.dueDateRange) {
       const start = filters.dueDateRange.start ? new Date(filters.dueDateRange.start) : null
       const end = filters.dueDateRange.end ? new Date(filters.dueDateRange.end) : null
@@ -480,7 +502,7 @@ export default function ListPage({
     }
 
     return result
-  }, [tasks, filters])
+  }, [tasks, filters, allTaskAssignees, allTaskLabels])
 
   // Apply sorting to filtered tasks
   const sortedTasks = useMemo(() => {
@@ -562,15 +584,32 @@ export default function ListPage({
             else groupKey = "later"
           }
           break
-        // case "assignee": would need API data
-        // case "label": would need API data
+        case "assignee": {
+          const assignees = allTaskAssignees?.[task.id] || []
+          if (assignees.length === 0) {
+            groupKey = "unassigned"
+          } else {
+            // Group by first assignee
+            groupKey = assignees[0].userId
+          }
+          break
+        }
+        case "label": {
+          const taskLabels = allTaskLabels?.[task.id] || []
+          if (taskLabels.length === 0) {
+            groupKey = "unlabeled"
+          } else {
+            groupKey = taskLabels[0].id
+          }
+          break
+        }
       }
       if (!groups[groupKey]) groups[groupKey] = []
       groups[groupKey].push(task)
     })
 
     return groups
-  }, [taskTree, groupBy])
+  }, [taskTree, groupBy, allTaskAssignees, allTaskLabels])
 
   // Handlers
   const handleCreateTask = useCallback((data: {
@@ -794,7 +833,21 @@ export default function ListPage({
       case "this_week": return "This Week"
       case "later": return "Later"
       case "no_due_date": return "No Due Date"
-      default: return key
+      case "unassigned": return "Unassigned"
+      case "unlabeled": return "No Label"
+      default: {
+        // Check if it's an assignee userId
+        if (groupBy === "assignee") {
+          const member = workspaceMembers?.find((m) => m.id === key)
+          return member?.name || member?.email || key
+        }
+        // Check if it's a label id
+        if (groupBy === "label") {
+          const label = labels?.find((l) => l.id === key)
+          return label?.name || key
+        }
+        return key
+      }
     }
   }
 
@@ -917,8 +970,16 @@ export default function ListPage({
               onFiltersChange={setFilters}
               availableStatuses={availableStatuses}
               availablePriorities={availablePriorities}
-              availableAssignees={[]}
-              availableLabels={[]}
+              availableAssignees={(workspaceMembers || []).map((m) => ({
+                value: m.id,
+                label: m.name || m.email,
+                avatar: m.avatarUrl || undefined,
+              }))}
+              availableLabels={(labels || []).map((l) => ({
+                value: l.id,
+                label: l.name,
+                color: l.color,
+              }))}
             />
           </div>
           <FilterChips filters={filters} onRemoveFilter={handleRemoveFilter} />
@@ -1194,8 +1255,16 @@ export default function ListPage({
         onDelete={handleBulkDelete}
         availableStatuses={availableStatuses}
         availablePriorities={availablePriorities}
-        availableAssignees={[]}
-        availableLabels={[]}
+        availableAssignees={(workspaceMembers || []).map((m) => ({
+          value: m.id,
+          label: m.name || m.email,
+          avatar: m.avatarUrl || undefined,
+        }))}
+        availableLabels={(labels || []).map((l) => ({
+          value: l.id,
+          label: l.name,
+          color: l.color,
+        }))}
       />
 
       {/* AI Generate Modal */}

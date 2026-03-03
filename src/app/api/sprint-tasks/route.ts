@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
+import { auth } from "@/auth"
 import { db } from "@/db"
-import { sprintTasks, sprints } from "@/db/schema"
+import { sprintTasks, sprints, workspaceMembers } from "@/db/schema"
 import { eq, and } from "drizzle-orm"
 import { z } from "zod"
 
@@ -10,10 +11,38 @@ const moveTaskSchema = z.object({
   taskId: z.string().uuid(),
 })
 
+async function checkSprintAccess(sprintId: string, userId: string) {
+  const sprint = await db.query.sprints.findFirst({ where: eq(sprints.id, sprintId) })
+  if (!sprint) return null
+  const membership = await db.query.workspaceMembers.findFirst({
+    where: and(
+      eq(workspaceMembers.workspaceId, sprint.workspaceId),
+      eq(workspaceMembers.userId, userId)
+    ),
+  })
+  return membership ? { sprint, membership } : null
+}
+
 export async function PUT(request: NextRequest) {
   try {
+    const session = await auth()
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
     const body = await request.json()
     const { fromSprintId, toSprintId, taskId } = moveTaskSchema.parse(body)
+
+    const access = await checkSprintAccess(fromSprintId, session.user.id)
+    if (!access) {
+      return NextResponse.json({ error: "Access denied" }, { status: 403 })
+    }
+
+    // Verify access to destination sprint to prevent cross-workspace moves
+    const toAccess = await checkSprintAccess(toSprintId, session.user.id)
+    if (!toAccess) {
+      return NextResponse.json({ error: "Access denied to destination sprint" }, { status: 403 })
+    }
 
     // Remove from old sprint first
     await db
@@ -52,6 +81,11 @@ export async function PUT(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const session = await auth()
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
     const body = await request.json()
     const { sprintId, taskId } = body
 
@@ -62,15 +96,9 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Check if sprint exists
-    const sprint = await db
-      .select()
-      .from(sprints)
-      .where(eq(sprints.id, sprintId))
-      .then((rows) => rows[0])
-
-    if (!sprint) {
-      return NextResponse.json({ error: "Sprint not found" }, { status: 404 })
+    const access = await checkSprintAccess(sprintId, session.user.id)
+    if (!access) {
+      return NextResponse.json({ error: "Access denied" }, { status: 403 })
     }
 
     // Add task to sprint
@@ -94,6 +122,11 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
+    const session = await auth()
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
     const { searchParams } = new URL(request.url)
     const sprintId = searchParams.get("sprintId")
     const taskId = searchParams.get("taskId")
@@ -103,6 +136,11 @@ export async function DELETE(request: NextRequest) {
         { error: "Sprint ID and Task ID are required" },
         { status: 400 }
       )
+    }
+
+    const access = await checkSprintAccess(sprintId, session.user.id)
+    if (!access) {
+      return NextResponse.json({ error: "Access denied" }, { status: 403 })
     }
 
     await db

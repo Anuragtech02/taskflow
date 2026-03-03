@@ -117,15 +117,17 @@ export async function POST(
       })
     );
 
-    // Trigger automations for each task
-    try {
-      await runAutomations("task_created", {
-        taskId: createdTasks[0].id,
-        workspaceId: list.space.workspaceId,
-        userId: session.user.id,
-      });
-    } catch (err) {
-      console.error("Error running automations:", err);
+    // Trigger automations for ALL created tasks
+    for (const task of createdTasks) {
+      try {
+        await runAutomations("task_created", {
+          taskId: task.id,
+          workspaceId: list.space.workspaceId,
+          userId: session.user.id,
+        });
+      } catch (err) {
+        console.error("Error running automations for task:", task.id, err);
+      }
     }
 
     return NextResponse.json({ tasks: createdTasks }, { status: 201 });

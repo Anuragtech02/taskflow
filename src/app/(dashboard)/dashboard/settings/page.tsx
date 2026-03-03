@@ -245,7 +245,7 @@ export default function SettingsPage() {
             <CardHeader>
               <CardTitle>Theme</CardTitle>
               <CardDescription>
-                Customize the look and feel of your TaskForge interface
+                Customize the look and feel of your TaskFlow interface
               </CardDescription>
             </CardHeader>
             <CardContent>

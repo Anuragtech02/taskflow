@@ -1,37 +1,12 @@
 services:
-  traefik:
-    image: traefik:v3.1
-    restart: unless-stopped
-    command:
-      - "--api.dashboard=false"
-      - "--providers.docker=true"
-      - "--providers.docker.exposedbydefault=false"
-      - "--providers.docker.network=proxy"
-      - "--entrypoints.web.address=:80"
-      - "--entrypoints.websecure.address=:443"
-      - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
-      - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
-      - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL:?Set ACME_EMAIL for Let's Encrypt}"
-      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
-      - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
-      - "--log.level=${TRAEFIK_LOG_LEVEL:-INFO}"
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - letsencrypt_data:/letsencrypt
-    networks:
-      - proxy
-
   app:
     build:
       context: .
       dockerfile: Dockerfile
       target: production
       args:
-        NEXT_PUBLIC_APP_URL: https://${DOMAIN:?Set DOMAIN e.g. app.taskflow.dev}
-        NEXT_PUBLIC_MAIN_DOMAIN: ${MAIN_DOMAIN:?Set MAIN_DOMAIN e.g. taskflow.dev}
+        NEXT_PUBLIC_APP_URL: ${NEXTAUTH_URL}
+        NEXT_PUBLIC_MAIN_DOMAIN: ${MAIN_DOMAIN}
     restart: unless-stopped
     depends_on:
       postgres:
@@ -41,11 +16,11 @@ services:
     environment:
       NODE_ENV: production
       DATABASE_URL: postgresql://taskflow:${POSTGRES_PASSWORD:-taskflow_secure_pwd}@postgres:5432/taskflow
-      NEXTAUTH_URL: https://${DOMAIN}
+      NEXTAUTH_URL: ${NEXTAUTH_URL:?Set NEXTAUTH_URL to your full domain e.g. https://app.taskflow.dev}
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:?Set NEXTAUTH_SECRET via openssl rand -base64 32}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
-      NEXT_PUBLIC_APP_URL: https://${DOMAIN}
-      NEXT_PUBLIC_MAIN_DOMAIN: ${MAIN_DOMAIN}
+      NEXT_PUBLIC_APP_URL: ${NEXTAUTH_URL}
+      NEXT_PUBLIC_MAIN_DOMAIN: ${MAIN_DOMAIN:?Set MAIN_DOMAIN e.g. taskflow.dev}
       AUTH_TRUST_HOST: "true"
       AUTH_GOOGLE_ID: ${AUTH_GOOGLE_ID:-}
       AUTH_GOOGLE_SECRET: ${AUTH_GOOGLE_SECRET:-}
@@ -56,24 +31,14 @@ services:
       S3_ACCESS_KEY: ${MINIO_ROOT_USER:-taskflow}
       S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-taskflow_minio_pwd}
       S3_REGION: us-east-1
-      RESEND_API_KEY: ${RESEND_API_KEY:-}
-      EMAIL_FROM: ${EMAIL_FROM:-notifications@taskflow.dev}
-      CRON_API_KEY: ${CRON_API_KEY:-}
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.taskflow.rule=Host(`${DOMAIN}`)"
-      - "traefik.http.routers.taskflow.entrypoints=websecure"
-      - "traefik.http.routers.taskflow.tls.certresolver=letsencrypt"
-      - "traefik.http.services.taskflow.loadbalancer.server.port=3000"
+    expose:
+      - "3000"
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3000/api/health"]
       interval: 30s
       timeout: 10s
       retries: 5
       start_period: 60s
-    networks:
-      - proxy
-      - internal
 
   postgres:
     image: postgres:16-alpine
@@ -89,8 +54,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    networks:
-      - internal
 
   minio:
     image: minio/minio:latest
@@ -106,15 +69,7 @@ services:
       interval: 30s
       timeout: 20s
       retries: 3
-    networks:
-      - internal
 
 volumes:
   postgres_data:
   minio_data:
-  letsencrypt_data:
-
-networks:
-  proxy:
-    name: proxy
-  internal:

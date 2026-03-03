@@ -60,6 +60,7 @@ import {
   useDeleteSubtask,
   useComments,
   useCreateComment,
+  useDeleteComment,
   useWorkspaceMembers,
   useCustomFields,
   useCreateCustomField,
@@ -81,7 +82,12 @@ import {
   useTaskLabels,
   useAddTaskLabel,
   useRemoveTaskLabel,
+  useTaskReminders,
+  useCreateTaskReminder,
+  useDeleteTaskReminder,
 } from "@/hooks/useQueries"
+import { useQueryClient } from "@tanstack/react-query"
+import { useSession } from "next-auth/react"
 import { CUSTOM_FIELD_TYPES, type CustomFieldType } from "@/lib/api"
 import { cn } from "@/lib/utils"
 import { extractTextFromTiptap } from "@/lib/tiptap"
@@ -281,23 +287,29 @@ export function TaskDetailPanel({ task, taskId, open, onClose, onTaskSelect, sta
   const { data: fetchedTask, isLoading: taskLoading } = useTask(taskId)
   const currentTask = task || fetchedTask
 
+  const { data: session } = useSession()
+  const currentUserId = session?.user?.id
+
   const updateTaskMutation = useUpdateTask()
   const deleteTaskMutation = useDeleteTask()
 
+  const queryClient = useQueryClient()
+
   // Assignees
-  const { data: assignees = [], isLoading: assigneesLoading } = useTaskAssignees(task?.id)
+  const { data: assignees = [], isLoading: assigneesLoading } = useTaskAssignees(currentTask?.id)
   const addAssigneeMutation = useAddTaskAssignee()
   const removeAssigneeMutation = useRemoveTaskAssignee()
 
   // Subtasks
-  const { data: subtasks = [], isLoading: subtasksLoading } = useSubtasks(task?.id)
+  const { data: subtasks = [], isLoading: subtasksLoading } = useSubtasks(currentTask?.id)
   const createSubtaskMutation = useCreateSubtask()
   const toggleSubtaskMutation = useToggleSubtask()
   const deleteSubtaskMutation = useDeleteSubtask()
 
   // Comments
-  const { data: comments = [], isLoading: commentsLoading } = useComments(task?.id)
+  const { data: comments = [], isLoading: commentsLoading } = useComments(currentTask?.id)
   const createCommentMutation = useCreateComment()
+  const deleteCommentMutation = useDeleteComment()
 
   // Workspace members for assignee picker
   const { data: workspaceMembers = [] } = useWorkspaceMembers(workspaceId)
@@ -338,6 +350,7 @@ export function TaskDetailPanel({ task, taskId, open, onClose, onTaskSelect, sta
   const [tags, setTags] = useState<string[]>([])
   const [newTag, setNewTag] = useState("")
   const [collapseEmpty, setCollapseEmpty] = useState(false)
+  const [newLabelColor, setNewLabelColor] = useState("#6366f1")
   const [customFieldsExpanded, setCustomFieldsExpanded] = useState(true)
 
   // Custom fields dialog
@@ -347,23 +360,23 @@ export function TaskDetailPanel({ task, taskId, open, onClose, onTaskSelect, sta
   const [newFieldOptions, setNewFieldOptions] = useState<string>("")
 
   // Custom fields
-  const { data: customFields = [], isLoading: customFieldsLoading } = useCustomFields(task?.listId)
+  const { data: customFields = [], isLoading: customFieldsLoading } = useCustomFields(currentTask?.listId)
   const createCustomFieldMutation = useCreateCustomField()
   const deleteCustomFieldMutation = useDeleteCustomField()
 
   // Sprint hooks
   const { data: sprints = [] } = useSprints(workspaceId)
-  const { data: currentSprint, isLoading: sprintLoading } = useTaskSprint(task?.id)
+  const { data: currentSprint, isLoading: sprintLoading } = useTaskSprint(currentTask?.id)
   const assignToSprintMutation = useAssignTaskToSprint()
   const removeFromSprintMutation = useRemoveTaskFromAllSprints()
 
   // Attachment hooks
-  const { data: attachments = [], isLoading: attachmentsLoading } = useTaskAttachments(task?.id)
+  const { data: attachments = [], isLoading: attachmentsLoading } = useTaskAttachments(currentTask?.id)
   const uploadAttachmentMutation = useUploadAttachment()
   const deleteAttachmentMutation = useDeleteAttachment()
 
   // Dependencies hooks
-  const { data: dependencies, isLoading: dependenciesLoading } = useTaskDependencies(task?.id)
+  const { data: dependencies, isLoading: dependenciesLoading } = useTaskDependencies(currentTask?.id)
   const addDependencyMutation = useAddTaskDependency()
   const removeDependencyMutation = useRemoveTaskDependency()
   const searchTasksMutation = useSearchWorkspaceTasks()
@@ -386,11 +399,12 @@ export function TaskDetailPanel({ task, taskId, open, onClose, onTaskSelect, sta
 
   // Handle file upload
   const handleFileUpload = async (files: FileList | null) => {
-    if (!files || !task) return
+    const effectiveId = currentTask?.id || task?.id
+    if (!files || !effectiveId) return
     setIsUploading(true)
     try {
       for (const file of Array.from(files)) {
-        await uploadAttachmentMutation.mutateAsync({ taskId: task?.id, file })
+        await uploadAttachmentMutation.mutateAsync({ taskId: effectiveId, file })
       }
     } catch (error) {
       console.error("Upload failed:", error)
@@ -430,9 +444,10 @@ export function TaskDetailPanel({ task, taskId, open, onClose, onTaskSelect, sta
 
   // Handle delete attachment
   const handleDeleteAttachment = async (attachmentId: string) => {
-    if (!task) return
+    const effectiveId = currentTask?.id || task?.id
+    if (!effectiveId) return
     try {
-      await deleteAttachmentMutation.mutateAsync({ taskId: task?.id, attachmentId })
+      await deleteAttachmentMutation.mutateAsync({ taskId: effectiveId, attachmentId })
     } catch (error) {
       console.error("Delete failed:", error)
     }
@@ -454,7 +469,7 @@ export function TaskDetailPanel({ task, taskId, open, onClose, onTaskSelect, sta
         // Filter out current task and tasks already linked
         const blockedByIds = dependencies?.blockedBy ?? []
         const blocksIds = dependencies?.blocks ?? []
-        const excludeIds = new Set([task?.id, ...blockedByIds, ...blocksIds])
+        const excludeIds = new Set([currentTask?.id || task?.id, ...blockedByIds, ...blocksIds])
         setDepSearchResults(results.filter((t) => !excludeIds.has(t.id)))
       } catch {
         setDepSearchResults([])
@@ -462,13 +477,14 @@ export function TaskDetailPanel({ task, taskId, open, onClose, onTaskSelect, sta
         setDepSearching(false)
       }
     }, 300)
-  }, [workspaceId, task?.id, dependencies, searchTasksMutation])
+  }, [workspaceId, currentTask?.id, task?.id, dependencies, searchTasksMutation])
 
   // Add dependency: current task is blocked by selectedTask
   const handleAddBlockedBy = async (blockingTaskId: string) => {
-    if (!task) return
+    const effectiveId = currentTask?.id || task?.id
+    if (!effectiveId) return
     try {
-      await addDependencyMutation.mutateAsync({ taskId: task.id, blockedTaskId: blockingTaskId })
+      await addDependencyMutation.mutateAsync({ taskId: effectiveId, blockedTaskId: blockingTaskId })
     } catch (error) {
       console.error("Add dependency failed:", error)
     }
@@ -479,9 +495,10 @@ export function TaskDetailPanel({ task, taskId, open, onClose, onTaskSelect, sta
 
   // Remove dependency
   const handleRemoveBlockedBy = async (blockingTaskId: string) => {
-    if (!task) return
+    const effectiveId = currentTask?.id || task?.id
+    if (!effectiveId) return
     try {
-      await removeDependencyMutation.mutateAsync({ taskId: task.id, blockedTaskId: blockingTaskId })
+      await removeDependencyMutation.mutateAsync({ taskId: effectiveId, blockedTaskId: blockingTaskId })
     } catch (error) {
       console.error("Remove dependency failed:", error)
     }
@@ -489,24 +506,24 @@ export function TaskDetailPanel({ task, taskId, open, onClose, onTaskSelect, sta
 
   // Populate form when task changes (from server — NOT user edits)
   useEffect(() => {
-    if (task) {
+    if (currentTask) {
       // Clear any pending auto-save — server data is authoritative
       if (autoSaveTimeoutRef.current) {
         clearTimeout(autoSaveTimeoutRef.current)
         autoSaveTimeoutRef.current = null
       }
       isDirtyRef.current = false
-      setTitle(currentTask?.title || "")
-      setDescription(task.description as Record<string, unknown> | null)
-      setStatus(task.status || "todo")
-      setPriority((task.priority as Priority) || "none")
-      setDueDate(task.dueDate ? new Date(task.dueDate) : undefined)
-      setStartDate(task.startDate ? new Date(task.startDate) : undefined)
-      setTimeEstimate(task.timeEstimate)
-      setTimerSeconds(task.timeSpent || 0)
+      setTitle(currentTask.title || "")
+      setDescription(currentTask.description as Record<string, unknown> | null)
+      setStatus(currentTask.status || "todo")
+      setPriority((currentTask.priority as Priority) || "none")
+      setDueDate(currentTask.dueDate ? new Date(currentTask.dueDate) : undefined)
+      setStartDate(currentTask.startDate ? new Date(currentTask.startDate) : undefined)
+      setTimeEstimate(currentTask.timeEstimate)
+      setTimerSeconds(currentTask.timeSpent || 0)
       setIsTimerRunning(false)
     }
-  }, [task?.id]) // Only re-populate when switching to a different task
+  }, [currentTask?.id]) // Only re-populate when switching to a different task
 
   // Timer cleanup
   useEffect(() => {
@@ -536,9 +553,10 @@ export function TaskDetailPanel({ task, taskId, open, onClose, onTaskSelect, sta
   }, [open, taskId, workspaceId])
 
   const handleSave = useCallback(() => {
-    if (!task) return
+    const effectiveId = currentTask?.id || task?.id
+    if (!effectiveId) return
     updateTaskMutation.mutate({
-      taskId: task?.id,
+      taskId: effectiveId,
       title,
       description: (description ?? undefined) as string | Record<string, unknown> | undefined,
       status,
@@ -547,7 +565,7 @@ export function TaskDetailPanel({ task, taskId, open, onClose, onTaskSelect, sta
       startDate: startDate ? startDate.toISOString() : undefined,
       timeEstimate: timeEstimate ?? undefined,
     })
-  }, [task, title, description, status, priority, dueDate, startDate, timeEstimate, updateTaskMutation])
+  }, [currentTask, task, title, description, status, priority, dueDate, startDate, timeEstimate, updateTaskMutation])
 
   // Debounced auto-save — only fires if user actually made changes
   const debouncedSave = useCallback(() => {
@@ -574,14 +592,26 @@ export function TaskDetailPanel({ task, taskId, open, onClose, onTaskSelect, sta
   }, [open, handleSave])
 
   const handleDelete = useCallback(() => {
-    if (!task) return
-    deleteTaskMutation.mutate(task?.id)
+    const effectiveId = currentTask?.id || task?.id
+    if (!effectiveId) return
+    deleteTaskMutation.mutate(effectiveId)
     setIsDeleteDialogOpen(false)
     onClose()
-  }, [task, deleteTaskMutation, onClose])
+  }, [currentTask, task, deleteTaskMutation, onClose])
 
   // Timer controls
-  const handleStartTimer = () => {
+  const handleStartTimer = async () => {
+    const effectiveId = currentTask?.id || task?.id
+    if (!effectiveId) return
+    try {
+      await fetch(`/api/tasks/${effectiveId}/time-entries`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "start" }),
+      })
+    } catch (error) {
+      console.error("Failed to start timer:", error)
+    }
     setIsTimerRunning(true)
     const interval = setInterval(() => {
       setTimerSeconds((prev) => prev + 1)
@@ -597,9 +627,21 @@ export function TaskDetailPanel({ task, taskId, open, onClose, onTaskSelect, sta
     }
   }
 
-  const handleStopTimer = () => {
+  const handleStopTimer = async () => {
     handlePauseTimer()
-    // Could save timeSpent here
+    const effectiveId = currentTask?.id || task?.id
+    if (!effectiveId) return
+    try {
+      await fetch(`/api/tasks/${effectiveId}/time-entries`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "stop" }),
+      })
+      queryClient.invalidateQueries({ queryKey: ["time-entries", effectiveId] })
+      queryClient.invalidateQueries({ queryKey: ["task", effectiveId] })
+    } catch (error) {
+      console.error("Failed to stop timer:", error)
+    }
   }
 
   const formatTimer = (seconds: number) => {
@@ -614,16 +656,17 @@ export function TaskDetailPanel({ task, taskId, open, onClose, onTaskSelect, sta
 
   // Subtask handlers
   const handleAddSubtask = () => {
-    if (!newSubtask.trim() || !task) return
+    const effectiveId = currentTask?.id || task?.id
+    if (!newSubtask.trim() || !effectiveId) return
     createSubtaskMutation.mutate({
-      taskId: task?.id,
+      taskId: effectiveId,
       title: newSubtask.trim(),
     })
     setNewSubtask("")
   }
 
   const handleToggleSubtask = (subtask: SubtaskResponse) => {
-    if (!task) return
+    if (!task && !currentTask) return
     // Subtasks are full tasks - toggle between todo and done
     const newStatus = subtask.status === "done" ? "todo" : "done"
     updateTaskMutation.mutate({
@@ -633,9 +676,10 @@ export function TaskDetailPanel({ task, taskId, open, onClose, onTaskSelect, sta
   }
 
   const handleDeleteSubtask = (subtaskId: string) => {
-    if (!task) return
+    const effectiveId = currentTask?.id || task?.id
+    if (!effectiveId) return
     deleteSubtaskMutation.mutate({
-      taskId: task?.id,
+      taskId: effectiveId,
       subtaskId,
     })
   }
@@ -646,18 +690,24 @@ export function TaskDetailPanel({ task, taskId, open, onClose, onTaskSelect, sta
   }
 
   const handleSaveEditSubtask = () => {
-    // Would need an update subtask mutation
+    if (editingSubtaskId && editingSubtaskTitle.trim()) {
+      updateTaskMutation.mutate({
+        taskId: editingSubtaskId,
+        title: editingSubtaskTitle.trim(),
+      })
+    }
     setEditingSubtaskId(null)
     setEditingSubtaskTitle("")
   }
 
   // Comment handlers
   const handleAddComment = () => {
-    if (!newComment || !task) return
+    const effectiveId = currentTask?.id || task?.id
+    if (!newComment || !effectiveId) return
     const text = extractTextFromTiptap(newComment)
     if (!text.trim()) return
     createCommentMutation.mutate({
-      taskId: task?.id,
+      taskId: effectiveId,
       content: JSON.stringify(newComment),
     })
     setNewComment(null)
@@ -665,18 +715,20 @@ export function TaskDetailPanel({ task, taskId, open, onClose, onTaskSelect, sta
 
   // Assignee handlers
   const handleAddAssignee = (member: WorkspaceMemberResponse) => {
-    if (!task) return
+    const effectiveId = currentTask?.id || task?.id
+    if (!effectiveId) return
     addAssigneeMutation.mutate({
-      taskId: task?.id,
+      taskId: effectiveId,
       userId: member.id,
     })
     setAssigneeSearch("")
   }
 
   const handleRemoveAssignee = (userId: string) => {
-    if (!task) return
+    const effectiveId = currentTask?.id || task?.id
+    if (!effectiveId) return
     removeAssigneeMutation.mutate({
-      taskId: task?.id,
+      taskId: effectiveId,
       userId,
     })
   }
@@ -695,13 +747,18 @@ export function TaskDetailPanel({ task, taskId, open, onClose, onTaskSelect, sta
   // subtask completion shown via badge (e.g. "2/5") — no progress bar needed
 
   // Labels hooks — must be before early return to avoid "fewer hooks" error
-  const { data: taskLabels = [] } = useTaskLabels(task?.id)
+  const { data: taskLabels = [] } = useTaskLabels(currentTask?.id)
   const createLabelMutation = useCreateLabel()
   const deleteLabelMutation = useDeleteLabel()
   const addTaskLabelMutation = useAddTaskLabel()
   const removeTaskLabelMutation = useRemoveTaskLabel()
 
-  if (!open || !task) return null
+  // Reminders hooks
+  const { data: taskReminders = [] } = useTaskReminders(currentTask?.id)
+  const createReminderMutation = useCreateTaskReminder()
+  const deleteReminderMutation = useDeleteTaskReminder()
+
+  if (!open || (!task && !currentTask)) return null
 
   // Find matching status object for current task
   // Fallback default statuses if none are provided
@@ -807,9 +864,10 @@ export function TaskDetailPanel({ task, taskId, open, onClose, onTaskSelect, sta
                     value={status}
                     onValueChange={(value) => {
                       setStatus(value)
-                      if (task) {
+                      const effectiveId = currentTask?.id || task?.id
+                      if (effectiveId) {
                         updateTaskMutation.mutate({
-                          taskId: task?.id,
+                          taskId: effectiveId,
                           status: value,
                         })
                       }
@@ -855,9 +913,10 @@ export function TaskDetailPanel({ task, taskId, open, onClose, onTaskSelect, sta
                     onValueChange={(value) => {
                       const newPriority = value as Priority
                       setPriority(newPriority)
-                      if (task) {
+                      const effectiveId = currentTask?.id || task?.id
+                      if (effectiveId) {
                         updateTaskMutation.mutate({
-                          taskId: task?.id,
+                          taskId: effectiveId,
                           priority: newPriority,
                         })
                       }
@@ -891,7 +950,7 @@ export function TaskDetailPanel({ task, taskId, open, onClose, onTaskSelect, sta
                 </div>
 
                 {/* Dates - Start & Due */}
-                <div className="flex items-center py-2.5 border-b border-border/30">
+                {(!collapseEmpty || startDate || dueDate) && <div className="flex items-center py-2.5 border-b border-border/30">
                   <span className="w-24 text-sm text-muted-foreground flex-shrink-0 flex items-center gap-2">
                     <Calendar className="h-4 w-4" />
                     Dates
@@ -917,10 +976,11 @@ export function TaskDetailPanel({ task, taskId, open, onClose, onTaskSelect, sta
                           selected={startDate}
                           onSelect={(date) => {
                             setStartDate(date)
-                            if (task && date) {
+                            const effectiveId = currentTask?.id || task?.id
+                            if (effectiveId) {
                               updateTaskMutation.mutate({
-                                taskId: task?.id,
-                                startDate: date.toISOString(),
+                                taskId: effectiveId,
+                                startDate: date ? date.toISOString() : null,
                               })
                             }
                           }}
@@ -949,10 +1009,11 @@ export function TaskDetailPanel({ task, taskId, open, onClose, onTaskSelect, sta
                           selected={dueDate}
                           onSelect={(date) => {
                             setDueDate(date)
-                            if (task && date) {
+                            const effectiveId = currentTask?.id || task?.id
+                            if (effectiveId) {
                               updateTaskMutation.mutate({
-                                taskId: task?.id,
-                                dueDate: date.toISOString(),
+                                taskId: effectiveId,
+                                dueDate: date ? date.toISOString() : null,
                               })
                             }
                           }}
@@ -961,7 +1022,7 @@ export function TaskDetailPanel({ task, taskId, open, onClose, onTaskSelect, sta
                       </PopoverContent>
                     </Popover>
                   </div>
-                </div>
+                </div>}
 
                 {/* Assignees */}
                 <PropertyRow label="Assignees" icon={<Users className="h-4 w-4" />}>
@@ -1049,6 +1110,7 @@ export function TaskDetailPanel({ task, taskId, open, onClose, onTaskSelect, sta
                 </PropertyRow>
 
                 {/* Track time + Estimate */}
+                {(!collapseEmpty || timerSeconds > 0 || timeEstimate) && (
                 <div className="flex items-center py-2.5 border-b border-border/30">
                   <span className="w-24 text-sm text-muted-foreground flex-shrink-0 flex items-center gap-2">
                     <Timer className="h-4 w-4" />
@@ -1074,6 +1136,7 @@ export function TaskDetailPanel({ task, taskId, open, onClose, onTaskSelect, sta
                     </Button>
                   </div>
                 </div>
+                )}
                 <PropertyRow label="Tags" icon={<Tag className="h-4 w-4" />}>
                   <div className="flex items-center gap-2 flex-wrap">
                     {/* Show labels assigned to this task */}
@@ -1087,8 +1150,9 @@ export function TaskDetailPanel({ task, taskId, open, onClose, onTaskSelect, sta
                         {label.name}
                         <button
                           onClick={() => {
-                            if (task) {
-                              removeTaskLabelMutation.mutate({ taskId: task.id, labelId: label.id })
+                            const effectiveId = currentTask?.id || task?.id
+                            if (effectiveId) {
+                              removeTaskLabelMutation.mutate({ taskId: effectiveId, labelId: label.id })
                             }
                           }}
                           className="ml-1 hover:text-destructive"
@@ -1117,8 +1181,9 @@ export function TaskDetailPanel({ task, taskId, open, onClose, onTaskSelect, sta
                                     <button
                                       key={label.id}
                                       onClick={() => {
-                                        if (task) {
-                                          addTaskLabelMutation.mutate({ taskId: task.id, labelId: label.id })
+                                        const effectiveId = currentTask?.id || task?.id
+                                        if (effectiveId) {
+                                          addTaskLabelMutation.mutate({ taskId: effectiveId, labelId: label.id })
                                         }
                                       }}
                                       className="px-2 py-1 text-xs rounded-full border transition-colors hover:opacity-80"
@@ -1131,7 +1196,7 @@ export function TaskDetailPanel({ task, taskId, open, onClose, onTaskSelect, sta
                             </div>
                           )}
                           {/* Create new label */}
-                          <div className="space-y-1 pt-2 border-t">
+                          <div className="space-y-2 pt-2 border-t">
                             <p className="text-xs text-muted-foreground font-medium">Create New Label</p>
                             <Input
                               value={newTag}
@@ -1140,7 +1205,7 @@ export function TaskDetailPanel({ task, taskId, open, onClose, onTaskSelect, sta
                               onKeyDown={(e) => {
                                 if (e.key === "Enter" && newTag.trim() && workspaceId) {
                                   createLabelMutation.mutate(
-                                    { workspaceId, name: newTag.trim(), color: "#6366f1" },
+                                    { workspaceId, name: newTag.trim(), color: newLabelColor },
                                     {
                                       onSuccess: () => {
                                         setNewTag("")
@@ -1150,13 +1215,27 @@ export function TaskDetailPanel({ task, taskId, open, onClose, onTaskSelect, sta
                                 }
                               }}
                             />
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-xs text-muted-foreground mr-1">Color:</span>
+                              {["#6366f1", "#ef4444", "#f97316", "#eab308", "#22c55e", "#14b8a6", "#3b82f6", "#8b5cf6", "#ec4899", "#6b7280"].map((color) => (
+                                <button
+                                  key={color}
+                                  onClick={() => setNewLabelColor(color)}
+                                  className={cn(
+                                    "w-5 h-5 rounded-full border-2 transition-all",
+                                    newLabelColor === color ? "border-foreground scale-110" : "border-transparent hover:scale-110"
+                                  )}
+                                  style={{ backgroundColor: color }}
+                                />
+                              ))}
+                            </div>
                             {newTag.trim() && workspaceId && (
                               <Button
                                 size="sm"
                                 className="w-full text-xs"
                                 onClick={() => {
                                   createLabelMutation.mutate(
-                                    { workspaceId, name: newTag.trim(), color: "#6366f1" },
+                                    { workspaceId, name: newTag.trim(), color: newLabelColor },
                                     {
                                       onSuccess: () => {
                                         setNewTag("")
@@ -1177,6 +1256,7 @@ export function TaskDetailPanel({ task, taskId, open, onClose, onTaskSelect, sta
                 </PropertyRow>
 
                 {/* Sprint Property Row */}
+                {(!collapseEmpty || currentSprint) && (
                 <div className="flex items-center py-2.5 border-b border-border/30">
                   <span className="w-24 text-sm text-muted-foreground flex-shrink-0 flex items-center gap-2">
                     <FolderKanban className="h-4 w-4" />
@@ -1185,10 +1265,12 @@ export function TaskDetailPanel({ task, taskId, open, onClose, onTaskSelect, sta
                   <Select
                     value={currentSprint?.id || "none"}
                     onValueChange={(value) => {
+                      const effectiveId = currentTask?.id || task?.id
+                      if (!effectiveId) return
                       if (value === "none") {
-                        removeFromSprintMutation.mutate({ taskId: task?.id })
+                        removeFromSprintMutation.mutate({ taskId: effectiveId })
                       } else {
-                        assignToSprintMutation.mutate({ taskId: task?.id, sprintId: value })
+                        assignToSprintMutation.mutate({ taskId: effectiveId, sprintId: value })
                       }
                     }}
                   >
@@ -1209,6 +1291,7 @@ export function TaskDetailPanel({ task, taskId, open, onClose, onTaskSelect, sta
                     </SelectContent>
                   </Select>
                 </div>
+                )}
 
                 {/* Collapse empty fields toggle (spans both columns) */}
                 <button
@@ -1252,7 +1335,7 @@ export function TaskDetailPanel({ task, taskId, open, onClose, onTaskSelect, sta
                       <div className="grid grid-cols-2 gap-3">
                         {customFields.map((field) => {
                           // Get current value from task.customFields
-                          const fieldValue = task?.customFields?.[field.id]
+                          const fieldValue = (currentTask || task)?.customFields?.[field.id]
                           
                           return (
                           <div
@@ -1263,9 +1346,10 @@ export function TaskDetailPanel({ task, taskId, open, onClose, onTaskSelect, sta
                               <span className="text-sm font-medium truncate">{field.name}</span>
                               <button
                                 onClick={() => {
-                                  if (task) {
+                                  const listId = (currentTask || task)?.listId
+                                  if (listId) {
                                     deleteCustomFieldMutation.mutate({
-                                      listId: task.listId,
+                                      listId,
                                       fieldId: field.id,
                                     })
                                   }
@@ -1281,10 +1365,11 @@ export function TaskDetailPanel({ task, taskId, open, onClose, onTaskSelect, sta
                               <Input
                                 value={fieldValue as string || ""}
                                 onChange={(e) => {
-                                  if (task) {
-                                    const newCustomFields = { ...task.customFields, [field.id]: e.target.value }
+                                  const cEffId = currentTask?.id || task?.id
+                                  if (cEffId) {
+                                    const newCustomFields = { ...(currentTask || task)?.customFields, [field.id]: e.target.value }
                                     updateTaskMutation.mutate({
-                                      taskId: task?.id,
+                                      taskId: cEffId,
                                       customFields: newCustomFields,
                                     })
                                   }
@@ -1297,10 +1382,11 @@ export function TaskDetailPanel({ task, taskId, open, onClose, onTaskSelect, sta
                               <Textarea
                                 value={fieldValue as string || ""}
                                 onChange={(e) => {
-                                  if (task) {
-                                    const newCustomFields = { ...task.customFields, [field.id]: e.target.value }
+                                  const cEffId = currentTask?.id || task?.id
+                                  if (cEffId) {
+                                    const newCustomFields = { ...(currentTask || task)?.customFields, [field.id]: e.target.value }
                                     updateTaskMutation.mutate({
-                                      taskId: task?.id,
+                                      taskId: cEffId,
                                       customFields: newCustomFields,
                                     })
                                   }
@@ -1314,10 +1400,11 @@ export function TaskDetailPanel({ task, taskId, open, onClose, onTaskSelect, sta
                                 type="number"
                                 value={fieldValue as number || ""}
                                 onChange={(e) => {
-                                  if (task) {
-                                    const newCustomFields = { ...task.customFields, [field.id]: e.target.value ? parseFloat(e.target.value) : null }
+                                  const cEffId2 = currentTask?.id || task?.id
+                                  if (cEffId2) {
+                                    const newCustomFields = { ...(currentTask || task)?.customFields, [field.id]: e.target.value ? parseFloat(e.target.value) : null }
                                     updateTaskMutation.mutate({
-                                      taskId: task?.id,
+                                      taskId: cEffId2,
                                       customFields: newCustomFields,
                                     })
                                   }
@@ -1331,10 +1418,11 @@ export function TaskDetailPanel({ task, taskId, open, onClose, onTaskSelect, sta
                                 <Switch
                                   checked={fieldValue as boolean || false}
                                   onCheckedChange={(checked) => {
-                                    if (task) {
-                                      const newCustomFields = { ...task.customFields, [field.id]: checked }
+                                    const cEffId3 = currentTask?.id || task?.id
+                                    if (cEffId3) {
+                                      const newCustomFields = { ...(currentTask || task)?.customFields, [field.id]: checked }
                                       updateTaskMutation.mutate({
-                                        taskId: task?.id,
+                                        taskId: cEffId3,
                                         customFields: newCustomFields,
                                       })
                                     }
@@ -1364,10 +1452,11 @@ export function TaskDetailPanel({ task, taskId, open, onClose, onTaskSelect, sta
                                     mode="single"
                                     selected={fieldValue ? new Date(fieldValue as string) : undefined}
                                     onSelect={(date) => {
-                                      if (task && date) {
-                                        const newCustomFields = { ...task.customFields, [field.id]: date.toISOString() }
+                                      const cEffId4 = currentTask?.id || task?.id
+                                      if (cEffId4 && date) {
+                                        const newCustomFields = { ...(currentTask || task)?.customFields, [field.id]: date.toISOString() }
                                         updateTaskMutation.mutate({
-                                          taskId: task?.id,
+                                          taskId: cEffId4,
                                           customFields: newCustomFields,
                                         })
                                       }
@@ -1381,10 +1470,11 @@ export function TaskDetailPanel({ task, taskId, open, onClose, onTaskSelect, sta
                               <Select
                                 value={fieldValue as string || ""}
                                 onValueChange={(value) => {
-                                  if (task) {
-                                    const newCustomFields = { ...task.customFields, [field.id]: value }
+                                  const cEffId5 = currentTask?.id || task?.id
+                                  if (cEffId5) {
+                                    const newCustomFields = { ...(currentTask || task)?.customFields, [field.id]: value }
                                     updateTaskMutation.mutate({
-                                      taskId: task?.id,
+                                      taskId: cEffId5,
                                       customFields: newCustomFields,
                                     })
                                   }
@@ -1405,10 +1495,11 @@ export function TaskDetailPanel({ task, taskId, open, onClose, onTaskSelect, sta
                                 type="url"
                                 value={fieldValue as string || ""}
                                 onChange={(e) => {
-                                  if (task) {
-                                    const newCustomFields = { ...task.customFields, [field.id]: e.target.value }
+                                  const cEffId = currentTask?.id || task?.id
+                                  if (cEffId) {
+                                    const newCustomFields = { ...(currentTask || task)?.customFields, [field.id]: e.target.value }
                                     updateTaskMutation.mutate({
-                                      taskId: task?.id,
+                                      taskId: cEffId,
                                       customFields: newCustomFields,
                                     })
                                   }
@@ -1422,10 +1513,11 @@ export function TaskDetailPanel({ task, taskId, open, onClose, onTaskSelect, sta
                                 type="email"
                                 value={fieldValue as string || ""}
                                 onChange={(e) => {
-                                  if (task) {
-                                    const newCustomFields = { ...task.customFields, [field.id]: e.target.value }
+                                  const cEffId = currentTask?.id || task?.id
+                                  if (cEffId) {
+                                    const newCustomFields = { ...(currentTask || task)?.customFields, [field.id]: e.target.value }
                                     updateTaskMutation.mutate({
-                                      taskId: task?.id,
+                                      taskId: cEffId,
                                       customFields: newCustomFields,
                                     })
                                   }
@@ -1438,10 +1530,11 @@ export function TaskDetailPanel({ task, taskId, open, onClose, onTaskSelect, sta
                               <Input
                                 value={fieldValue as string || ""}
                                 onChange={(e) => {
-                                  if (task) {
-                                    const newCustomFields = { ...task.customFields, [field.id]: e.target.value }
+                                  const cEffId = currentTask?.id || task?.id
+                                  if (cEffId) {
+                                    const newCustomFields = { ...(currentTask || task)?.customFields, [field.id]: e.target.value }
                                     updateTaskMutation.mutate({
-                                      taskId: task?.id,
+                                      taskId: cEffId,
                                       customFields: newCustomFields,
                                     })
                                   }
@@ -1457,10 +1550,11 @@ export function TaskDetailPanel({ task, taskId, open, onClose, onTaskSelect, sta
                                   type="number"
                                   value={fieldValue as number || ""}
                                   onChange={(e) => {
-                                    if (task) {
-                                      const newCustomFields = { ...task.customFields, [field.id]: e.target.value ? parseFloat(e.target.value) : null }
+                                    const cEffId6 = currentTask?.id || task?.id
+                                    if (cEffId6) {
+                                      const newCustomFields = { ...(currentTask || task)?.customFields, [field.id]: e.target.value ? parseFloat(e.target.value) : null }
                                       updateTaskMutation.mutate({
-                                        taskId: task?.id,
+                                        taskId: cEffId6,
                                         customFields: newCustomFields,
                                       })
                                     }
@@ -1476,10 +1570,11 @@ export function TaskDetailPanel({ task, taskId, open, onClose, onTaskSelect, sta
                                   type="number"
                                   value={fieldValue as number || ""}
                                   onChange={(e) => {
-                                    if (task) {
-                                      const newCustomFields = { ...task.customFields, [field.id]: e.target.value ? parseFloat(e.target.value) : null }
+                                    const cEffId7 = currentTask?.id || task?.id
+                                    if (cEffId7) {
+                                      const newCustomFields = { ...(currentTask || task)?.customFields, [field.id]: e.target.value ? parseFloat(e.target.value) : null }
                                       updateTaskMutation.mutate({
-                                        taskId: task?.id,
+                                        taskId: cEffId7,
                                         customFields: newCustomFields,
                                       })
                                     }
@@ -1495,10 +1590,11 @@ export function TaskDetailPanel({ task, taskId, open, onClose, onTaskSelect, sta
                                 type="time"
                                 value={fieldValue as string || ""}
                                 onChange={(e) => {
-                                  if (task) {
-                                    const newCustomFields = { ...task.customFields, [field.id]: e.target.value }
+                                  const cEffId = currentTask?.id || task?.id
+                                  if (cEffId) {
+                                    const newCustomFields = { ...(currentTask || task)?.customFields, [field.id]: e.target.value }
                                     updateTaskMutation.mutate({
-                                      taskId: task?.id,
+                                      taskId: cEffId,
                                       customFields: newCustomFields,
                                     })
                                   }
@@ -1511,10 +1607,11 @@ export function TaskDetailPanel({ task, taskId, open, onClose, onTaskSelect, sta
                                 type="datetime-local"
                                 value={fieldValue ? (fieldValue as string).slice(0, 16) : ""}
                                 onChange={(e) => {
-                                  if (task) {
-                                    const newCustomFields = { ...task.customFields, [field.id]: e.target.value ? new Date(e.target.value).toISOString() : null }
+                                  const cEffId8 = currentTask?.id || task?.id
+                                  if (cEffId8) {
+                                    const newCustomFields = { ...(currentTask || task)?.customFields, [field.id]: e.target.value ? new Date(e.target.value).toISOString() : null }
                                     updateTaskMutation.mutate({
-                                      taskId: task?.id,
+                                      taskId: cEffId8,
                                       customFields: newCustomFields,
                                     })
                                   }
@@ -1527,10 +1624,11 @@ export function TaskDetailPanel({ task, taskId, open, onClose, onTaskSelect, sta
                               <Input
                                 value={String(fieldValue || "")}
                                 onChange={(e) => {
-                                  if (task) {
-                                    const newCustomFields = { ...task.customFields, [field.id]: e.target.value }
+                                  const cEffId = currentTask?.id || task?.id
+                                  if (cEffId) {
+                                    const newCustomFields = { ...(currentTask || task)?.customFields, [field.id]: e.target.value }
                                     updateTaskMutation.mutate({
-                                      taskId: task?.id,
+                                      taskId: cEffId,
                                       customFields: newCustomFields,
                                     })
                                   }
@@ -1610,13 +1708,14 @@ export function TaskDetailPanel({ task, taskId, open, onClose, onTaskSelect, sta
                           </Button>
                           <Button
                             onClick={() => {
-                              if (task && newFieldName.trim()) {
+                              const listId = (currentTask || task)?.listId
+                              if (listId && newFieldName.trim()) {
                                 const options: Record<string, unknown> = {}
                                 if ((newFieldType === "select" || newFieldType === "multiSelect") && newFieldOptions.trim()) {
                                   options.choices = newFieldOptions.split("\n").map(o => o.trim()).filter(Boolean)
                                 }
                                 createCustomFieldMutation.mutate({
-                                  listId: task.listId,
+                                  listId,
                                   name: newFieldName.trim(),
                                   type: newFieldType,
                                   options,
@@ -1758,7 +1857,7 @@ export function TaskDetailPanel({ task, taskId, open, onClose, onTaskSelect, sta
                             <DependencyChip
                               key={depId}
                               taskId={depId}
-                              onRemove={() => {/* remove from the other side would need reverse API call */}}
+                              onRemove={() => removeDependencyMutation.mutate({ taskId: depId, blockedTaskId: currentTask?.id || task?.id || "" })}
                               onClick={() => onTaskSelect?.(depId)}
                               variant="blocks"
                             />
@@ -1824,6 +1923,107 @@ export function TaskDetailPanel({ task, taskId, open, onClose, onTaskSelect, sta
                     </div>
                   </PopoverContent>
                 </Popover>
+              </div>
+
+              <Separator />
+
+              {/* Reminders */}
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <AlertCircle className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-medium">Reminders</span>
+                  {taskReminders.length > 0 && (
+                    <Badge variant="secondary" className="h-5 text-xs">
+                      {taskReminders.length}
+                    </Badge>
+                  )}
+                </div>
+                {taskReminders.length > 0 && (
+                  <div className="space-y-1 mb-2">
+                    {taskReminders.map((reminder) => (
+                      <div key={reminder.id} className="flex items-center justify-between text-xs bg-muted/50 rounded px-2 py-1.5">
+                        <span>
+                          {new Date(reminder.remindAt).toLocaleString("en-US", {
+                            month: "short", day: "numeric", hour: "numeric", minute: "2-digit"
+                          })}
+                          {reminder.sent && <span className="text-muted-foreground ml-1">(sent)</span>}
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-5 w-5"
+                          onClick={() => {
+                            const effectiveId = currentTask?.id || task?.id
+                            if (effectiveId) {
+                              deleteReminderMutation.mutate({ taskId: effectiveId, reminderId: reminder.id })
+                            }
+                          }}
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="h-7 text-xs">
+                      <Plus className="h-3 w-3 mr-1" />
+                      Set Reminder
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start">
+                    {dueDate && (
+                      <>
+                        <DropdownMenuItem onClick={() => {
+                          const effectiveId = currentTask?.id || task?.id
+                          if (effectiveId) {
+                            const remindAt = new Date(dueDate.getTime() - 15 * 60 * 1000)
+                            createReminderMutation.mutate({ taskId: effectiveId, data: { remindAt: remindAt.toISOString(), preset: "15min" } })
+                          }
+                        }}>
+                          15 minutes before due
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => {
+                          const effectiveId = currentTask?.id || task?.id
+                          if (effectiveId) {
+                            const remindAt = new Date(dueDate.getTime() - 60 * 60 * 1000)
+                            createReminderMutation.mutate({ taskId: effectiveId, data: { remindAt: remindAt.toISOString(), preset: "1hour" } })
+                          }
+                        }}>
+                          1 hour before due
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => {
+                          const effectiveId = currentTask?.id || task?.id
+                          if (effectiveId) {
+                            const remindAt = new Date(dueDate.getTime() - 24 * 60 * 60 * 1000)
+                            createReminderMutation.mutate({ taskId: effectiveId, data: { remindAt: remindAt.toISOString(), preset: "1day" } })
+                          }
+                        }}>
+                          1 day before due
+                        </DropdownMenuItem>
+                      </>
+                    )}
+                    <DropdownMenuItem onClick={() => {
+                      const effectiveId = currentTask?.id || task?.id
+                      if (effectiveId) {
+                        const remindAt = new Date(Date.now() + 30 * 60 * 1000)
+                        createReminderMutation.mutate({ taskId: effectiveId, data: { remindAt: remindAt.toISOString(), preset: "custom" } })
+                      }
+                    }}>
+                      In 30 minutes
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => {
+                      const effectiveId = currentTask?.id || task?.id
+                      if (effectiveId) {
+                        const remindAt = new Date(Date.now() + 24 * 60 * 60 * 1000)
+                        createReminderMutation.mutate({ taskId: effectiveId, data: { remindAt: remindAt.toISOString(), preset: "custom" } })
+                      }
+                    }}>
+                      Tomorrow
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
 
               <Separator />
@@ -2000,7 +2200,7 @@ export function TaskDetailPanel({ task, taskId, open, onClose, onTaskSelect, sta
                     // Not JSON, use as plain text
                   }
                   return (
-                    <div key={comment.id} className="flex gap-2">
+                    <div key={comment.id} className="group/comment flex gap-2">
                       <Avatar className="h-7 w-7 flex-shrink-0">
                         <AvatarImage src={comment.user.avatarUrl || undefined} />
                         <AvatarFallback className="text-xs">
@@ -2013,6 +2213,20 @@ export function TaskDetailPanel({ task, taskId, open, onClose, onTaskSelect, sta
                           <span className="text-xs text-muted-foreground">
                             {formatRelativeTime(comment.createdAt)}
                           </span>
+                          {currentUserId && comment.userId === currentUserId && (
+                            <button
+                              onClick={() => {
+                                const effectiveId = currentTask?.id || task?.id
+                                if (effectiveId) {
+                                  deleteCommentMutation.mutate({ taskId: effectiveId, commentId: comment.id })
+                                }
+                              }}
+                              className="ml-auto opacity-0 group-hover/comment:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
+                              title="Delete comment"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          )}
                         </div>
                         <div className="text-sm mt-1">
                           {typeof contentToRender === "object" ? (

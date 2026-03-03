@@ -82,7 +82,7 @@ export async function GET(request: NextRequest) {
       title: task.title,
       type: "task" as const,
       workspaceId: task.workspaceId,
-      url: `/dashboard/workspaces/${task.workspaceId}/lists/${task.listId}/tasks/${task.id}`,
+      url: `/dashboard/workspaces/${task.workspaceId}/tasks/${task.id}`,
     })),
     ...docResults.map((doc) => ({
       id: doc.id,

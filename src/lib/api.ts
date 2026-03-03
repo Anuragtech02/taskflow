@@ -207,8 +207,8 @@ export async function updateTask(
     description: string | Record<string, unknown>
     status: string
     priority: string
-    dueDate: string
-    startDate: string
+    dueDate: string | null
+    startDate: string | null
     timeEstimate: number
     order: number
     customFields: Record<string, unknown>
@@ -346,8 +346,7 @@ export async function moveTaskBetweenSprints(
   toSprintId: string,
   taskId: string
 ): Promise<void> {
-  // First remove from old sprint, then add to new (ensures move behavior)
-  await fetchJSON(`/sprint-tasks/move`, {
+  await fetchJSON(`/sprint-tasks`, {
     method: "PUT",
     body: JSON.stringify({ fromSprintId, toSprintId, taskId }),
   })
@@ -771,4 +770,132 @@ export async function removeTaskLabel(taskId: string, labelId: string): Promise<
   return fetchJSON(`/tasks/${taskId}/labels?labelId=${labelId}`, {
     method: "DELETE",
   })
+}
+
+// ── Reminders ─────────────────────────────────────────────────────────────
+export interface ReminderResponse {
+  id: string
+  taskId: string
+  userId: string
+  remindAt: string
+  type: string
+  sent: boolean
+  createdAt: string
+  user?: {
+    id: string
+    name: string | null
+    email: string
+    avatarUrl: string | null
+  }
+}
+
+export async function fetchTaskReminders(taskId: string): Promise<ReminderResponse[]> {
+  const data = await fetchJSON<{ reminders: ReminderResponse[] }>(`/tasks/${taskId}/reminders`)
+  return data.reminders
+}
+
+export async function createTaskReminder(
+  taskId: string,
+  data: { remindAt: string; type?: string; preset?: string }
+): Promise<ReminderResponse> {
+  const result = await fetchJSON<{ reminder: ReminderResponse }>(`/tasks/${taskId}/reminders`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  })
+  return result.reminder
+}
+
+export async function deleteTaskReminder(taskId: string, reminderId: string): Promise<void> {
+  await fetchJSON(`/tasks/${taskId}/reminders?reminderId=${reminderId}`, {
+    method: "DELETE",
+  })
+}
+
+// ── Goals / OKRs ─────────────────────────────────────────────────────────────
+export interface GoalResponse {
+  id: string
+  workspaceId: string
+  name: string
+  description: string | null
+  targetDate: string | null
+  status: string
+  createdAt: string
+  progress?: number
+  keyResults?: KeyResultResponse[]
+}
+
+export interface KeyResultResponse {
+  id: string
+  goalId: string
+  title: string
+  targetValue: number
+  currentValue: number | null
+  linkedTaskId: string | null
+}
+
+export async function fetchGoals(workspaceId: string): Promise<GoalResponse[]> {
+  const data = await fetchJSON<{ goals: GoalResponse[] }>(`/goals?workspaceId=${workspaceId}`)
+  return data.goals
+}
+
+export async function fetchGoal(goalId: string): Promise<GoalResponse> {
+  const data = await fetchJSON<{ goal: GoalResponse }>(`/goals/${goalId}`)
+  return data.goal
+}
+
+export async function createGoal(
+  data: { workspaceId: string; name: string; description?: string; targetDate?: string }
+): Promise<GoalResponse> {
+  const result = await fetchJSON<{ goal: GoalResponse }>(`/goals`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  })
+  return result.goal
+}
+
+export async function updateGoal(
+  goalId: string,
+  data: { name?: string; description?: string; targetDate?: string | null; status?: string }
+): Promise<GoalResponse> {
+  const result = await fetchJSON<{ goal: GoalResponse }>(`/goals/${goalId}`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  })
+  return result.goal
+}
+
+export async function deleteGoal(goalId: string): Promise<void> {
+  await fetchJSON(`/goals/${goalId}`, { method: "DELETE" })
+}
+
+export async function fetchKeyResults(goalId: string): Promise<KeyResultResponse[]> {
+  const data = await fetchJSON<{ keyResults: KeyResultResponse[] }>(`/goals/${goalId}/key-results`)
+  return data.keyResults
+}
+
+export async function createKeyResult(
+  goalId: string,
+  data: { title: string; targetValue: number; linkedTaskId?: string }
+): Promise<KeyResultResponse> {
+  const result = await fetchJSON<{ keyResult: KeyResultResponse }>(`/goals/${goalId}/key-results`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  })
+  return result.keyResult
+}
+
+export async function updateKeyResult(
+  goalId: string,
+  krId: string,
+  data: { title?: string; targetValue?: number; currentValue?: number; linkedTaskId?: string | null }
+): Promise<KeyResultResponse> {
+  const result = await fetchJSON<{ keyResult: KeyResultResponse }>(`/goals/${goalId}/key-results/${krId}`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  })
+  return result.keyResult
+}
+
+export async function deleteKeyResult(goalId: string, krId: string): Promise<void> {
+  await fetchJSON(`/goals/${goalId}/key-results/${krId}`, { method: "DELETE" })
 }
