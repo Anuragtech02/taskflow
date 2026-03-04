@@ -4,7 +4,7 @@ import { User } from "lucide-react"
 
 export interface MentionSuggestionListProps {
   items: { id: string; name: string; email: string }[]
-  command: (props: { id: string; name: string }) => void
+  command: (props: { id: string; label: string }) => void
 }
 
 interface MentionSuggestionListHandle {
@@ -20,7 +20,7 @@ const MentionSuggestionList = forwardRef<
   const selectItem = (index: number) => {
     const item = items[index]
     if (item) {
-      command({ id: item.id, name: item.name })
+      command({ id: item.id, label: item.name })
     }
   }
 
