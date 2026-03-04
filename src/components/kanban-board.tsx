@@ -24,7 +24,6 @@ import { useQueryClient } from "@tanstack/react-query"
 import { Plus } from "lucide-react"
 import { TaskCardOverlay } from "@/components/task-card"
 import { KanbanColumn } from "@/components/kanban-column"
-import { TaskDetailPanel } from "@/components/task-detail-panel"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useUpdateTask, useDeleteTask, useCreateTask, useCreateStatus, useUpdateStatus, useDeleteStatus, useReorderStatuses } from "@/hooks/useQueries"
@@ -79,7 +78,7 @@ export function KanbanBoard({ tasks, statuses, listId, workspaceId }: KanbanBoar
   const updateStatusMutation = useUpdateStatus()
   const deleteStatusMutation = useDeleteStatus()
   const reorderStatusesMutation = useReorderStatuses()
-  const { selectedTaskId, setSelectedTask, isOpen, close } = useTaskPanel()
+  const { setSelectedTask } = useTaskPanel()
 
   // Local state for optimistic updates
   const [localTasks, setLocalTasks] = useState<TaskResponse[]>(tasks)
@@ -567,8 +566,6 @@ export function KanbanBoard({ tasks, statuses, listId, workspaceId }: KanbanBoar
     })
   }
 
-  const selectedTask = selectedTaskId ? localTasks.find((t) => t.id === selectedTaskId) : null
-
   return (
     <>
       <DndContext
@@ -676,13 +673,6 @@ export function KanbanBoard({ tasks, statuses, listId, workspaceId }: KanbanBoar
           )}
         </DragOverlay>
       </DndContext>
-
-      <TaskDetailPanel
-        task={selectedTask}
-        open={isOpen}
-        onClose={close}
-        statuses={localStatuses}
-      />
     </>
   )
 }

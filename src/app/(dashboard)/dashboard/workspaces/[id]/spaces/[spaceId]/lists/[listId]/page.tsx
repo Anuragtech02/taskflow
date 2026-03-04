@@ -16,6 +16,7 @@ import {
   Trash2,
   Pencil,
   Palette,
+  User,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -41,6 +42,7 @@ import { TimelineView } from "@/components/timeline-view/TimelineView"
 import { CalendarView } from "@/components/calendar-view"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { toast } from "sonner"
+import { useSession } from "next-auth/react"
 
 type ViewMode = "list" | "board" | "gantt" | "calendar"
 type GroupByOption = "status" | "priority" | "assignee" | "dueDate" | "label" | null
@@ -480,6 +482,11 @@ export default function ListPage({
   const createStatusMutation = useCreateStatus()
   const updateStatusMutation = useUpdateStatus()
   const deleteStatusMutation = useDeleteStatus()
+  const { data: session } = useSession()
+  const currentUserId = session?.user?.id
+
+  // "My Tasks" toggle
+  const [showMyTasks, setShowMyTasks] = useState(false)
 
   // Fetch all task assignees and labels for filtering/grouping
   const taskIds = useMemo(() => (tasks || []).map((t) => t.id), [tasks])
@@ -667,8 +674,16 @@ export default function ListPage({
       })
     }
 
+    // "My Tasks" filter
+    if (showMyTasks && currentUserId && allTaskAssignees) {
+      result = result.filter((t) => {
+        const assignees = allTaskAssignees[t.id] || []
+        return assignees.some((a) => a.userId === currentUserId)
+      })
+    }
+
     return result
-  }, [tasks, filters, allTaskAssignees, allTaskLabels])
+  }, [tasks, filters, allTaskAssignees, allTaskLabels, showMyTasks, currentUserId])
 
   // Apply sorting to filtered tasks
   const sortedTasks = useMemo(() => {
@@ -1120,17 +1135,21 @@ export default function ListPage({
         </div>
       </div>
 
-      {/* List View Toolbar */}
-      {viewMode === "list" && (
+      {/* List/Board View Toolbar */}
+      {(viewMode === "list" || viewMode === "board") && (
         <>
           <div className="flex items-center gap-2 px-4 py-2 border-b bg-background">
-            <GroupByDropdown value={groupBy} onChange={setGroupBy} />
-            <SortDropdown
-              sortBy={sortBy}
-              sortOrder={sortOrder}
-              onSortByChange={setSortBy}
-              onSortOrderChange={setSortOrder}
-            />
+            {viewMode === "list" && (
+              <>
+                <GroupByDropdown value={groupBy} onChange={setGroupBy} />
+                <SortDropdown
+                  sortBy={sortBy}
+                  sortOrder={sortOrder}
+                  onSortByChange={setSortBy}
+                  onSortOrderChange={setSortOrder}
+                />
+              </>
+            )}
             <FilterPopover
               filters={filters}
               onFiltersChange={setFilters}
@@ -1313,6 +1332,17 @@ export default function ListPage({
                 </div>
               </PopoverContent>
             </Popover>
+
+            {/* My Tasks toggle */}
+            <Button
+              variant={showMyTasks ? "default" : "outline"}
+              size="sm"
+              className="gap-1.5 ml-auto"
+              onClick={() => setShowMyTasks(!showMyTasks)}
+            >
+              <User className="h-3.5 w-3.5" />
+              My Tasks
+            </Button>
           </div>
           <FilterChips filters={filters} onRemoveFilter={handleRemoveFilter} />
         </>
@@ -1502,13 +1532,16 @@ export default function ListPage({
                 <p className="text-sm text-muted-foreground mb-4">
                   Try adjusting your filters or search criteria.
                 </p>
-                <Button variant="outline" onClick={() => setFilters({
-                  status: [],
-                  priority: [],
-                  assigneeIds: [],
-                  dueDateRange: null,
-                  labels: [],
-                })}>
+                <Button variant="outline" onClick={() => {
+                  setFilters({
+                    status: [],
+                    priority: [],
+                    assigneeIds: [],
+                    dueDateRange: null,
+                    labels: [],
+                  })
+                  setShowMyTasks(false)
+                }}>
                   Clear Filters
                 </Button>
               </div>
@@ -1548,7 +1581,7 @@ export default function ListPage({
               const kanbanStatuses = customStatuses.length > 0 ? [...kept, ...customStatuses] : defaultKanbanStatuses
               return (
                 <KanbanBoard
-                  tasks={tasks || []}
+                  tasks={filteredTasks}
                   statuses={kanbanStatuses}
                   listId={listId}
                   workspaceId={workspaceId}
