@@ -1066,6 +1066,7 @@ export function useAddTaskLabel() {
       addTaskLabel(taskId, labelId),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["task-labels", variables.taskId] })
+      queryClient.invalidateQueries({ queryKey: ["all-task-labels"] })
     },
   })
 }
@@ -1077,6 +1078,7 @@ export function useRemoveTaskLabel() {
       removeTaskLabel(taskId, labelId),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["task-labels", variables.taskId] })
+      queryClient.invalidateQueries({ queryKey: ["all-task-labels"] })
     },
   })
 }

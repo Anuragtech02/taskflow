@@ -26,7 +26,7 @@ import { Breadcrumb } from "@/components/breadcrumb"
 import { KanbanBoard } from "@/components/kanban-board"
 import { TaskDetailPanel } from "@/components/task-detail-panel"
 import { useTaskPanel } from "@/store/useTaskPanel"
-import { useTasks, useCreateTask, useUpdateTask, useDeleteTask, useStatuses, useCreateStatus, useUpdateStatus, useDeleteStatus, useWorkspaceMembers, useAddTaskAssignee, useRemoveTaskAssignee, useList, useLabels, useAllTaskAssignees, useAllTaskLabels } from "@/hooks/useQueries"
+import { useTasks, useCreateTask, useUpdateTask, useDeleteTask, useStatuses, useCreateStatus, useUpdateStatus, useDeleteStatus, useWorkspaceMembers, useAddTaskAssignee, useRemoveTaskAssignee, useAddTaskLabel, useRemoveTaskLabel, useList, useLabels, useAllTaskAssignees, useAllTaskLabels } from "@/hooks/useQueries"
 import { cn } from "@/lib/utils"
 import type { TaskResponse } from "@/lib/api"
 import { buildTaskTree, flattenTree, type TaskTreeNode } from "@/lib/task-tree"
@@ -479,6 +479,8 @@ export default function ListPage({
   const { data: workspaceMembers } = useWorkspaceMembers(workspaceId)
   const addTaskAssigneeMutation = useAddTaskAssignee()
   const removeTaskAssigneeMutation = useRemoveTaskAssignee()
+  const addTaskLabelMutation = useAddTaskLabel()
+  const removeTaskLabelMutation = useRemoveTaskLabel()
   const createStatusMutation = useCreateStatus()
   const updateStatusMutation = useUpdateStatus()
   const deleteStatusMutation = useDeleteStatus()
@@ -634,6 +636,11 @@ export default function ListPage({
     return [...kept, ...customMapped]
   }, [statuses])
   const availablePriorities = DEFAULT_PRIORITIES
+
+  const availableLabelsForRows = useMemo(
+    () => (labels || []).map((l) => ({ id: l.id, name: l.name, color: l.color })),
+    [labels]
+  )
 
   // Filter tasks (including subtasks)
   const filteredTasks = useMemo(() => {
@@ -854,6 +861,20 @@ export default function ListPage({
       removeTaskAssigneeMutation.mutate({ taskId, userId })
     },
     [removeTaskAssigneeMutation]
+  )
+
+  const handleLabelAdd = useCallback(
+    (taskId: string, labelId: string) => {
+      addTaskLabelMutation.mutate({ taskId, labelId })
+    },
+    [addTaskLabelMutation]
+  )
+
+  const handleLabelRemove = useCallback(
+    (taskId: string, labelId: string) => {
+      removeTaskLabelMutation.mutate({ taskId, labelId })
+    },
+    [removeTaskLabelMutation]
   )
 
   const handleRename = useCallback(
@@ -1451,6 +1472,9 @@ export default function ListPage({
                                   onDueDateChange={handleDueDateChange}
                                   onAssigneeAdd={handleAssigneeAdd}
                                   onAssigneeRemove={handleAssigneeRemove}
+                                  onLabelAdd={handleLabelAdd}
+                                  onLabelRemove={handleLabelRemove}
+                                  availableLabels={availableLabelsForRows}
                                   onRename={handleRename}
                                   onAddSubtask={handleAddSubtask}
                                   columnWidths={columnWidths}
@@ -1500,6 +1524,9 @@ export default function ListPage({
                             onDueDateChange={handleDueDateChange}
                             onAssigneeAdd={handleAssigneeAdd}
                             onAssigneeRemove={handleAssigneeRemove}
+                            onLabelAdd={handleLabelAdd}
+                            onLabelRemove={handleLabelRemove}
+                            availableLabels={availableLabelsForRows}
                             onRename={handleRename}
                             onAddSubtask={handleAddSubtask}
                             columnWidths={columnWidths}

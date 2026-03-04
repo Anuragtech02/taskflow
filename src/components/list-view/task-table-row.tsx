@@ -14,7 +14,7 @@ import { useTaskDependencies } from "@/hooks/useQueries"
 import type { TaskResponse } from "@/lib/api"
 import { Input } from "@/components/ui/input"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { Calendar as CalendarIcon, Plus, ChevronRight, ChevronDown, Pencil, ListPlus, Link2, Lock } from "lucide-react"
+import { Calendar as CalendarIcon, Plus, ChevronRight, ChevronDown, Pencil, ListPlus, Link2, Lock, Check } from "lucide-react"
 
 export interface TaskTableRowProps {
   task: TaskResponse
@@ -34,6 +34,9 @@ export interface TaskTableRowProps {
   onAssigneeRemove?: (taskId: string, userId: string) => void
   onRename?: (taskId: string, newTitle: string) => void
   onAddSubtask?: (parentTaskId: string) => void
+  onLabelAdd?: (taskId: string, labelId: string) => void
+  onLabelRemove?: (taskId: string, labelId: string) => void
+  availableLabels?: { id: string; name: string; color: string }[]
   // New props for nested tasks
   depth?: number
   hasChildren?: boolean
@@ -92,6 +95,9 @@ export function TaskTableRow({
   onAssigneeRemove,
   onRename,
   onAddSubtask,
+  onLabelAdd,
+  onLabelRemove,
+  availableLabels = [],
   depth = 0,
   hasChildren = false,
   childCount = 0,
@@ -104,6 +110,7 @@ export function TaskTableRow({
   const priority = task.priority || "none"
   const canHaveChildren = (depth || 0) < MAX_NESTING_DEPTH
   const [assigneeSearch, setAssigneeSearch] = React.useState("")
+  const [labelSearch, setLabelSearch] = React.useState("")
   const [isEditing, setIsEditing] = React.useState(false)
   const [editTitle, setEditTitle] = React.useState(task.title)
   const inputRef = React.useRef<HTMLInputElement>(null)
@@ -148,6 +155,15 @@ export function TaskTableRow({
   // Check if a member is assigned to this task
   const isMemberAssigned = (memberId: string) =>
     taskAssignees.some((a) => a.userId === memberId)
+
+  // Check if a label is assigned to this task
+  const isLabelAssigned = (labelId: string) =>
+    tags.some((t) => t.id === labelId)
+
+  // Filter available labels based on search
+  const filteredLabels = availableLabels.filter(
+    (label) => label.name.toLowerCase().includes(labelSearch.toLowerCase())
+  )
 
   // Handle date change
   const handleDateSelect = (date: Date | undefined) => {
@@ -560,21 +576,89 @@ export function TaskTableRow({
       </div>
 
       {/* Tags */}
-      <div className="flex-shrink-0 flex flex-wrap gap-1" style={{ width: `${columnWidths?.tags ?? 96}px` }}>
-        {tags.slice(0, 2).map((tag) => (
-          <span
-            key={tag.id}
-            className="px-1.5 py-0.5 rounded text-[10px] text-white truncate"
-            style={{ backgroundColor: tag.color }}
-            title={tag.name}
-          >
-            {tag.name}
-          </span>
-        ))}
-        {tags.length > 2 && (
-          <span className="text-[10px] text-muted-foreground">+{tags.length - 2}</span>
-        )}
-      </div>
+      {onLabelAdd && onLabelRemove ? (
+        <Popover onOpenChange={(open) => { if (!open) setLabelSearch("") }}>
+          <PopoverTrigger asChild>
+            <button className="flex-shrink-0 flex flex-wrap gap-1 items-center cursor-pointer hover:bg-accent/50 rounded px-1 py-0.5" style={{ width: `${columnWidths?.tags ?? 96}px` }}>
+              {tags.length > 0 ? (
+                <>
+                  {tags.slice(0, 2).map((tag) => (
+                    <span
+                      key={tag.id}
+                      className="px-1.5 py-0.5 rounded text-[10px] text-white truncate"
+                      style={{ backgroundColor: tag.color }}
+                      title={tag.name}
+                    >
+                      {tag.name}
+                    </span>
+                  ))}
+                  {tags.length > 2 && (
+                    <span className="text-[10px] text-muted-foreground">+{tags.length - 2}</span>
+                  )}
+                </>
+              ) : (
+                <Plus className="h-4 w-4 text-muted-foreground" />
+              )}
+            </button>
+          </PopoverTrigger>
+          <PopoverContent className="w-56 p-0" align="start">
+            <Command>
+              <CommandInput
+                placeholder="Search labels..."
+                value={labelSearch}
+                onValueChange={setLabelSearch}
+              />
+              <CommandList>
+                <CommandEmpty>No labels found.</CommandEmpty>
+                <CommandGroup>
+                  {filteredLabels.map((label) => {
+                    const assigned = isLabelAssigned(label.id)
+                    return (
+                      <CommandItem
+                        key={label.id}
+                        value={label.name}
+                        onSelect={() => {
+                          if (assigned) {
+                            onLabelRemove(task.id, label.id)
+                          } else {
+                            onLabelAdd(task.id, label.id)
+                          }
+                        }}
+                        className="flex items-center gap-2"
+                      >
+                        <div
+                          className="w-3 h-3 rounded-full flex-shrink-0"
+                          style={{ backgroundColor: label.color }}
+                        />
+                        <span className="flex-1 truncate">{label.name}</span>
+                        {assigned && (
+                          <Check className="h-4 w-4 text-green-500 flex-shrink-0" />
+                        )}
+                      </CommandItem>
+                    )
+                  })}
+                </CommandGroup>
+              </CommandList>
+            </Command>
+          </PopoverContent>
+        </Popover>
+      ) : (
+        <div className="flex-shrink-0 flex flex-wrap gap-1" style={{ width: `${columnWidths?.tags ?? 96}px` }}>
+          {tags.slice(0, 2).map((tag) => (
+            <span
+              key={tag.id}
+              className="px-1.5 py-0.5 rounded text-[10px] text-white truncate"
+              style={{ backgroundColor: tag.color }}
+              title={tag.name}
+            >
+              {tag.name}
+            </span>
+          ))}
+          {tags.length > 2 && (
+            <span className="text-[10px] text-muted-foreground">+{tags.length - 2}</span>
+          )}
+        </div>
+      )}
 
       {/* Created */}
       <div className="flex-shrink-0 text-xs text-muted-foreground" style={{ width: `${columnWidths?.created ?? 80}px` }}>

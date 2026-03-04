@@ -1,4 +1,5 @@
 import { ReactRenderer } from "@tiptap/react"
+import tippy, { type Instance as TippyInstance } from "tippy.js"
 import SuggestionList from "./mention-suggestion-list"
 import { PluginKey } from "@tiptap/pm/state"
 
@@ -18,6 +19,7 @@ export default (mentions: { id: string; name: string; email: string }[]) => {
     },
     render: () => {
       let component: ReactRenderer | null = null
+      let popup: TippyInstance[] | null = null
 
       return {
         onStart: (props: any) => {
@@ -25,22 +27,41 @@ export default (mentions: { id: string; name: string; email: string }[]) => {
             props,
             editor: props.editor,
           })
+
+          if (!props.clientRect) return
+
+          popup = tippy("body", {
+            getReferenceClientRect: props.clientRect,
+            appendTo: () => document.body,
+            content: component.element,
+            showOnCreate: true,
+            interactive: true,
+            trigger: "manual",
+            placement: "bottom-start",
+          })
         },
         onUpdate: (props: any) => {
-          if (component) {
-            (component as any).props = props
-          }
-        },
-        onExit: () => {
-          component?.destroy()
-          component = null
+          component?.updateProps(props)
+
+          if (!props.clientRect) return
+
+          popup?.[0]?.setProps({
+            getReferenceClientRect: props.clientRect,
+          })
         },
         onKeyDown: (props: any) => {
           if (props.event.key === "Escape") {
-            component?.destroy()
+            popup?.[0]?.hide()
             return true
           }
-          return false
+
+          return (component?.ref as any)?.onKeyDown(props)
+        },
+        onExit: () => {
+          popup?.[0]?.destroy()
+          component?.destroy()
+          popup = null
+          component = null
         },
       }
     },

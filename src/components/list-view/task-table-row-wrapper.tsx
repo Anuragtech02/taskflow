@@ -18,6 +18,9 @@ interface TaskTableRowWrapperProps {
   onAssigneeRemove?: (taskId: string, userId: string) => void
   onRename?: (taskId: string, newTitle: string) => void
   onAddSubtask?: (parentTaskId: string) => void
+  onLabelAdd?: (taskId: string, labelId: string) => void
+  onLabelRemove?: (taskId: string, labelId: string) => void
+  availableLabels?: { id: string; name: string; color: string }[]
   // New props for nested tasks
   depth?: number
   hasChildren?: boolean
