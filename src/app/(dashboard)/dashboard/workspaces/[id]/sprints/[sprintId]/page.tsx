@@ -305,7 +305,13 @@ export default function SprintDetailPage() {
   const now = new Date()
   const totalDays = differenceInDays(endDate, startDate)
   const daysRemaining = differenceInDays(endDate, now)
-  const timeProgress = Math.max(0, Math.min(100, ((totalDays - daysRemaining) / totalDays) * 100))
+  // Only show time elapsed for active/completed sprints, not planned ones
+  const sprintStatus = sprint?.status
+  const timeProgress = sprintStatus === "planned"
+    ? 0
+    : sprintStatus === "completed"
+      ? 100
+      : Math.max(0, Math.min(100, ((totalDays - daysRemaining) / totalDays) * 100))
 
   const doneTasks = tasks.filter(
     (t: TaskResponse) => t.status === "done" || t.status === "closed" || t.status === "complete"
