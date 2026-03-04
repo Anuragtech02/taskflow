@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { authenticateRequest } from "@/lib/api-auth";
 import { db } from "@/db";
 import { tasks, lists, spaces, workspaceMembers, taskActivities, taskAssignees } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
@@ -54,13 +54,13 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
+    const authResult = await authenticateRequest(request);
+    if (!authResult) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { id: taskId } = await params;
-    const access = await checkTaskAccess(taskId, session.user.id);
+    const access = await checkTaskAccess(taskId, authResult.userId);
 
     if (!access) {
       return NextResponse.json({ error: "Task not found or access denied" }, { status: 404 });
@@ -173,13 +173,13 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
+    const authResult = await authenticateRequest(request);
+    if (!authResult) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { id: taskId } = await params;
-    const access = await checkTaskAccess(taskId, session.user.id);
+    const access = await checkTaskAccess(taskId, authResult.userId);
 
     if (!access) {
       return NextResponse.json({ error: "Task not found or access denied" }, { status: 404 });
@@ -223,7 +223,7 @@ export async function PATCH(
       if (oldValue !== newValue) {
         await db.insert(taskActivities).values({
           taskId,
-          userId: session.user.id,
+          userId: authResult.userId,
           action: "updated",
           field,
           oldValue,
@@ -238,7 +238,7 @@ export async function PATCH(
         await runAutomations("status_change", {
           taskId,
           workspaceId: oldTask.list.space.workspaceId,
-          userId: session.user.id,
+          userId: authResult.userId,
           oldStatus: oldTask.status ?? undefined,
           newStatus: validatedData.status,
         });
@@ -257,7 +257,7 @@ export async function PATCH(
       // 2. Or the due date is being changed to a later date
       if (newDueDate && (!oldDueDate || newDueDate.getTime() > oldDueDate.getTime())) {
         try {
-          await autoCreateDueDateReminder(taskId, session.user.id, newDueDate);
+          await autoCreateDueDateReminder(taskId, authResult.userId, newDueDate);
         } catch (err) {
           console.error("Error creating auto-reminder:", err);
           // Don't fail the request if reminder creation fails
@@ -268,7 +268,7 @@ export async function PATCH(
     // Broadcast SSE event to workspace
     broadcastToWorkspace(oldTask.list.space.workspaceId, {
       type: "task_updated",
-      data: { task: updatedTask, listId: oldTask.listId, userId: session.user.id },
+      data: { task: updatedTask, listId: oldTask.listId, userId: authResult.userId },
     });
 
     return NextResponse.json({ task: updatedTask });
@@ -292,13 +292,13 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
+    const authResult = await authenticateRequest(request);
+    if (!authResult) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { id: taskId } = await params;
-    const access = await checkTaskAccess(taskId, session.user.id);
+    const access = await checkTaskAccess(taskId, authResult.userId);
 
     if (!access) {
       return NextResponse.json({ error: "Task not found or access denied" }, { status: 404 });
@@ -312,7 +312,7 @@ export async function DELETE(
     // Broadcast SSE event to workspace
     broadcastToWorkspace(workspaceId, {
       type: "task_deleted",
-      data: { taskId, listId, userId: session.user.id },
+      data: { taskId, listId, userId: authResult.userId },
     });
 
     return NextResponse.json({ success: true });

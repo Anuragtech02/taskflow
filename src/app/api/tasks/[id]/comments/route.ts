@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { authenticateRequest } from "@/lib/api-auth";
 import { db } from "@/db";
 import { tasks, lists, spaces, workspaceMembers, taskComments, taskAssignees, taskActivities } from "@/db/schema";
 import { eq, and, desc } from "drizzle-orm";
@@ -41,13 +41,13 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
+    const authResult = await authenticateRequest(request);
+    if (!authResult) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { id: taskId } = await params;
-    const access = await checkTaskAccess(taskId, session.user.id);
+    const access = await checkTaskAccess(taskId, authResult.userId);
 
     if (!access) {
       return NextResponse.json({ error: "Task not found or access denied" }, { status: 404 });
@@ -83,13 +83,13 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
+    const authResult = await authenticateRequest(request);
+    if (!authResult) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { id: taskId } = await params;
-    const access = await checkTaskAccess(taskId, session.user.id);
+    const access = await checkTaskAccess(taskId, authResult.userId);
 
     if (!access) {
       return NextResponse.json({ error: "Task not found or access denied" }, { status: 404 });
@@ -102,7 +102,7 @@ export async function POST(
       .insert(taskComments)
       .values({
         taskId,
-        userId: session.user.id,
+        userId: authResult.userId,
         content: validatedData.content,
       })
       .returning();
@@ -110,7 +110,7 @@ export async function POST(
     // Log activity
     await db.insert(taskActivities).values({
       taskId,
-      userId: session.user.id,
+      userId: authResult.userId,
       action: "added_comment",
       field: "comment",
       newValue: validatedData.content.substring(0, 100) || "comment",
@@ -137,7 +137,7 @@ export async function POST(
     });
 
     for (const assignee of taskAssigneesList) {
-      if (assignee.userId !== session.user.id) {
+      if (assignee.userId !== authResult.userId) {
         await createNotification({
           userId: assignee.userId,
           type: "comment_added",
@@ -151,7 +151,7 @@ export async function POST(
     }
 
     // Also notify the task creator if they're not the commenter and not already notified
-    if (access.task.creatorId !== session.user.id) {
+    if (access.task.creatorId !== authResult.userId) {
       const alreadyNotified = taskAssigneesList.some(a => a.userId === access.task.creatorId);
       if (!alreadyNotified) {
         await createNotification({
@@ -167,7 +167,7 @@ export async function POST(
     }
 
     // Handle @mentions
-    await notifyMentions(validatedData.content, session.user.id, "task", taskId, access.task.title, access.task.list.space.workspaceId);
+    await notifyMentions(validatedData.content, authResult.userId, "task", taskId, access.task.title, access.task.list.space.workspaceId);
 
     return NextResponse.json({ comment: commentWithUser }, { status: 201 });
   } catch (error) {
@@ -190,13 +190,13 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
+    const authResult = await authenticateRequest(request);
+    if (!authResult) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { id: taskId } = await params;
-    const access = await checkTaskAccess(taskId, session.user.id);
+    const access = await checkTaskAccess(taskId, authResult.userId);
 
     if (!access) {
       return NextResponse.json({ error: "Task not found or access denied" }, { status: 404 });
@@ -222,7 +222,7 @@ export async function DELETE(
     }
 
     // Allow deletion if user owns the comment or is the task creator
-    if (comment.userId !== session.user.id && access.task.creatorId !== session.user.id) {
+    if (comment.userId !== authResult.userId && access.task.creatorId !== authResult.userId) {
       return NextResponse.json({ error: "Not authorized to delete this comment" }, { status: 403 });
     }
 

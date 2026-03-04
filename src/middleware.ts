@@ -18,6 +18,9 @@ export default auth((req) => {
     isMainApp = false;
   }
 
+  // Let Bearer-authenticated requests through to route handlers
+  const hasBearerToken = req.headers.get("authorization")?.startsWith("Bearer ");
+
   // Public paths that don't require auth
   const isPublicPath =
     pathname === "/" ||
@@ -32,7 +35,7 @@ export default auth((req) => {
   // Handle subdomain tenants
   if (!isMainApp && subdomain) {
     // Tenant-specific routes - require auth
-    if (!req.auth && !isPublicPath) {
+    if (!req.auth && !hasBearerToken && !isPublicPath) {
       // API routes should return 401 JSON, not redirect
       if (pathname.startsWith("/api/")) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -50,7 +53,7 @@ export default auth((req) => {
   }
 
   // Main app paths
-  if (!req.auth && !isPublicPath) {
+  if (!req.auth && !hasBearerToken && !isPublicPath) {
     // API routes should return 401 JSON, not redirect
     if (pathname.startsWith("/api/")) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { authenticateRequest } from "@/lib/api-auth";
 import { db } from "@/db";
 import { tasks, lists, spaces, workspaceMembers, taskAssignees, users, taskActivities } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
@@ -42,13 +42,13 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
+    const authResult = await authenticateRequest(request);
+    if (!authResult) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { id: taskId } = await params;
-    const access = await checkTaskAccess(taskId, session.user.id);
+    const access = await checkTaskAccess(taskId, authResult.userId);
 
     if (!access) {
       return NextResponse.json({ error: "Task not found or access denied" }, { status: 404 });
@@ -83,13 +83,13 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
+    const authResult = await authenticateRequest(request);
+    if (!authResult) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { id: taskId } = await params;
-    const access = await checkTaskAccess(taskId, session.user.id);
+    const access = await checkTaskAccess(taskId, authResult.userId);
 
     if (!access) {
       return NextResponse.json({ error: "Task not found or access denied" }, { status: 404 });
@@ -144,7 +144,7 @@ export async function POST(
 
     // Get the current user who assigned the task
     const currentUser = await db.query.users.findFirst({
-      where: eq(users.id, session.user.id),
+      where: eq(users.id, authResult.userId),
       columns: { name: true },
     });
 
@@ -164,7 +164,7 @@ export async function POST(
     // Log activity
     await db.insert(taskActivities).values({
       taskId,
-      userId: session.user.id,
+      userId: authResult.userId,
       action: "added_assignee",
       field: "assignee",
       newValue: assignedUser?.name || assignedUser?.email || "user",
@@ -178,7 +178,7 @@ export async function POST(
       await runAutomations("assignment", {
         taskId,
         workspaceId: access.task.list.space.workspaceId,
-        userId: session.user.id,
+        userId: authResult.userId,
         newAssignees: previousAssignees.map(a => a.userId),
         previousAssignees: previousAssignees.filter(a => a.userId !== validatedData.userId).map(a => a.userId),
       });
@@ -207,13 +207,13 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
+    const authResult = await authenticateRequest(request);
+    if (!authResult) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { id: taskId } = await params;
-    const access = await checkTaskAccess(taskId, session.user.id);
+    const access = await checkTaskAccess(taskId, authResult.userId);
 
     if (!access) {
       return NextResponse.json({ error: "Task not found or access denied" }, { status: 404 });
@@ -248,7 +248,7 @@ export async function DELETE(
     // Log activity
     await db.insert(taskActivities).values({
       taskId,
-      userId: session.user.id,
+      userId: authResult.userId,
       action: "removed_assignee",
       field: "assignee",
       oldValue: removedUser?.name || removedUser?.email || "user",

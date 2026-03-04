@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { authenticateRequest } from "@/lib/api-auth";
 import { db } from "@/db";
 import { tasks, taskComments, documents, lists, spaces, workspaceMembers } from "@/db/schema";
 import { eq, ilike, or, and, sql, inArray } from "drizzle-orm";
@@ -11,8 +11,8 @@ interface RouteParams {
 // GET /api/workspaces/[id]/search?q=searchterm
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
+    const authResult = await authenticateRequest(request);
+    if (!authResult) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -28,7 +28,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const memberCheck = await db.query.workspaceMembers.findFirst({
       where: and(
         eq(workspaceMembers.workspaceId, workspaceId),
-        eq(workspaceMembers.userId, session.user.id)
+        eq(workspaceMembers.userId, authResult.userId)
       ),
     });
 

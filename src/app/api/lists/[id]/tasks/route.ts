@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { authenticateRequest } from "@/lib/api-auth";
 import { db } from "@/db";
 import { tasks, lists, spaces, workspaceMembers, taskActivities } from "@/db/schema";
 import { eq, and, asc } from "drizzle-orm";
@@ -23,8 +23,8 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
+    const authResult = await authenticateRequest(request);
+    if (!authResult) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -45,7 +45,7 @@ export async function GET(
     const membership = await db.query.workspaceMembers.findFirst({
       where: and(
         eq(workspaceMembers.workspaceId, list.space.workspaceId),
-        eq(workspaceMembers.userId, session.user.id)
+        eq(workspaceMembers.userId, authResult.userId)
       ),
     });
 
@@ -95,8 +95,8 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
+    const authResult = await authenticateRequest(request);
+    if (!authResult) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -117,7 +117,7 @@ export async function POST(
     const membership = await db.query.workspaceMembers.findFirst({
       where: and(
         eq(workspaceMembers.workspaceId, list.space.workspaceId),
-        eq(workspaceMembers.userId, session.user.id)
+        eq(workspaceMembers.userId, authResult.userId)
       ),
     });
 
@@ -136,7 +136,7 @@ export async function POST(
         description: validatedData.description ?? {},
         status: validatedData.status ?? "todo",
         priority: validatedData.priority ?? "none",
-        creatorId: session.user.id,
+        creatorId: authResult.userId,
         dueDate: validatedData.dueDate ? new Date(validatedData.dueDate) : null,
         timeEstimate: validatedData.timeEstimate,
         order: validatedData.order ?? 0,
@@ -147,7 +147,7 @@ export async function POST(
     // Create activity log
     await db.insert(taskActivities).values({
       taskId: task.id,
-      userId: session.user.id,
+      userId: authResult.userId,
       action: "created",
     });
 
@@ -156,7 +156,7 @@ export async function POST(
       await runAutomations("task_created", {
         taskId: task.id,
         workspaceId: list.space.workspaceId,
-        userId: session.user.id,
+        userId: authResult.userId,
       });
     } catch (err) {
       console.error("Error running automations:", err);
@@ -165,7 +165,7 @@ export async function POST(
     // Broadcast SSE event to workspace
     broadcastToWorkspace(list.space.workspaceId, {
       type: "task_created",
-      data: { task, listId, userId: session.user.id },
+      data: { task, listId, userId: authResult.userId },
     });
 
     return NextResponse.json({ task }, { status: 201 });

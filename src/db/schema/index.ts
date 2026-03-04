@@ -406,6 +406,7 @@ export const usersRelations = relations(users, ({ many }) => ({
   timeEntries: many(timeEntries),
   notifications: many(notifications),
   reminders: many(reminders),
+  apiKeys: many(apiKeys),
 }));
 
 export const workspacesRelations = relations(workspaces, ({ one, many }) => ({
@@ -652,6 +653,27 @@ export const remindersRelations = relations(reminders, ({ one }) => ({
   }),
 }));
 
+// ─── API Keys ─────────────────────────────────────────────────────────────────
+export const apiKeys = pgTable(
+  "api_keys",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    keyHash: varchar("key_hash", { length: 255 }).notNull(),
+    keyPrefix: varchar("key_prefix", { length: 20 }).notNull().default(""),
+    name: varchar("name", { length: 255 }).notNull(),
+    lastUsedAt: timestamp("last_used_at"),
+    expiresAt: timestamp("expires_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [
+    index("api_keys_user_idx").on(t.userId),
+    index("api_keys_hash_idx").on(t.keyHash),
+  ]
+);
+
 // ─── Automations ───────────────────────────────────────────────────────────────
 export const automations = pgTable(
   "automations",
@@ -764,6 +786,13 @@ export const keyResults = pgTable(
 // RELATIONS
 // ═══════════════════════════════════════════════════════════════════════════════
 
+export const apiKeysRelations = relations(apiKeys, ({ one }) => ({
+  user: one(users, {
+    fields: [apiKeys.userId],
+    references: [users.id],
+  }),
+}));
+
 export const automationsRelations = relations(automations, ({ one }) => ({
   workspace: one(workspaces, {
     fields: [automations.workspaceId],
@@ -874,3 +903,5 @@ export type TaskAttachment = typeof taskAttachments.$inferSelect;
 export type NewTaskAttachment = typeof taskAttachments.$inferInsert;
 export type Reminder = typeof reminders.$inferSelect;
 export type NewReminder = typeof reminders.$inferInsert;
+export type ApiKey = typeof apiKeys.$inferSelect;
+export type NewApiKey = typeof apiKeys.$inferInsert;

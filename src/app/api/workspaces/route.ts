@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { authenticateRequest } from "@/lib/api-auth";
 import { db } from "@/db";
 import { workspaces, workspaceMembers, spaces } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
@@ -13,10 +13,10 @@ const createWorkspaceSchema = z.object({
   plan: z.enum(["free", "pro", "enterprise"]).optional(),
 });
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
+    const authResult = await authenticateRequest(request);
+    if (!authResult) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -34,7 +34,7 @@ export async function GET() {
       })
       .from(workspaceMembers)
       .innerJoin(workspaces, eq(workspaces.id, workspaceMembers.workspaceId))
-      .where(eq(workspaceMembers.userId, session.user.id));
+      .where(eq(workspaceMembers.userId, authResult.userId));
 
     return NextResponse.json({ workspaces: userWorkspaces });
   } catch (error) {
@@ -48,8 +48,8 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
+    const authResult = await authenticateRequest(request);
+    if (!authResult) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
         name: validatedData.name,
         slug: validatedData.slug,
         subdomain: validatedData.subdomain?.toLowerCase(),
-        ownerId: session.user.id,
+        ownerId: authResult.userId,
         logoUrl: validatedData.logoUrl,
         plan: validatedData.plan || "free",
         status: "active",
@@ -99,7 +99,7 @@ export async function POST(request: NextRequest) {
     // Add owner as workspace member
     await db.insert(workspaceMembers).values({
       workspaceId: workspace.id,
-      userId: session.user.id,
+      userId: authResult.userId,
       role: "owner",
     });
 

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { authenticateRequest } from "@/lib/api-auth";
 import { db } from "@/db";
 import { workspaceMembers, users, workspaces } from "@/db/schema";
 import { eq, and, ilike, or } from "drizzle-orm";
@@ -11,8 +11,8 @@ interface RouteParams {
 
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
+    const authResult = await authenticateRequest(request);
+    if (!authResult) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -24,7 +24,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const membership = await db.query.workspaceMembers.findFirst({
       where: and(
         eq(workspaceMembers.workspaceId, workspaceId),
-        eq(workspaceMembers.userId, session.user.id)
+        eq(workspaceMembers.userId, authResult.userId)
       ),
     });
 
@@ -82,8 +82,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
+    const authResult = await authenticateRequest(request);
+    if (!authResult) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -111,7 +111,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const membership = await db.query.workspaceMembers.findFirst({
       where: and(
         eq(workspaceMembers.workspaceId, workspaceId),
-        eq(workspaceMembers.userId, session.user.id)
+        eq(workspaceMembers.userId, authResult.userId)
       ),
     });
 
@@ -187,7 +187,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       where: eq(workspaces.id, workspaceId),
       columns: { name: true },
     });
-    const inviterName = session.user.name || session.user.email || "Someone";
+    const inviter = await db.query.users.findFirst({
+      where: eq(users.id, authResult.userId),
+      columns: { name: true, email: true },
+    });
+    const inviterName = inviter?.name || inviter?.email || "Someone";
     sendInviteEmail(
       userToAdd.email!,
       workspace?.name ?? "a workspace",
