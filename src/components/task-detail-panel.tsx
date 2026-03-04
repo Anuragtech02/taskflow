@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react"
-import { X, Calendar, Clock, CheckSquare, MessageSquare, Play, Pause, Square, Trash2, Plus, Check, Search, Link2, ChevronRight, Tag, Paperclip, AlertCircle, ArrowUpRight, MoreHorizontal, CircleCheckBig, Flag, Users, Timer, Gauge, ChevronDown, FolderKanban, FileText, Edit3, Lock, ExternalLink } from "lucide-react"
+import { X, Calendar, Clock, CheckSquare, MessageSquare, Play, Pause, Square, Trash2, Plus, Check, Search, Link2, ChevronRight, Tag, Paperclip, AlertCircle, ArrowUpRight, MoreHorizontal, CircleCheckBig, Flag, Users, Timer, Gauge, ChevronDown, FolderKanban, FileText, Edit3, Lock, ExternalLink, List as ListIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -47,6 +47,7 @@ import {
 import { RichTextEditor } from "./rich-text-editor"
 import { MarkdownRenderer } from "./markdown-renderer"
 import { SubtaskRow } from "./subtask-row"
+import { MoveToListPicker } from "./move-to-list-picker"
 import {
   useTask,
   useUpdateTask,
@@ -86,10 +87,12 @@ import {
   useTaskReminders,
   useCreateTaskReminder,
   useDeleteTaskReminder,
+  useList,
 } from "@/hooks/useQueries"
 import { useQueryClient } from "@tanstack/react-query"
 import { useSession } from "next-auth/react"
 import { CUSTOM_FIELD_TYPES, type CustomFieldType } from "@/lib/api"
+import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import { extractTextFromTiptap } from "@/lib/tiptap"
 import type { TaskResponse, StatusResponse, WorkspaceMemberResponse, SubtaskResponse, CommentResponse, ActivityResponse } from "@/lib/api"
@@ -366,6 +369,9 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
   const { data: customFields = [], isLoading: customFieldsLoading } = useCustomFields(currentTask?.listId)
   const createCustomFieldMutation = useCreateCustomField()
   const deleteCustomFieldMutation = useDeleteCustomField()
+
+  // List hook (for displaying current list name)
+  const { data: currentList } = useList(currentTask?.listId)
 
   // Sprint hooks
   const { data: sprints = [] } = useSprints(workspaceId)
@@ -1364,6 +1370,39 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
                     </Popover>
                   </div>
                 </PropertyRow>
+
+                {/* List Property Row */}
+                {workspaceId && (
+                <div className="flex items-center py-2.5 border-b border-border/30">
+                  <span className="w-28 text-sm text-muted-foreground flex-shrink-0 flex items-center gap-2">
+                    <ListIcon className="h-4 w-4" />
+                    List
+                  </span>
+                  <MoveToListPicker
+                    workspaceId={workspaceId}
+                    currentListId={currentTask?.listId}
+                    onSelect={(listId) => {
+                      const effectiveId = currentTask?.id || task?.id
+                      if (!effectiveId) return
+                      updateTaskMutation.mutate(
+                        { taskId: effectiveId, listId },
+                        {
+                          onSuccess: () => {
+                            queryClient.invalidateQueries({ queryKey: ["task", effectiveId] })
+                            queryClient.invalidateQueries({ queryKey: ["list"] })
+                            toast.success("Task moved to another list")
+                          },
+                        }
+                      )
+                    }}
+                    trigger={
+                      <button className="h-8 px-3 text-sm text-left rounded-md border border-input bg-background hover:bg-accent hover:text-accent-foreground transition-colors flex-1 truncate">
+                        {currentList?.name || "Select list"}
+                      </button>
+                    }
+                  />
+                </div>
+                )}
 
                 {/* Sprint Property Row */}
                 {(!collapseEmpty || currentSprint) && (

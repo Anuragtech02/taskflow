@@ -11,10 +11,20 @@ import { Calendar } from "@/components/ui/calendar"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import { useTaskDependencies } from "@/hooks/useQueries"
-import type { TaskResponse } from "@/lib/api"
+import type { TaskResponse, WorkspaceSpaceWithLists } from "@/lib/api"
 import { Input } from "@/components/ui/input"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { Calendar as CalendarIcon, Plus, ChevronRight, ChevronDown, Pencil, ListPlus, Link2, Lock, Check } from "lucide-react"
+import { Calendar as CalendarIcon, Plus, ChevronRight, ChevronDown, Pencil, ListPlus, Link2, Lock, Check, Trash2, ArrowRightLeft, ExternalLink, Circle, Flag, List as ListIcon } from "lucide-react"
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuSub,
+  ContextMenuSubContent,
+  ContextMenuSubTrigger,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu"
 
 export interface TaskTableRowProps {
   task: TaskResponse
@@ -45,6 +55,11 @@ export interface TaskTableRowProps {
   onToggleExpand?: (taskId: string) => void
   // Available statuses for the dropdown (custom or default)
   availableStatuses?: { value: string; label: string; color: string }[]
+  // Move to list callback + data
+  onMoveToList?: (taskId: string, listId: string) => void
+  workspaceLists?: WorkspaceSpaceWithLists[]
+  // Delete callback
+  onDelete?: (taskId: string) => void
   // Resizable column widths
   columnWidths?: {
     status?: number
@@ -104,6 +119,9 @@ export function TaskTableRow({
   isExpanded = false,
   onToggleExpand,
   availableStatuses,
+  onMoveToList,
+  workspaceLists,
+  onDelete,
   columnWidths,
 }: TaskTableRowProps) {
   const status = task.status || "todo"
@@ -117,6 +135,7 @@ export function TaskTableRow({
   const { data: deps } = useTaskDependencies(task.id)
   const isBlocked = (deps?.blockedBy?.length ?? 0) > 0
   const hasDeps = isBlocked || (deps?.blocks?.length ?? 0) > 0
+  const workspaceListsData = workspaceLists ?? []
 
   // Resolve the matched custom status for display (no fallback to [0] — show actual status if unmatched)
   const hasCustomStatuses = availableStatuses && availableStatuses.length > 0
@@ -177,7 +196,17 @@ export function TaskTableRow({
   // Calculate indentation — spacer width (depth 0 = 8px, depth 1 = 32px, etc.)
   const indentWidth = depth * 28 + 8
 
+  // Status/priority items for context menu
+  const contextStatuses = hasCustomStatuses ? availableStatuses : [
+    { value: "todo", label: "To Do", color: STATUS_COLORS.todo },
+    { value: "in_progress", label: "In Progress", color: STATUS_COLORS.in_progress },
+    { value: "review", label: "Review", color: STATUS_COLORS.review },
+    { value: "done", label: "Done", color: STATUS_COLORS.done },
+  ]
+
   return (
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
     <div
       className={cn(
         "flex items-center gap-2 px-4 py-2 border-b border-border/50 hover:bg-accent/30 transition-colors group",
@@ -670,6 +699,120 @@ export function TaskTableRow({
         {formatDate(task.updatedAt)}
       </div>
     </div>
+      </ContextMenuTrigger>
+      <ContextMenuContent className="w-56">
+        <ContextMenuItem onClick={() => onClick?.(task.id)}>
+          <ExternalLink className="h-4 w-4 mr-2" />
+          Open
+        </ContextMenuItem>
+        <ContextMenuItem onClick={() => {
+          setEditTitle(task.title)
+          setIsEditing(true)
+        }}>
+          <Pencil className="h-4 w-4 mr-2" />
+          Rename
+        </ContextMenuItem>
+        <ContextMenuSeparator />
+
+        {/* Set Status submenu */}
+        <ContextMenuSub>
+          <ContextMenuSubTrigger>
+            <Circle className="h-4 w-4 mr-2" />
+            Set Status
+          </ContextMenuSubTrigger>
+          <ContextMenuSubContent className="w-48">
+            {contextStatuses.map((s) => (
+              <ContextMenuItem key={s.value} onClick={() => onStatusChange(task.id, s.value)}>
+                <div className="w-2.5 h-2.5 rounded-full mr-2" style={{ backgroundColor: s.color }} />
+                {s.label}
+                {s.value === status && <Check className="h-4 w-4 ml-auto" />}
+              </ContextMenuItem>
+            ))}
+          </ContextMenuSubContent>
+        </ContextMenuSub>
+
+        {/* Set Priority submenu */}
+        {onPriorityChange && (
+          <ContextMenuSub>
+            <ContextMenuSubTrigger>
+              <Flag className="h-4 w-4 mr-2" />
+              Set Priority
+            </ContextMenuSubTrigger>
+            <ContextMenuSubContent className="w-48">
+              {[
+                { value: "urgent", label: "Urgent" },
+                { value: "high", label: "High" },
+                { value: "medium", label: "Medium" },
+                { value: "low", label: "Low" },
+                { value: "none", label: "None" },
+              ].map((p) => (
+                <ContextMenuItem key={p.value} onClick={() => onPriorityChange(task.id, p.value)}>
+                  {p.label}
+                  {p.value === priority && <Check className="h-4 w-4 ml-auto" />}
+                </ContextMenuItem>
+              ))}
+            </ContextMenuSubContent>
+          </ContextMenuSub>
+        )}
+
+        {/* Move to List submenu */}
+        {onMoveToList && workspaceListsData.length > 0 && (
+          <>
+            <ContextMenuSeparator />
+            <ContextMenuSub>
+              <ContextMenuSubTrigger>
+                <ArrowRightLeft className="h-4 w-4 mr-2" />
+                Move to List
+              </ContextMenuSubTrigger>
+              <ContextMenuSubContent className="w-56 max-h-80 overflow-y-auto">
+                {workspaceListsData.map((space) => (
+                  <React.Fragment key={space.id}>
+                    {space.lists.map((list) => (
+                      <ContextMenuItem
+                        key={list.id}
+                        disabled={list.id === task.listId}
+                        onClick={() => onMoveToList(task.id, list.id)}
+                      >
+                        <ListIcon className="h-3.5 w-3.5 mr-2 text-muted-foreground" />
+                        <span className="truncate">{space.name} / {list.name}</span>
+                        {list.id === task.listId && <Check className="h-4 w-4 ml-auto" />}
+                      </ContextMenuItem>
+                    ))}
+                    {space.folders.map((folder) =>
+                      folder.lists.map((list) => (
+                        <ContextMenuItem
+                          key={list.id}
+                          disabled={list.id === task.listId}
+                          onClick={() => onMoveToList(task.id, list.id)}
+                        >
+                          <ListIcon className="h-3.5 w-3.5 mr-2 text-muted-foreground" />
+                          <span className="truncate">{space.name} / {folder.name} / {list.name}</span>
+                          {list.id === task.listId && <Check className="h-4 w-4 ml-auto" />}
+                        </ContextMenuItem>
+                      ))
+                    )}
+                  </React.Fragment>
+                ))}
+              </ContextMenuSubContent>
+            </ContextMenuSub>
+          </>
+        )}
+
+        {/* Delete */}
+        {onDelete && (
+          <>
+            <ContextMenuSeparator />
+            <ContextMenuItem
+              className="text-red-600 focus:text-red-600"
+              onClick={() => onDelete(task.id)}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete
+            </ContextMenuItem>
+          </>
+        )}
+      </ContextMenuContent>
+    </ContextMenu>
   )
 }
 

@@ -26,7 +26,7 @@ import { Breadcrumb } from "@/components/breadcrumb"
 import { KanbanBoard } from "@/components/kanban-board"
 import { TaskDetailPanel } from "@/components/task-detail-panel"
 import { useTaskPanel } from "@/store/useTaskPanel"
-import { useTasks, useCreateTask, useUpdateTask, useDeleteTask, useStatuses, useCreateStatus, useUpdateStatus, useDeleteStatus, useWorkspaceMembers, useAddTaskAssignee, useRemoveTaskAssignee, useAddTaskLabel, useRemoveTaskLabel, useList, useLabels, useAllTaskAssignees, useAllTaskLabels } from "@/hooks/useQueries"
+import { useTasks, useCreateTask, useUpdateTask, useDeleteTask, useStatuses, useCreateStatus, useUpdateStatus, useDeleteStatus, useWorkspaceMembers, useAddTaskAssignee, useRemoveTaskAssignee, useAddTaskLabel, useRemoveTaskLabel, useList, useLabels, useAllTaskAssignees, useAllTaskLabels, useWorkspaceLists } from "@/hooks/useQueries"
 import { cn } from "@/lib/utils"
 import type { TaskResponse } from "@/lib/api"
 import { buildTaskTree, flattenTree, type TaskTreeNode } from "@/lib/task-tree"
@@ -477,6 +477,7 @@ export default function ListPage({
   const updateTaskMutation = useUpdateTask()
   const deleteTaskMutation = useDeleteTask()
   const { data: workspaceMembers } = useWorkspaceMembers(workspaceId)
+  const { data: workspaceLists } = useWorkspaceLists(workspaceId)
   const addTaskAssigneeMutation = useAddTaskAssignee()
   const removeTaskAssigneeMutation = useRemoveTaskAssignee()
   const addTaskLabelMutation = useAddTaskLabel()
@@ -939,6 +940,44 @@ export default function ListPage({
         deleteTaskMutation.mutate(taskId)
       })
       setSelectedTasks(new Set())
+    },
+    [deleteTaskMutation]
+  )
+
+  const handleMoveToList = useCallback(
+    (taskId: string, targetListId: string) => {
+      updateTaskMutation.mutate(
+        { taskId, listId: targetListId },
+        {
+          onSuccess: () => {
+            toast.success("Task moved to another list")
+          },
+        }
+      )
+    },
+    [updateTaskMutation]
+  )
+
+  const handleBulkMoveToList = useCallback(
+    async (taskIds: string[], targetListId: string) => {
+      try {
+        await Promise.all(
+          taskIds.map((taskId) =>
+            updateTaskMutation.mutateAsync({ taskId, listId: targetListId })
+          )
+        )
+        toast.success(`${taskIds.length} task${taskIds.length !== 1 ? "s" : ""} moved`)
+      } catch {
+        toast.error("Failed to move some tasks")
+      }
+      setSelectedTasks(new Set())
+    },
+    [updateTaskMutation]
+  )
+
+  const handleDeleteTask = useCallback(
+    (taskId: string) => {
+      deleteTaskMutation.mutate(taskId)
     },
     [deleteTaskMutation]
   )
@@ -1477,6 +1516,9 @@ export default function ListPage({
                                   availableLabels={availableLabelsForRows}
                                   onRename={handleRename}
                                   onAddSubtask={handleAddSubtask}
+                                  onMoveToList={handleMoveToList}
+                                  workspaceLists={workspaceLists}
+                                  onDelete={handleDeleteTask}
                                   columnWidths={columnWidths}
                                   availableStatuses={availableStatuses}
                                 />
@@ -1529,6 +1571,8 @@ export default function ListPage({
                             availableLabels={availableLabelsForRows}
                             onRename={handleRename}
                             onAddSubtask={handleAddSubtask}
+                            onMoveToList={handleMoveToList}
+                            onDelete={handleDeleteTask}
                             columnWidths={columnWidths}
                             availableStatuses={availableStatuses}
                           />
@@ -1659,6 +1703,9 @@ export default function ListPage({
         onAssigneeAdd={() => {}}
         onLabelAdd={() => {}}
         onDelete={handleBulkDelete}
+        onMoveToList={handleBulkMoveToList}
+        workspaceId={workspaceId}
+        currentListId={listId}
         availableStatuses={availableStatuses}
         availablePriorities={availablePriorities}
         availableAssignees={(workspaceMembers || []).map((m) => ({

@@ -2,7 +2,7 @@
 
 import { TaskTableRow } from "./task-table-row"
 import { useTaskAssignees, useTaskLabels } from "@/hooks/useQueries"
-import type { TaskResponse } from "@/lib/api"
+import type { TaskResponse, WorkspaceSpaceWithLists } from "@/lib/api"
 
 interface TaskTableRowWrapperProps {
   task: TaskResponse
@@ -29,6 +29,11 @@ interface TaskTableRowWrapperProps {
   onToggleExpand?: (taskId: string) => void
   // Available statuses for the dropdown
   availableStatuses?: { value: string; label: string; color: string }[]
+  // Move to list callback + data
+  onMoveToList?: (taskId: string, listId: string) => void
+  workspaceLists?: WorkspaceSpaceWithLists[]
+  // Delete callback
+  onDelete?: (taskId: string) => void
   // Resizable column widths
   columnWidths?: {
     status?: number

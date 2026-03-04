@@ -9,7 +9,8 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
-import { ChevronDown, Trash2, UserPlus, Tag, Flag, Circle } from "lucide-react"
+import { ChevronDown, Trash2, UserPlus, Tag, Flag, Circle, ArrowRightLeft } from "lucide-react"
+import { MoveToListPicker } from "@/components/move-to-list-picker"
 
 interface BulkActionsBarProps {
   selectedCount: number
@@ -20,6 +21,9 @@ interface BulkActionsBarProps {
   onAssigneeAdd: (taskIds: string[], userId: string) => void
   onLabelAdd: (taskIds: string[], labelId: string) => void
   onDelete: (taskIds: string[]) => void
+  onMoveToList?: (taskIds: string[], listId: string) => void
+  workspaceId?: string
+  currentListId?: string
   availableStatuses: { value: string; label: string; color: string }[]
   availablePriorities: { value: string; label: string }[]
   availableAssignees: { value: string; label: string }[]
@@ -50,6 +54,9 @@ export function BulkActionsBar({
   onAssigneeAdd,
   onLabelAdd,
   onDelete,
+  onMoveToList,
+  workspaceId,
+  currentListId,
   availableStatuses,
   availablePriorities,
   availableAssignees,
@@ -171,6 +178,22 @@ export function BulkActionsBar({
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
+        )}
+
+        {/* Move to List */}
+        {onMoveToList && workspaceId && (
+          <MoveToListPicker
+            workspaceId={workspaceId}
+            currentListId={currentListId}
+            onSelect={(listId) => onMoveToList(taskIds, listId)}
+            trigger={
+              <Button variant="ghost" size="sm" className="h-8">
+                <ArrowRightLeft className="h-4 w-4 mr-2" />
+                Move to List
+                <ChevronDown className="h-3 w-3 ml-1 opacity-50" />
+              </Button>
+            }
+          />
         )}
 
         <div className="flex-1" />

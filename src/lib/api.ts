@@ -183,6 +183,34 @@ export async function deleteList(listId: string): Promise<void> {
   await fetchJSON(`/lists/${listId}`, { method: "DELETE" })
 }
 
+// ── Workspace Lists (all lists in workspace) ────────────────────────────────
+export interface WorkspaceListItem {
+  id: string
+  name: string
+}
+
+export interface WorkspaceFolderWithLists {
+  id: string
+  name: string
+  lists: WorkspaceListItem[]
+}
+
+export interface WorkspaceSpaceWithLists {
+  id: string
+  name: string
+  lists: WorkspaceListItem[]
+  folders: WorkspaceFolderWithLists[]
+}
+
+export async function fetchWorkspaceLists(
+  workspaceId: string
+): Promise<WorkspaceSpaceWithLists[]> {
+  const data = await fetchJSON<{ spaces: WorkspaceSpaceWithLists[] }>(
+    `/workspaces/${workspaceId}/lists`
+  )
+  return data.spaces
+}
+
 // ── Tasks ───────────────────────────────────────────────────────────────────
 export interface ActivityResponse {
   id: string
@@ -254,6 +282,7 @@ export async function updateTask(
     timeEstimate: number
     order: number
     customFields: Record<string, unknown>
+    listId: string
   }>
 ): Promise<{ task: TaskResponse }> {
   return fetchJSON(`/tasks/${taskId}`, {

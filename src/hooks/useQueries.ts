@@ -70,6 +70,8 @@ import {
   fetchTaskReminders,
   createTaskReminder,
   deleteTaskReminder,
+  fetchWorkspaceLists,
+  type WorkspaceSpaceWithLists,
   type WorkspaceResponse,
   type SpaceResponse,
   type FolderResponse,
@@ -319,6 +321,16 @@ export function useDeleteList() {
   })
 }
 
+// ── Workspace Lists Hook ────────────────────────────────────────────────────
+
+export function useWorkspaceLists(workspaceId: string | undefined) {
+  return useQuery<WorkspaceSpaceWithLists[]>({
+    queryKey: ["workspace-lists", workspaceId],
+    queryFn: () => fetchWorkspaceLists(workspaceId!),
+    enabled: !!workspaceId,
+  })
+}
+
 // ── Task Hooks ──────────────────────────────────────────────────────────────
 
 export function useTasks(listId: string | undefined) {
@@ -381,6 +393,7 @@ export function useUpdateTask() {
       timeEstimate?: number
       order?: number
       customFields?: Record<string, unknown>
+      listId?: string
     }) => updateTask(taskId, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tasks"] })
