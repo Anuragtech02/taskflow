@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { TaskFlowClient } from "../client.js";
+import { formatSearchResults } from "../format.js";
 
 export function registerSearchTools(server: McpServer, client: TaskFlowClient) {
   server.tool(
@@ -16,7 +17,7 @@ export function registerSearchTools(server: McpServer, client: TaskFlowClient) {
     async ({ workspaceId, query }) => {
       const data = await client.searchTasks(workspaceId, query);
       return {
-        content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
+        content: [{ type: "text", text: formatSearchResults(data) }],
       };
     }
   );

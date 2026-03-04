@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { TaskFlowClient } from "../client.js";
+import { formatTasks, formatTask } from "../format.js";
 
 export function registerTaskTools(server: McpServer, client: TaskFlowClient) {
   server.tool(
@@ -10,7 +11,7 @@ export function registerTaskTools(server: McpServer, client: TaskFlowClient) {
     async ({ listId }) => {
       const data = await client.getTasks(listId);
       return {
-        content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
+        content: [{ type: "text", text: formatTasks(data) }],
       };
     }
   );
@@ -22,7 +23,7 @@ export function registerTaskTools(server: McpServer, client: TaskFlowClient) {
     async ({ taskId }) => {
       const data = await client.getTask(taskId);
       return {
-        content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
+        content: [{ type: "text", text: formatTask(data) }],
       };
     }
   );
