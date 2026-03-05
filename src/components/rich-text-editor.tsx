@@ -27,6 +27,7 @@ interface RichTextEditorProps {
   editable?: boolean
   mentions?: { id: string; name: string; email: string }[]
   showToolbar?: boolean
+  onImageClick?: (src: string) => void
 }
 
 async function uploadImage(file: File): Promise<string | null> {
@@ -97,7 +98,7 @@ async function processHtmlImages(html: string): Promise<string> {
   return doc.body.innerHTML
 }
 
-export function RichTextEditor({ content, onChange, placeholder, minHeight = "150px", className, editable = true, mentions, showToolbar = false }: RichTextEditorProps) {
+export function RichTextEditor({ content, onChange, placeholder, minHeight = "150px", className, editable = true, mentions, showToolbar = false, onImageClick }: RichTextEditorProps) {
   const editorRef = useRef<ReturnType<typeof useEditor>>(null)
 
   // Build extensions array
@@ -258,8 +259,19 @@ export function RichTextEditor({ content, onChange, placeholder, minHeight = "15
 
   if (!editor) return null
 
+  const handleEditorClick = useCallback((e: React.MouseEvent) => {
+    if (!onImageClick) return
+    const target = e.target as HTMLElement
+    if (target.tagName === "IMG") {
+      e.preventDefault()
+      e.stopPropagation()
+      const src = (target as HTMLImageElement).src
+      if (src) onImageClick(src)
+    }
+  }, [onImageClick])
+
   return (
-    <div className={cn("relative border rounded-md bg-background", className)}>
+    <div className={cn("relative border rounded-md bg-background", className)} onClick={handleEditorClick}>
       {showToolbar && editable && <Toolbar />}
       {editor && editable && (
         <BubbleMenu editor={editor}>

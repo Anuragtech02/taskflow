@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react"
-import { X, Calendar, Clock, CheckSquare, MessageSquare, Play, Pause, Square, Trash2, Plus, Check, Search, Link2, ChevronRight, Tag, Paperclip, AlertCircle, ArrowUpRight, MoreHorizontal, CircleCheckBig, Flag, Users, Timer, Gauge, ChevronDown, FolderKanban, FileText, Edit3, Lock, ExternalLink, List as ListIcon } from "lucide-react"
+import { X, Calendar, Clock, CheckSquare, MessageSquare, Play, Pause, Square, Trash2, Plus, Check, Search, Link2, ChevronRight, Tag, Paperclip, AlertCircle, ArrowUpRight, MoreHorizontal, CircleCheckBig, Flag, Users, Timer, Gauge, ChevronDown, FolderKanban, FileText, Edit3, Lock, ExternalLink, List as ListIcon, Maximize, Minimize, Download } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -351,6 +351,7 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
 
   // Image preview
   const [previewImage, setPreviewImage] = useState<string | null>(null)
+  const [isFullscreen, setIsFullscreen] = useState(false)
 
   // Tags (mock - would need tag API)
   const [tags, setTags] = useState<string[]>([])
@@ -1899,6 +1900,7 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
                   onChange={(json) => { setDescription(json); debouncedSave(); }}
                   placeholder="Add a description..."
                   minHeight="120px"
+                  onImageClick={setPreviewImage}
                 />
               </div>
 
@@ -2385,6 +2387,7 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
                               onChange={() => {}}
                               editable={false}
                               minHeight="auto"
+                              onImageClick={setPreviewImage}
                             />
                           ) : (
                             <MarkdownRenderer content={contentToRender as string} />
@@ -2435,19 +2438,60 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
     </div>
 
     {/* Image Preview Dialog */}
-    <Dialog open={!!previewImage} onOpenChange={(open) => !open && setPreviewImage(null)}>
-      <DialogContent className="max-w-4xl p-0 bg-transparent border-none">
-        <div className="relative flex items-center justify-center">
-          {previewImage && (
-            <img
-              src={previewImage}
-              alt="Preview"
-              className="max-h-[80vh] max-w-full rounded-lg shadow-2xl"
-            />
-          )}
+    {previewImage && (
+      <div
+        className={cn(
+          "fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm",
+          isFullscreen ? "p-0" : "p-8"
+        )}
+        onClick={(e) => { if (e.target === e.currentTarget) { setPreviewImage(null); setIsFullscreen(false); } }}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") { setPreviewImage(null); setIsFullscreen(false); }
+          if (e.key === "f" || e.key === "F") setIsFullscreen(v => !v);
+        }}
+        tabIndex={0}
+        ref={(el) => el?.focus()}
+      >
+        <div className="absolute top-4 right-4 flex items-center gap-2 z-10">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9 rounded-full bg-black/50 text-white hover:bg-black/70"
+            onClick={() => setIsFullscreen(!isFullscreen)}
+          >
+            {isFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9 rounded-full bg-black/50 text-white hover:bg-black/70"
+            asChild
+          >
+            <a href={previewImage} download target="_blank" rel="noopener noreferrer">
+              <Download className="h-4 w-4" />
+            </a>
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9 rounded-full bg-black/50 text-white hover:bg-black/70"
+            onClick={() => { setPreviewImage(null); setIsFullscreen(false); }}
+          >
+            <X className="h-4 w-4" />
+          </Button>
         </div>
-      </DialogContent>
-    </Dialog>
+        <img
+          src={previewImage}
+          alt="Preview"
+          className={cn(
+            "rounded-lg shadow-2xl",
+            isFullscreen
+              ? "max-h-screen max-w-screen object-contain"
+              : "max-h-[80vh] max-w-full"
+          )}
+        />
+      </div>
+    )}
     </>
   )
 }
