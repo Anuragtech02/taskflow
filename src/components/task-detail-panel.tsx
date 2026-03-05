@@ -611,6 +611,10 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
     })
   }, [currentTask, task, title, description, status, priority, dueDate, startDate, timeEstimate, updateTaskMutation])
 
+  // Keep a ref to the latest handleSave so debounce timeouts never use a stale closure
+  const handleSaveRef = useRef(handleSave)
+  handleSaveRef.current = handleSave
+
   // Debounced auto-save — only fires if user actually made changes
   const debouncedSave = useCallback(() => {
     isDirtyRef.current = true
@@ -633,12 +637,32 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
     }
     autoSaveTimeoutRef.current = setTimeout(() => {
       if (isDirtyRef.current) {
-        handleSave()
+        handleSaveRef.current()
         isDirtyRef.current = false
         pendingSaveDataRef.current = null
       }
     }, 1000)
-  }, [handleSave, currentTask, task, title, description, status, priority, dueDate, startDate, timeEstimate])
+  }, [currentTask, task, title, description, status, priority, dueDate, startDate, timeEstimate])
+
+  // Keep pendingSaveDataRef in sync after each render so flush-on-switch
+  // never uses a stale snapshot (setTitle is async, closure captures old value)
+  useEffect(() => {
+    if (isDirtyRef.current) {
+      const effectiveId = currentTask?.id || task?.id
+      if (effectiveId) {
+        pendingSaveDataRef.current = {
+          taskId: effectiveId,
+          title,
+          description: (description ?? undefined) as Record<string, unknown> | undefined,
+          status,
+          priority,
+          dueDate: dueDate ? dueDate.toISOString() : undefined,
+          startDate: startDate ? startDate.toISOString() : undefined,
+          timeEstimate: timeEstimate ?? undefined,
+        }
+      }
+    }
+  })
 
   // Flush pending save on panel close
   useEffect(() => {
