@@ -2450,7 +2450,7 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
           if (e.key === "f" || e.key === "F") setIsFullscreen(v => !v);
         }}
         tabIndex={0}
-        ref={(el) => el?.focus()}
+        ref={(el) => { if (el) el.focus(); }}
       >
         <div className="absolute top-4 right-4 flex items-center gap-2 z-10">
           <Button

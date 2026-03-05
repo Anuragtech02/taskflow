@@ -257,8 +257,6 @@ export function RichTextEditor({ content, onChange, placeholder, minHeight = "15
     </div>
   )
 
-  if (!editor) return null
-
   const handleEditorClick = useCallback((e: React.MouseEvent) => {
     if (!onImageClick) return
     const target = e.target as HTMLElement
@@ -269,6 +267,8 @@ export function RichTextEditor({ content, onChange, placeholder, minHeight = "15
       if (src) onImageClick(src)
     }
   }, [onImageClick])
+
+  if (!editor) return null
 
   return (
     <div className={cn("relative border rounded-md bg-background", className)} onClick={handleEditorClick}>
