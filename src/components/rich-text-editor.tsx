@@ -229,6 +229,17 @@ export function RichTextEditor({ content, onChange, placeholder, minHeight = "15
     }
   }, [])
 
+  const handleEditorClick = useCallback((e: React.MouseEvent) => {
+    if (!onImageClick) return
+    const target = e.target as HTMLElement
+    if (target.tagName === "IMG") {
+      e.preventDefault()
+      e.stopPropagation()
+      const src = (target as HTMLImageElement).src
+      if (src) onImageClick(src)
+    }
+  }, [onImageClick])
+
   if (!editor) return null
 
   // Toolbar component
@@ -256,19 +267,6 @@ export function RichTextEditor({ content, onChange, placeholder, minHeight = "15
       <button type="button" onClick={insertTable} className="p-1.5 rounded hover:bg-muted"><TableIcon className="h-4 w-4" /></button>
     </div>
   )
-
-  const handleEditorClick = useCallback((e: React.MouseEvent) => {
-    if (!onImageClick) return
-    const target = e.target as HTMLElement
-    if (target.tagName === "IMG") {
-      e.preventDefault()
-      e.stopPropagation()
-      const src = (target as HTMLImageElement).src
-      if (src) onImageClick(src)
-    }
-  }, [onImageClick])
-
-  if (!editor) return null
 
   return (
     <div className={cn("relative border rounded-md bg-background", className)} onClick={handleEditorClick}>
