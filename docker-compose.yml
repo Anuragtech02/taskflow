@@ -92,6 +92,50 @@ services:
     networks:
       - internal
 
+  api:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+      target: production
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: "3001"
+      DATABASE_URL: postgresql://taskflow:${POSTGRES_PASSWORD:-taskflow_secure_pwd}@postgres:5432/taskflow
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:?Set NEXTAUTH_SECRET via openssl rand -base64 32}
+      CORS_ORIGIN: https://${DOMAIN}
+      NEXT_PUBLIC_APP_URL: https://${DOMAIN}
+      NEXT_PUBLIC_MAIN_DOMAIN: ${MAIN_DOMAIN}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      S3_ENDPOINT: http://minio:9000
+      S3_BUCKET: taskflow
+      S3_ACCESS_KEY: ${MINIO_ROOT_USER:-taskflow}
+      S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-taskflow_minio_pwd}
+      S3_REGION: us-east-1
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      EMAIL_FROM: ${EMAIL_FROM:-notifications@taskflow.dev}
+      CRON_API_KEY: ${CRON_API_KEY:-}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.taskflow-api.rule=Host(`api.${DOMAIN}`)"
+      - "traefik.http.routers.taskflow-api.entrypoints=websecure"
+      - "traefik.http.routers.taskflow-api.tls.certresolver=letsencrypt"
+      - "traefik.http.services.taskflow-api.loadbalancer.server.port=3001"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    networks:
+      - proxy
+      - internal
+
   minio:
     image: minio/minio:latest
     restart: unless-stopped
