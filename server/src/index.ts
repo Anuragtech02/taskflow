@@ -8,6 +8,14 @@ import ssePlugin from "./plugins/sse.js";
 import healthRoutes from "./routes/health/index.js";
 import registerRoutes from "./routes/auth/register.js";
 import userRoutes from "./routes/users/me.js";
+import workspaceRoutes from "./routes/workspaces/index.js";
+import memberRoutes from "./routes/workspaces/members.js";
+import workspaceSpaceRoutes from "./routes/workspaces/spaces.js";
+import labelRoutes from "./routes/workspaces/labels.js";
+import workspaceSearchRoutes from "./routes/workspaces/search.js";
+import dashboardRoutes from "./routes/workspaces/dashboard.js";
+import statsRoutes from "./routes/workspaces/stats.js";
+import spaceRoutes from "./routes/spaces/space.js";
 
 const fastify = Fastify({
   logger: {
@@ -27,6 +35,14 @@ await fastify.register(ssePlugin);
 await fastify.register(healthRoutes);
 await fastify.register(registerRoutes);
 await fastify.register(userRoutes);
+await fastify.register(workspaceRoutes);
+await fastify.register(memberRoutes);
+await fastify.register(workspaceSpaceRoutes);
+await fastify.register(labelRoutes);
+await fastify.register(workspaceSearchRoutes);
+await fastify.register(dashboardRoutes);
+await fastify.register(statsRoutes);
+await fastify.register(spaceRoutes);
 
 // Start server
 try {
