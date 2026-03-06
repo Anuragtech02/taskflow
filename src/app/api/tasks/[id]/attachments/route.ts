@@ -40,6 +40,11 @@ const ALLOWED_TYPES = [
   "image/gif",
   "image/webp",
   "image/svg+xml",
+  "video/mp4",
+  "video/webm",
+  "video/quicktime",
+  "video/x-msvideo",
+  "video/x-matroska",
   "application/pdf",
   "application/msword",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -50,7 +55,7 @@ const ALLOWED_TYPES = [
   "application/zip",
 ];
 
-const MAX_SIZE = 25 * 1024 * 1024; // 25MB
+const MAX_SIZE = 50 * 1024 * 1024; // 50MB
 
 // GET - List attachments for a task
 export async function GET(
@@ -131,7 +136,7 @@ export async function POST(
     // Validate file type
     if (!ALLOWED_TYPES.includes(file.type)) {
       return NextResponse.json(
-        { error: "Invalid file type. Allowed: images, PDF, DOC, DOCX, XLS, XLSX, TXT, CSV, ZIP" },
+        { error: "Invalid file type. Allowed: images, videos, PDF, DOC, DOCX, XLS, XLSX, TXT, CSV, ZIP" },
         { status: 400 }
       );
     }
@@ -139,7 +144,7 @@ export async function POST(
     // Validate file size
     if (file.size > MAX_SIZE) {
       return NextResponse.json(
-        { error: "File too large. Max 25MB allowed." },
+        { error: "File too large. Max 50MB allowed." },
         { status: 400 }
       );
     }

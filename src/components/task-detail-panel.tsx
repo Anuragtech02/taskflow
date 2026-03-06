@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react"
-import { X, Calendar, Clock, CheckSquare, MessageSquare, Play, Pause, Square, Trash2, Plus, Check, Search, Link2, ChevronRight, Tag, Paperclip, AlertCircle, ArrowUpRight, MoreHorizontal, CircleCheckBig, Flag, Users, Timer, Gauge, ChevronDown, FolderKanban, FileText, Edit3, Lock, ExternalLink, List as ListIcon, Maximize, Minimize, Download } from "lucide-react"
+import { X, Calendar, Clock, CheckSquare, MessageSquare, Play, Pause, Square, Trash2, Plus, Check, Search, Link2, ChevronRight, Tag, Paperclip, AlertCircle, ArrowUpRight, MoreHorizontal, CircleCheckBig, Flag, Users, Timer, Gauge, ChevronDown, FolderKanban, FileText, Film, Edit3, Lock, ExternalLink, List as ListIcon, Maximize, Minimize, Download } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -450,6 +450,11 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
   // Check if file is image
   const isImageFile = (mimeType: string): boolean => {
     return mimeType.startsWith("image/")
+  }
+
+  // Check if file is video
+  const isVideoFile = (mimeType: string): boolean => {
+    return mimeType.startsWith("video/")
   }
 
   // Handle delete attachment
@@ -2248,7 +2253,7 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
                     multiple
                     className="hidden"
                     onChange={(e) => handleFileUpload(e.target.files)}
-                    accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,.zip"
+                    accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,.zip"
                   />
                   {isUploading ? (
                     <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
@@ -2277,7 +2282,7 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
                       >
                         {/* Thumbnail or icon */}
                         {isImageFile(attachment.mimeType) ? (
-                          <div 
+                          <div
                             className="h-10 w-10 rounded overflow-hidden flex-shrink-0 bg-muted cursor-pointer hover:ring-2 hover:ring-primary"
                             onClick={() => setPreviewImage(attachment.url)}
                           >
@@ -2286,6 +2291,10 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
                               alt={attachment.filename}
                               className="h-full w-full object-cover"
                             />
+                          </div>
+                        ) : isVideoFile(attachment.mimeType) ? (
+                          <div className="h-10 w-10 rounded flex-shrink-0 bg-muted flex items-center justify-center">
+                            <Film className="h-5 w-5 text-muted-foreground" />
                           </div>
                         ) : (
                           <div className="h-10 w-10 rounded flex-shrink-0 bg-muted flex items-center justify-center">
@@ -2297,7 +2306,7 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
                         <div className="flex-1 min-w-0">
                           <button
                             onClick={() => {
-                              if (isImageFile(attachment.mimeType)) {
+                              if (isImageFile(attachment.mimeType) || isVideoFile(attachment.mimeType)) {
                                 setPreviewImage(attachment.url)
                               } else {
                                 window.open(attachment.url, "_blank")
@@ -2518,16 +2527,30 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
             <X className="h-4 w-4" />
           </Button>
         </div>
-        <img
-          src={previewImage}
-          alt="Preview"
-          className={cn(
-            "rounded-lg shadow-2xl",
-            isFullscreen
-              ? "max-h-screen max-w-screen object-contain"
-              : "max-h-[80vh] max-w-full"
-          )}
-        />
+        {previewImage.match(/\.(mp4|webm|mov|avi|mkv)$/i) ? (
+          <video
+            src={previewImage}
+            controls
+            autoPlay
+            className={cn(
+              "rounded-lg shadow-2xl",
+              isFullscreen
+                ? "max-h-screen max-w-screen object-contain"
+                : "max-h-[80vh] max-w-full"
+            )}
+          />
+        ) : (
+          <img
+            src={previewImage}
+            alt="Preview"
+            className={cn(
+              "rounded-lg shadow-2xl",
+              isFullscreen
+                ? "max-h-screen max-w-screen object-contain"
+                : "max-h-[80vh] max-w-full"
+            )}
+          />
+        )}
       </div>
     )}
     </>

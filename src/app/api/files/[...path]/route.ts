@@ -59,6 +59,11 @@ export async function GET(
       gif: "image/gif",
       webp: "image/webp",
       svg: "image/svg+xml",
+      mp4: "video/mp4",
+      webm: "video/webm",
+      mov: "video/quicktime",
+      avi: "video/x-msvideo",
+      mkv: "video/x-matroska",
       pdf: "application/pdf",
     }
     const contentType = contentTypes[ext] || "application/octet-stream"
