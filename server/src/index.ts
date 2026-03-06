@@ -16,6 +16,8 @@ import workspaceSearchRoutes from "./routes/workspaces/search.js";
 import dashboardRoutes from "./routes/workspaces/dashboard.js";
 import statsRoutes from "./routes/workspaces/stats.js";
 import spaceRoutes from "./routes/spaces/space.js";
+import listRoutes from "./routes/lists/list.js";
+import folderRoutes from "./routes/folders/folder.js";
 
 const fastify = Fastify({
   logger: {
@@ -43,6 +45,8 @@ await fastify.register(workspaceSearchRoutes);
 await fastify.register(dashboardRoutes);
 await fastify.register(statsRoutes);
 await fastify.register(spaceRoutes);
+await fastify.register(listRoutes);
+await fastify.register(folderRoutes);
 
 // Start server
 try {
