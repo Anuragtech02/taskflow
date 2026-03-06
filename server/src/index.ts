@@ -19,6 +19,11 @@ import spaceRoutes from "./routes/spaces/space.js";
 import listRoutes from "./routes/lists/list.js";
 import folderRoutes from "./routes/folders/folder.js";
 import taskRoutes from "./routes/tasks/task.js";
+import sprintRoutes from "./routes/sprints/sprint.js";
+import goalRoutes from "./routes/goals/goal.js";
+import automationRoutes from "./routes/automations/automation.js";
+import workspaceAutomationRoutes from "./routes/workspaces/automations.js";
+import workspaceSprintRoutes2 from "./routes/workspaces/sprints.js";
 
 const fastify = Fastify({
   logger: {
@@ -49,6 +54,11 @@ await fastify.register(spaceRoutes);
 await fastify.register(listRoutes);
 await fastify.register(folderRoutes);
 await fastify.register(taskRoutes);
+await fastify.register(sprintRoutes);
+await fastify.register(goalRoutes);
+await fastify.register(automationRoutes);
+await fastify.register(workspaceAutomationRoutes);
+await fastify.register(workspaceSprintRoutes2);
 
 // Start server
 try {
