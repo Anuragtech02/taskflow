@@ -569,6 +569,20 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
     }
   }, [currentTask?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Re-populate local state when fetchedTask data arrives after a save-triggered refetch,
+  // but only if the user isn't actively editing (isDirtyRef is false)
+  useEffect(() => {
+    if (fetchedTask && fetchedTask.id === prevTaskIdRef.current && !isDirtyRef.current) {
+      setTitle(fetchedTask.title || "")
+      setDescription(fetchedTask.description as Record<string, unknown> | null)
+      setStatus(fetchedTask.status || "todo")
+      setPriority((fetchedTask.priority as Priority) || "none")
+      setDueDate(fetchedTask.dueDate ? new Date(fetchedTask.dueDate) : undefined)
+      setStartDate(fetchedTask.startDate ? new Date(fetchedTask.startDate) : undefined)
+      setTimeEstimate(fetchedTask.timeEstimate)
+    }
+  }, [fetchedTask]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // Timer cleanup
   useEffect(() => {
     return () => {

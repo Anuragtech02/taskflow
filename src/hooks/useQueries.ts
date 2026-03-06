@@ -395,8 +395,9 @@ export function useUpdateTask() {
       customFields?: Record<string, unknown>
       listId?: string
     }) => updateTask(taskId, data),
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["tasks"] })
+      queryClient.invalidateQueries({ queryKey: ["task", variables.taskId] })
     },
   })
 }
