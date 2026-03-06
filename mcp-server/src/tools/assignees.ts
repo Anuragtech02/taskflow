@@ -10,8 +10,8 @@ export function registerAssigneeTools(
     "assign_task",
     "Assign or unassign a user from a task. Use list_members to find user IDs.",
     {
-      taskId: z.string().describe("The task ID"),
-      userId: z.string().describe("The user ID to assign/unassign"),
+      taskId: z.string().uuid().describe("The task ID"),
+      userId: z.string().uuid().describe("The user ID to assign/unassign"),
       action: z
         .enum(["assign", "unassign"])
         .describe("Whether to assign or unassign the user"),

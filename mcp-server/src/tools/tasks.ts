@@ -19,7 +19,7 @@ export function registerTaskTools(server: McpServer, client: TaskFlowClient) {
   server.tool(
     "get_task",
     "Get full details for a single task, including comments, assignees, and activity",
-    { taskId: z.string().describe("The task ID") },
+    { taskId: z.string().uuid().describe("The task ID") },
     async ({ taskId }) => {
       const data = await client.getTask(taskId);
       return {
@@ -66,7 +66,7 @@ export function registerTaskTools(server: McpServer, client: TaskFlowClient) {
     "update_task",
     "Update an existing task's fields (title, status, priority, description, due date, or move to a different list)",
     {
-      taskId: z.string().describe("The task ID to update"),
+      taskId: z.string().uuid().describe("The task ID to update"),
       title: z.string().optional().describe("New title"),
       status: z.string().optional().describe("New status (e.g. todo, in_progress, done)"),
       priority: z

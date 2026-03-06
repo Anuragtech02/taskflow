@@ -6,6 +6,8 @@ import { eq, and, desc } from "drizzle-orm";
 import { z } from "zod";
 import { createNotification, notifyMentions } from "@/lib/notifications";
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 const createCommentSchema = z.object({
   content: z.string().min(1),
 });
@@ -47,6 +49,9 @@ export async function GET(
     }
 
     const { id: taskId } = await params;
+    if (!UUID_REGEX.test(taskId)) {
+      return NextResponse.json({ error: "Invalid task ID format" }, { status: 400 });
+    }
     const access = await checkTaskAccess(taskId, authResult.userId);
 
     if (!access) {
@@ -89,6 +94,9 @@ export async function POST(
     }
 
     const { id: taskId } = await params;
+    if (!UUID_REGEX.test(taskId)) {
+      return NextResponse.json({ error: "Invalid task ID format" }, { status: 400 });
+    }
     const access = await checkTaskAccess(taskId, authResult.userId);
 
     if (!access) {
@@ -196,6 +204,9 @@ export async function DELETE(
     }
 
     const { id: taskId } = await params;
+    if (!UUID_REGEX.test(taskId)) {
+      return NextResponse.json({ error: "Invalid task ID format" }, { status: 400 });
+    }
     const access = await checkTaskAccess(taskId, authResult.userId);
 
     if (!access) {

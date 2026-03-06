@@ -8,6 +8,8 @@ import { runAutomations } from "@/lib/automations";
 import { autoCreateDueDateReminder } from "@/lib/reminders";
 import { broadcastToWorkspace } from "@/lib/sse";
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 const updateTaskSchema = z.object({
   title: z.string().min(1).max(500).optional(),
   description: z.record(z.string(), z.unknown()).optional(),
@@ -60,6 +62,9 @@ export async function GET(
     }
 
     const { id: taskId } = await params;
+    if (!UUID_REGEX.test(taskId)) {
+      return NextResponse.json({ error: "Invalid task ID format" }, { status: 400 });
+    }
     const access = await checkTaskAccess(taskId, authResult.userId);
 
     if (!access) {
@@ -179,6 +184,9 @@ export async function PATCH(
     }
 
     const { id: taskId } = await params;
+    if (!UUID_REGEX.test(taskId)) {
+      return NextResponse.json({ error: "Invalid task ID format" }, { status: 400 });
+    }
     const access = await checkTaskAccess(taskId, authResult.userId);
 
     if (!access) {
@@ -298,6 +306,9 @@ export async function DELETE(
     }
 
     const { id: taskId } = await params;
+    if (!UUID_REGEX.test(taskId)) {
+      return NextResponse.json({ error: "Invalid task ID format" }, { status: 400 });
+    }
     const access = await checkTaskAccess(taskId, authResult.userId);
 
     if (!access) {

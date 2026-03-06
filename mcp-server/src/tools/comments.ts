@@ -10,7 +10,7 @@ export function registerCommentTools(
     "add_comment",
     "Add a comment to a task",
     {
-      taskId: z.string().describe("The task ID to comment on"),
+      taskId: z.string().uuid().describe("The task ID to comment on"),
       content: z.string().min(1).describe("The comment text"),
     },
     async ({ taskId, content }) => {
