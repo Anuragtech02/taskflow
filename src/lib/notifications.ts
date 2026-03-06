@@ -51,10 +51,11 @@ async function shouldSendEmail(userId: string): Promise<boolean> {
  * Create a notification for a user
  */
 export async function createNotification(params: CreateNotificationParams) {
+  const truncatedTitle = params.title.length > 255 ? params.title.slice(0, 252) + "..." : params.title;
   const [notification] = await db.insert(notifications).values({
     userId: params.userId,
     type: params.type,
-    title: params.title,
+    title: truncatedTitle,
     message: params.message || null,
     entityType: params.entityType || null,
     entityId: params.entityId || null,

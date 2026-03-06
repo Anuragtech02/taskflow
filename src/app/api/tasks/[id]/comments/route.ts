@@ -140,42 +140,47 @@ export async function POST(
     });
 
     // Notify task assignees about the new comment (except the commenter)
-    const taskAssigneesList = await db.query.taskAssignees.findMany({
-      where: eq(taskAssignees.taskId, taskId),
-    });
+    // Wrapped in try/catch so notification failures never block comment creation
+    try {
+      const taskAssigneesList = await db.query.taskAssignees.findMany({
+        where: eq(taskAssignees.taskId, taskId),
+      });
 
-    for (const assignee of taskAssigneesList) {
-      if (assignee.userId !== authResult.userId) {
-        await createNotification({
-          userId: assignee.userId,
-          type: "comment_added",
-          title: `New comment on "${access.task.title}"`,
-          message: `${commentWithUser?.user?.name || "Someone"} commented on a task you're assigned to`,
-          entityType: "task",
-          entityId: taskId,
-          workspaceId: access.task.list.space.workspaceId,
-        });
+      for (const assignee of taskAssigneesList) {
+        if (assignee.userId !== authResult.userId) {
+          await createNotification({
+            userId: assignee.userId,
+            type: "comment_added",
+            title: `New comment on "${access.task.title}"`,
+            message: `${commentWithUser?.user?.name || "Someone"} commented on a task you're assigned to`,
+            entityType: "task",
+            entityId: taskId,
+            workspaceId: access.task.list.space.workspaceId,
+          });
+        }
       }
-    }
 
-    // Also notify the task creator if they're not the commenter and not already notified
-    if (access.task.creatorId !== authResult.userId) {
-      const alreadyNotified = taskAssigneesList.some(a => a.userId === access.task.creatorId);
-      if (!alreadyNotified) {
-        await createNotification({
-          userId: access.task.creatorId,
-          type: "comment_added",
-          title: `New comment on "${access.task.title}"`,
-          message: `${commentWithUser?.user?.name || "Someone"} commented on your task`,
-          entityType: "task",
-          entityId: taskId,
-          workspaceId: access.task.list.space.workspaceId,
-        });
+      // Also notify the task creator if they're not the commenter and not already notified
+      if (access.task.creatorId !== authResult.userId) {
+        const alreadyNotified = taskAssigneesList.some(a => a.userId === access.task.creatorId);
+        if (!alreadyNotified) {
+          await createNotification({
+            userId: access.task.creatorId,
+            type: "comment_added",
+            title: `New comment on "${access.task.title}"`,
+            message: `${commentWithUser?.user?.name || "Someone"} commented on your task`,
+            entityType: "task",
+            entityId: taskId,
+            workspaceId: access.task.list.space.workspaceId,
+          });
+        }
       }
-    }
 
-    // Handle @mentions
-    await notifyMentions(validatedData.content, authResult.userId, "task", taskId, access.task.title, access.task.list.space.workspaceId);
+      // Handle @mentions
+      await notifyMentions(validatedData.content, authResult.userId, "task", taskId, access.task.title, access.task.list.space.workspaceId);
+    } catch (notifError) {
+      console.error("Error sending comment notifications:", notifError);
+    }
 
     return NextResponse.json({ comment: commentWithUser }, { status: 201 });
   } catch (error) {
