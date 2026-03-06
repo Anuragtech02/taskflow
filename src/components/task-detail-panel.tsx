@@ -2363,33 +2363,100 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
 
           {/* Activity Feed - Scrollable */}
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            {/* Real Activity History - newest first */}
-            {activityTab === "all" || activityTab === "history" ? (
-              currentTask?.activities && currentTask.activities.length > 0 ? (
-                [...currentTask.activities].reverse().map((activity) => {
-                  const actionText = getActivityActionText(activity)
+            {activityTab === "all" ? (
+              (() => {
+                // Merge activities and comments into a single sorted timeline
+                const items: { type: "activity" | "comment"; data: any; time: number }[] = []
+                if (currentTask?.activities) {
+                  for (const a of currentTask.activities) {
+                    items.push({ type: "activity", data: a, time: new Date(a.createdAt).getTime() })
+                  }
+                }
+                for (const c of comments) {
+                  items.push({ type: "comment", data: c, time: new Date(c.createdAt).getTime() })
+                }
+                items.sort((a, b) => a.time - b.time)
+
+                if (items.length === 0) {
+                  return <p className="text-xs text-muted-foreground italic text-center py-4">No activity yet</p>
+                }
+
+                return items.map((item) => {
+                  if (item.type === "activity") {
+                    const activity = item.data as ActivityResponse
+                    const actionText = getActivityActionText(activity)
+                    return (
+                      <ActivityItem
+                        key={`activity-${activity.id}`}
+                        avatar={null}
+                        name={activity.user?.name || "Unknown"}
+                        action={actionText}
+                        timestamp={activity.createdAt}
+                        icon={getActivityIcon(activity.action)}
+                      />
+                    )
+                  }
+                  const comment = item.data as CommentResponse
+                  let contentToRender: string | Record<string, unknown> = comment.content
+                  try {
+                    const parsed = JSON.parse(comment.content)
+                    if (parsed && parsed.type === "doc") {
+                      contentToRender = parsed
+                    }
+                  } catch {
+                    // Not JSON, use as plain text
+                  }
                   return (
-                    <ActivityItem
-                      key={activity.id}
-                      avatar={null}
-                      name={activity.user?.name || "Unknown"}
-                      action={actionText}
-                      timestamp={activity.createdAt}
-                      icon={getActivityIcon(activity.action)}
-                    />
+                    <div key={`comment-${comment.id}`} className="group/comment flex gap-2">
+                      <Avatar className="h-7 w-7 flex-shrink-0">
+                        <AvatarImage src={comment.user.avatarUrl || undefined} />
+                        <AvatarFallback className="text-xs">
+                          {getInitials(comment.user.name)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium">{comment.user.name}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {formatRelativeTime(comment.createdAt)}
+                          </span>
+                          {currentUserId && comment.userId === currentUserId && (
+                            <button
+                              onClick={() => {
+                                const effectiveId = currentTask?.id || task?.id
+                                if (effectiveId) {
+                                  deleteCommentMutation.mutate({ taskId: effectiveId, commentId: comment.id })
+                                }
+                              }}
+                              className="ml-auto opacity-0 group-hover/comment:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
+                              title="Delete comment"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                        </div>
+                        <div className="text-sm mt-1">
+                          {typeof contentToRender === "object" ? (
+                            <RichTextEditor
+                              content={contentToRender as Record<string, unknown>}
+                              onChange={() => {}}
+                              editable={false}
+                              minHeight="auto"
+                              onImageClick={setPreviewImage}
+                            />
+                          ) : (
+                            <MarkdownRenderer content={contentToRender as string} />
+                          )}
+                        </div>
+                      </div>
+                    </div>
                   )
                 })
-              ) : (
-                <p className="text-xs text-muted-foreground italic text-center py-4">No activity yet</p>
-              )
-            ) : null}
-
-            {/* Comments */}
-            {activityTab === "all" || activityTab === "comments" ? (
+              })()
+            ) : activityTab === "comments" ? (
               comments.length > 0 ? (
                 comments.map((comment) => {
-                  // Check if content is JSON (TipTap format)
-                  let contentToRender = comment.content
+                  let contentToRender: string | Record<string, unknown> = comment.content
                   try {
                     const parsed = JSON.parse(comment.content)
                     if (parsed && parsed.type === "doc") {
@@ -2447,9 +2514,25 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
               ) : (
                 <p className="text-xs text-muted-foreground italic text-center py-4">No comments yet</p>
               )
-            ) : (
-              <p className="text-xs text-muted-foreground italic text-center py-4">No history available</p>
-            )}
+            ) : activityTab === "history" ? (
+              currentTask?.activities && currentTask.activities.length > 0 ? (
+                [...currentTask.activities].map((activity) => {
+                  const actionText = getActivityActionText(activity)
+                  return (
+                    <ActivityItem
+                      key={activity.id}
+                      avatar={null}
+                      name={activity.user?.name || "Unknown"}
+                      action={actionText}
+                      timestamp={activity.createdAt}
+                      icon={getActivityIcon(activity.action)}
+                    />
+                  )
+                })
+              ) : (
+                <p className="text-xs text-muted-foreground italic text-center py-4">No activity yet</p>
+              )
+            ) : null}
           </div>
 
           {/* Comment Input - Fixed at Bottom */}
