@@ -24,6 +24,16 @@ import goalRoutes from "./routes/goals/goal.js";
 import automationRoutes from "./routes/automations/automation.js";
 import workspaceAutomationRoutes from "./routes/workspaces/automations.js";
 import workspaceSprintRoutes2 from "./routes/workspaces/sprints.js";
+import documentRoutes from "./routes/documents/document.js";
+import formRoutes from "./routes/forms/form.js";
+import fileRoutes from "./routes/files/files.js";
+import notificationRoutes from "./routes/notifications/notification.js";
+import searchRoutes from "./routes/search/index.js";
+import aiRoutes from "./routes/ai/generate-tasks.js";
+import sseRoutes from "./routes/sse/index.js";
+import reminderCheckRoutes from "./routes/reminders/check.js";
+import workspaceListRoutes from "./routes/workspaces/lists.js";
+import reportRoutes from "./routes/workspaces/reports.js";
 
 const fastify = Fastify({
   logger: {
@@ -59,6 +69,16 @@ await fastify.register(goalRoutes);
 await fastify.register(automationRoutes);
 await fastify.register(workspaceAutomationRoutes);
 await fastify.register(workspaceSprintRoutes2);
+await fastify.register(documentRoutes);
+await fastify.register(formRoutes);
+await fastify.register(fileRoutes);
+await fastify.register(notificationRoutes);
+await fastify.register(searchRoutes);
+await fastify.register(aiRoutes);
+await fastify.register(sseRoutes);
+await fastify.register(reminderCheckRoutes);
+await fastify.register(workspaceListRoutes);
+await fastify.register(reportRoutes);
 
 // Start server
 try {
