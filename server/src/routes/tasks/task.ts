@@ -762,6 +762,37 @@ export default async function taskRoutes(fastify: FastifyInstance) {
     }
   });
 
+  // DELETE /tasks/:id/time-entries
+  fastify.delete("/tasks/:id/time-entries", async (request, reply) => {
+    const authResult = await authenticateRequest(request);
+    if (!authResult) return reply.status(401).send({ error: "Unauthorized" });
+    const { id: taskId } = request.params as { id: string };
+    try {
+      const access = await checkTaskAccess(taskId, authResult.userId);
+      if (!access) return reply.status(404).send({ error: "Task not found or access denied" });
+      const { entryId } = request.query as { entryId?: string };
+      if (!entryId) return reply.status(400).send({ error: "entryId is required" });
+
+      const entry = await db.query.timeEntries.findFirst({
+        where: and(eq(timeEntries.id, entryId), eq(timeEntries.taskId, taskId)),
+      });
+      if (!entry) return reply.status(404).send({ error: "Time entry not found" });
+      if (entry.userId !== authResult.userId) return reply.status(403).send({ error: "Not authorized to delete this time entry" });
+
+      await db.delete(timeEntries).where(eq(timeEntries.id, entryId));
+
+      // Recalculate total time spent
+      const allEntries = await db.query.timeEntries.findMany({ where: eq(timeEntries.taskId, taskId) });
+      const totalTimeSpent = allEntries.reduce((sum, e) => sum + (e.duration || 0), 0);
+      await db.update(tasks).set({ timeSpent: totalTimeSpent }).where(eq(tasks.id, taskId));
+
+      return { success: true };
+    } catch (error) {
+      console.error("Error deleting time entry:", error);
+      return reply.status(500).send({ error: "Internal server error" });
+    }
+  });
+
   // ==================== REMINDERS ====================
 
   // GET /tasks/:id/reminders

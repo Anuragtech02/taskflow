@@ -14,13 +14,13 @@ export interface DocumentResponse {
 }
 
 export async function fetchDocuments(workspaceId: string): Promise<DocumentResponse[]> {
-  const res = await fetch(`/api/workspaces/${workspaceId}/documents`)
+  const res = await fetch(`/api/workspaces/${workspaceId}/documents`, { credentials: "include" })
   const data = await res.json()
   return data.documents || []
 }
 
 export async function fetchDocument(documentId: string): Promise<{ document: DocumentResponse }> {
-  const res = await fetch(`/api/documents/${documentId}`)
+  const res = await fetch(`/api/documents/${documentId}`, { credentials: "include" })
   return res.json()
 }
 
@@ -35,6 +35,7 @@ export async function createDocument(
 ): Promise<{ document: DocumentResponse }> {
   const res = await fetch(`/api/workspaces/${workspaceId}/documents`, {
     method: "POST",
+    credentials: "include",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
   })
@@ -53,6 +54,7 @@ export async function updateDocument(
 ): Promise<{ document: DocumentResponse }> {
   const res = await fetch(`/api/documents/${documentId}`, {
     method: "PATCH",
+    credentials: "include",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
   })
@@ -62,5 +64,6 @@ export async function updateDocument(
 export async function deleteDocument(documentId: string): Promise<void> {
   await fetch(`/api/documents/${documentId}`, {
     method: "DELETE",
+    credentials: "include",
   })
 }

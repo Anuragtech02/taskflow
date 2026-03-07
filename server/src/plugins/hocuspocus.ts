@@ -1,7 +1,7 @@
 import { FastifyInstance } from "fastify";
 import fp from "fastify-plugin";
 import { Server } from "@hocuspocus/server";
-import jwt from "jsonwebtoken";
+import { jwtVerify } from "jose";
 import { db, schema } from "../db/index.js";
 import { eq, and, sql } from "drizzle-orm";
 import { config } from "../config.js";
@@ -18,9 +18,13 @@ interface CollabToken {
 async function hocuspocusPlugin(fastify: FastifyInstance) {
   const server = Server.configure({
     async onAuthenticate({ token, documentName }) {
-      // Token is a JWT with userId, documentId, role
+      // Collab tokens are signed JWTs (HS256) created by our collab-token route
       try {
-        const decoded = jwt.verify(token, config.jwtSecret) as CollabToken;
+        const secret = new TextEncoder().encode(config.jwtSecret);
+        const { payload } = await jwtVerify(token, secret, {
+          algorithms: ["HS256"],
+        });
+        const decoded = payload as unknown as CollabToken;
         if (decoded.documentId !== documentName) {
           throw new Error("Token document mismatch");
         }
@@ -51,60 +55,58 @@ async function hocuspocusPlugin(fastify: FastifyInstance) {
     },
 
     async onLoadDocument({ document, documentName }) {
-      // Load Yjs state from database
-      const doc = await db.query.documents.findFirst({
-        where: eq(documents.id, documentName),
-      });
+      try {
+        const doc = await db.query.documents.findFirst({
+          where: eq(documents.id, documentName),
+        });
 
-      if (doc?.ydocState) {
-        const state = doc.ydocState as Buffer;
-        Y.applyUpdate(document, new Uint8Array(state));
+        if (doc?.ydocState) {
+          const state = doc.ydocState as Buffer;
+          Y.applyUpdate(document, new Uint8Array(state));
+        }
+      } catch (err) {
+        console.error(`Failed to load document ${documentName}:`, err);
       }
 
       return document;
     },
 
     async onStoreDocument({ document, documentName }) {
-      const state = Y.encodeStateAsUpdate(document);
-      const content = document.getXmlFragment("default").toJSON();
-
-      await db
-        .update(documents)
-        .set({
-          ydocState: Buffer.from(state) as any,
-          content: content || {},
-          updatedAt: new Date(),
-        })
-        .where(eq(documents.id, documentName));
-
-      // Auto-version every 5 minutes
-      const doc = await db.query.documents.findFirst({
-        where: eq(documents.id, documentName),
-        columns: { lastVersionAt: true, title: true },
-      });
-
-      const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000);
-      if (!doc?.lastVersionAt || doc.lastVersionAt < fiveMinAgo) {
-        const lastVersion = await db
-          .select({ maxVersion: sql<number>`COALESCE(MAX(${documentVersions.versionNumber}), 0)` })
-          .from(documentVersions)
-          .where(eq(documentVersions.documentId, documentName));
-
-        const nextVersion = (lastVersion[0]?.maxVersion || 0) + 1;
-
-        await db.insert(documentVersions).values({
-          documentId: documentName,
-          versionNumber: nextVersion,
-          title: doc?.title || "Untitled",
-          content: content || {},
-          ydocState: Buffer.from(state) as any,
-          createdBy: "00000000-0000-0000-0000-000000000000", // system user
-        });
+      try {
+        const state = Y.encodeStateAsUpdate(document);
+        const content = document.getXmlFragment("default").toJSON();
 
         await db
           .update(documents)
-          .set({ lastVersionAt: new Date() })
+          .set({
+            ydocState: Buffer.from(state) as any,
+            content: content || {},
+            updatedAt: new Date(),
+          })
           .where(eq(documents.id, documentName));
+
+        // Auto-version every 5 minutes
+        const doc = await db.query.documents.findFirst({
+          where: eq(documents.id, documentName),
+          columns: { lastVersionAt: true, title: true },
+        });
+
+        const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000);
+        if (!doc?.lastVersionAt || doc.lastVersionAt < fiveMinAgo) {
+          // Use atomic insert with subquery to prevent version numbering race
+          await db.execute(sql`
+            INSERT INTO document_versions (id, document_id, version_number, title, content, ydoc_state, created_by)
+            SELECT gen_random_uuid(), ${documentName}, COALESCE(MAX(version_number), 0) + 1, ${doc?.title || "Untitled"}, ${JSON.stringify(content || {})}::jsonb, ${Buffer.from(state)}, '00000000-0000-0000-0000-000000000000'
+            FROM document_versions WHERE document_id = ${documentName}
+          `);
+
+          await db
+            .update(documents)
+            .set({ lastVersionAt: new Date() })
+            .where(eq(documents.id, documentName));
+        }
+      } catch (err) {
+        console.error(`Failed to store document ${documentName}:`, err);
       }
     },
   });
@@ -123,7 +125,7 @@ async function hocuspocusPlugin(fastify: FastifyInstance) {
 
 declare module "fastify" {
   interface FastifyInstance {
-    hocuspocus: Server;
+    hocuspocus: ReturnType<typeof Server.configure>;
   }
 }
 

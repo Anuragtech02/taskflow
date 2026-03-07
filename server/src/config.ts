@@ -6,7 +6,13 @@ export const config = {
   databaseUrl: process.env.DATABASE_URL || "postgresql://taskflow:taskflow@localhost:5432/taskflow",
 
   // Auth
-  jwtSecret: process.env.NEXTAUTH_SECRET || process.env.JWT_SECRET || "dev-secret",
+  jwtSecret: (() => {
+    const secret = process.env.NEXTAUTH_SECRET || process.env.JWT_SECRET;
+    if (!secret && process.env.NODE_ENV === "production") {
+      throw new Error("NEXTAUTH_SECRET or JWT_SECRET must be set in production");
+    }
+    return secret || "dev-secret";
+  })(),
   sessionCookieName: "session-token",
 
   // CORS

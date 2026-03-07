@@ -213,4 +213,63 @@ export default async function goalRoutes(fastify: FastifyInstance) {
       return reply.status(500).send({ error: "Internal server error" });
     }
   });
+
+  // PATCH /goals/:id/key-results/:krId
+  fastify.patch("/goals/:id/key-results/:krId", async (request, reply) => {
+    const authResult = await authenticateRequest(request);
+    if (!authResult) return reply.status(401).send({ error: "Unauthorized" });
+    const { id: goalId, krId } = request.params as { id: string; krId: string };
+    try {
+      const goal = await db.query.goals.findFirst({ where: eq(goals.id, goalId) });
+      if (!goal) return reply.status(404).send({ error: "Goal not found" });
+      const membership = await db.query.workspaceMembers.findFirst({
+        where: and(eq(workspaceMembers.workspaceId, goal.workspaceId), eq(workspaceMembers.userId, authResult.userId)),
+      });
+      if (!membership) return reply.status(403).send({ error: "Access denied" });
+
+      const kr = await db.query.keyResults.findFirst({
+        where: and(eq(keyResults.id, krId), eq(keyResults.goalId, goalId)),
+      });
+      if (!kr) return reply.status(404).send({ error: "Key result not found" });
+
+      const body = request.body as Record<string, unknown>;
+      const updateData: Record<string, unknown> = {};
+      if (body.title !== undefined) updateData.title = body.title;
+      if (body.targetValue !== undefined) updateData.targetValue = body.targetValue;
+      if (body.currentValue !== undefined) updateData.currentValue = body.currentValue;
+      if (body.linkedTaskId !== undefined) updateData.linkedTaskId = body.linkedTaskId;
+
+      const [updated] = await db.update(keyResults).set(updateData).where(eq(keyResults.id, krId)).returning();
+      return { keyResult: updated };
+    } catch (error) {
+      console.error("Error updating key result:", error);
+      return reply.status(500).send({ error: "Internal server error" });
+    }
+  });
+
+  // DELETE /goals/:id/key-results/:krId
+  fastify.delete("/goals/:id/key-results/:krId", async (request, reply) => {
+    const authResult = await authenticateRequest(request);
+    if (!authResult) return reply.status(401).send({ error: "Unauthorized" });
+    const { id: goalId, krId } = request.params as { id: string; krId: string };
+    try {
+      const goal = await db.query.goals.findFirst({ where: eq(goals.id, goalId) });
+      if (!goal) return reply.status(404).send({ error: "Goal not found" });
+      const membership = await db.query.workspaceMembers.findFirst({
+        where: and(eq(workspaceMembers.workspaceId, goal.workspaceId), eq(workspaceMembers.userId, authResult.userId)),
+      });
+      if (!membership || !["owner", "admin"].includes(membership.role)) return reply.status(403).send({ error: "Access denied" });
+
+      const kr = await db.query.keyResults.findFirst({
+        where: and(eq(keyResults.id, krId), eq(keyResults.goalId, goalId)),
+      });
+      if (!kr) return reply.status(404).send({ error: "Key result not found" });
+
+      await db.delete(keyResults).where(eq(keyResults.id, krId));
+      return { success: true };
+    } catch (error) {
+      console.error("Error deleting key result:", error);
+      return reply.status(500).send({ error: "Internal server error" });
+    }
+  });
 }

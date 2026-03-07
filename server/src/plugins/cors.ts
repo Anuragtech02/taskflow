@@ -19,8 +19,13 @@ async function corsPlugin(fastify: FastifyInstance) {
       if (mainDomain && origin.endsWith(`.${mainDomain}`)) return cb(null, true);
 
       // Allow localhost in development
-      if (origin.includes("localhost") || origin.includes("127.0.0.1")) {
-        return cb(null, true);
+      try {
+        const url = new URL(origin);
+        if (url.hostname === "localhost" || url.hostname === "127.0.0.1") {
+          return cb(null, true);
+        }
+      } catch {
+        // Invalid origin URL
       }
 
       cb(new Error("Not allowed by CORS"), false);

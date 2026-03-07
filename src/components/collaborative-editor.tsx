@@ -104,7 +104,7 @@ export function CollaborativeEditor({
 
     const wsUrl = process.env.NEXT_PUBLIC_API_URL
       ? process.env.NEXT_PUBLIC_API_URL.replace(/^http/, "ws")
-      : `ws://${window.location.hostname}:3001`
+      : `${window.location.protocol === "https:" ? "wss" : "ws"}://${window.location.hostname}:3001`
 
     const provider = new HocuspocusProvider({
       url: `${wsUrl}/collab`,

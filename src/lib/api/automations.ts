@@ -15,7 +15,7 @@ export interface AutomationResponse {
 export async function fetchAutomations(
   workspaceId: string
 ): Promise<AutomationResponse[]> {
-  const res = await fetch(`/api/workspaces/${workspaceId}/automations`)
+  const res = await fetch(`/api/workspaces/${workspaceId}/automations`, { credentials: "include" })
   const data = await res.json()
   return data.automations || []
 }
@@ -33,6 +33,7 @@ export async function createAutomation(
 ): Promise<{ automation: AutomationResponse }> {
   const res = await fetch(`/api/workspaces/${workspaceId}/automations`, {
     method: "POST",
+    credentials: "include",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
   })
@@ -52,6 +53,7 @@ export async function updateAutomation(
 ): Promise<{ automation: AutomationResponse }> {
   const res = await fetch(`/api/automations/${automationId}`, {
     method: "PATCH",
+    credentials: "include",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
   })
@@ -61,5 +63,6 @@ export async function updateAutomation(
 export async function deleteAutomation(automationId: string): Promise<void> {
   await fetch(`/api/automations/${automationId}`, {
     method: "DELETE",
+    credentials: "include",
   })
 }

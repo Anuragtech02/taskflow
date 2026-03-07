@@ -191,6 +191,23 @@ export default async function sprintRoutes(fastify: FastifyInstance) {
     }
   });
 
+  // DELETE /sprints/:id/tasks/:taskId
+  fastify.delete("/sprints/:id/tasks/:taskId", async (request, reply) => {
+    const authResult = await authenticateRequest(request);
+    if (!authResult) return reply.status(401).send({ error: "Unauthorized" });
+    const { id: sprintId, taskId } = request.params as { id: string; taskId: string };
+    try {
+      const access = await checkSprintAccess(sprintId, authResult.userId);
+      if (!access) return reply.status(404).send({ error: "Sprint not found" });
+
+      await db.delete(sprintTasks).where(and(eq(sprintTasks.sprintId, sprintId), eq(sprintTasks.taskId, taskId)));
+      return { success: true };
+    } catch (error) {
+      console.error("Error removing task from sprint:", error);
+      return reply.status(500).send({ error: "Internal server error" });
+    }
+  });
+
   // PUT /sprint-tasks (move task between sprints)
   fastify.put("/sprint-tasks", async (request, reply) => {
     const authResult = await authenticateRequest(request);
