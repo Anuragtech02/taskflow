@@ -7,6 +7,7 @@ import { randomBytes } from "crypto";
 const { documents, documentShares, workspaceMembers, users } = schema;
 
 const VALID_ROLES = ["viewer", "editor", "commenter"];
+const VALID_SHARE_TYPES = ["user", "link"];
 
 export default async function documentShareRoutes(fastify: FastifyInstance) {
   // GET /documents/:id/shares
@@ -75,6 +76,9 @@ export default async function documentShareRoutes(fastify: FastifyInstance) {
       }
 
       const shareType = body.shareType || "user";
+      if (!VALID_SHARE_TYPES.includes(shareType)) {
+        return reply.status(400).send({ error: `Invalid shareType. Must be one of: ${VALID_SHARE_TYPES.join(", ")}` });
+      }
 
       if (shareType === "link") {
         const token = randomBytes(32).toString("hex");

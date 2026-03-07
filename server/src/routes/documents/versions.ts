@@ -75,7 +75,6 @@ export default async function documentVersionRoutes(fastify: FastifyInstance) {
           creator: {
             id: version.creator.id,
             name: version.creator.name,
-            email: version.creator.email,
           },
         },
       };

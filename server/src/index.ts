@@ -94,6 +94,28 @@ await fastify.register(documentVersionRoutes);
 await fastify.register(collabTokenRoutes);
 await fastify.register(sharedTokenRoutes);
 
+// Graceful shutdown with timeout
+const shutdown = async (signal: string) => {
+  console.log(`Received ${signal}, shutting down gracefully...`);
+  const forceExit = setTimeout(() => {
+    console.error("Shutdown timed out, forcing exit");
+    process.exit(1);
+  }, 10_000);
+  try {
+    await fastify.close();
+    clearTimeout(forceExit);
+    console.log("Server closed");
+    process.exit(0);
+  } catch (err) {
+    clearTimeout(forceExit);
+    console.error("Error during shutdown:", err);
+    process.exit(1);
+  }
+};
+
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));
+
 // Start server
 try {
   await fastify.listen({ port: config.port, host: config.host });
@@ -102,21 +124,5 @@ try {
   fastify.log.error(err);
   process.exit(1);
 }
-
-// Graceful shutdown
-const shutdown = async (signal: string) => {
-  console.log(`Received ${signal}, shutting down gracefully...`);
-  try {
-    await fastify.close();
-    console.log("Server closed");
-    process.exit(0);
-  } catch (err) {
-    console.error("Error during shutdown:", err);
-    process.exit(1);
-  }
-};
-
-process.on("SIGTERM", () => shutdown("SIGTERM"));
-process.on("SIGINT", () => shutdown("SIGINT"));
 
 export { fastify };

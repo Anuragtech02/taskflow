@@ -26,6 +26,13 @@ const createKeyResultSchema = z.object({
   linkedTaskId: z.string().uuid().optional(),
 });
 
+const updateKeyResultSchema = z.object({
+  title: z.string().min(1).max(255).optional(),
+  targetValue: z.number().int().positive().optional(),
+  currentValue: z.number().int().min(0).optional(),
+  linkedTaskId: z.string().uuid().nullable().optional(),
+});
+
 export default async function goalRoutes(fastify: FastifyInstance) {
   // GET /goals
   fastify.get("/goals", async (request, reply) => {
@@ -233,15 +240,17 @@ export default async function goalRoutes(fastify: FastifyInstance) {
       if (!kr) return reply.status(404).send({ error: "Key result not found" });
 
       const body = request.body as Record<string, unknown>;
+      const validatedData = updateKeyResultSchema.parse(body);
       const updateData: Record<string, unknown> = {};
-      if (body.title !== undefined) updateData.title = body.title;
-      if (body.targetValue !== undefined) updateData.targetValue = body.targetValue;
-      if (body.currentValue !== undefined) updateData.currentValue = body.currentValue;
-      if (body.linkedTaskId !== undefined) updateData.linkedTaskId = body.linkedTaskId;
+      if (validatedData.title !== undefined) updateData.title = validatedData.title;
+      if (validatedData.targetValue !== undefined) updateData.targetValue = validatedData.targetValue;
+      if (validatedData.currentValue !== undefined) updateData.currentValue = validatedData.currentValue;
+      if (validatedData.linkedTaskId !== undefined) updateData.linkedTaskId = validatedData.linkedTaskId;
 
       const [updated] = await db.update(keyResults).set(updateData).where(eq(keyResults.id, krId)).returning();
       return { keyResult: updated };
     } catch (error) {
+      if (error instanceof z.ZodError) return reply.status(400).send({ error: "Validation error", details: error.issues });
       console.error("Error updating key result:", error);
       return reply.status(500).send({ error: "Internal server error" });
     }

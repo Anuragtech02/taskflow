@@ -42,7 +42,7 @@ export default async function fileRoutes(fastify: FastifyInstance) {
       const buffer = Buffer.concat(chunks);
       if (buffer.length > 10 * 1024 * 1024) return reply.status(400).send({ error: "File too large. Max 10MB allowed." });
 
-      const ext = data.filename.split(".").pop() || "png";
+      const ext = (data.filename.split(".").pop() || "png").replace(/[^a-zA-Z0-9]/g, "").slice(0, 10);
       const key = `uploads/${authResult.userId}/${randomUUID()}.${ext}`;
 
       await s3Client.send(new PutObjectCommand({ Bucket: BUCKET, Key: key, Body: buffer, ContentType: data.mimetype }));
@@ -58,6 +58,11 @@ export default async function fileRoutes(fastify: FastifyInstance) {
     if (!initialized) { await ensureBucket(); initialized = true; }
     try {
       const key = (request.params as { "*": string })["*"];
+
+      // Validate key to prevent path traversal
+      if (!key || key.includes("..") || !key.startsWith("uploads/")) {
+        return reply.status(400).send({ error: "Invalid file path" });
+      }
 
       try {
         await s3Client.send(new HeadObjectCommand({ Bucket: BUCKET, Key: key }));

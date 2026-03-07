@@ -648,7 +648,7 @@ export default async function taskRoutes(fastify: FastifyInstance) {
       if (!attachmentId) return reply.status(400).send({ error: "Attachment ID required" });
 
       const [attachment] = await db.select({ id: taskAttachments.id, filename: taskAttachments.filename, fileKey: taskAttachments.fileKey })
-        .from(taskAttachments).where(eq(taskAttachments.id, attachmentId)).limit(1);
+        .from(taskAttachments).where(and(eq(taskAttachments.id, attachmentId), eq(taskAttachments.taskId, taskId))).limit(1);
       if (!attachment) return reply.status(404).send({ error: "Attachment not found" });
 
       await s3Client.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: attachment.fileKey }));

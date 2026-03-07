@@ -53,7 +53,20 @@ export default async function aiRoutes(fastify: FastifyInstance) {
       let result;
 
       if (type === "url") {
-        try { new URL(content); } catch { return reply.status(400).send({ error: "Invalid URL format" }); }
+        let parsedUrl: URL;
+        try { parsedUrl = new URL(content); } catch { return reply.status(400).send({ error: "Invalid URL format" }); }
+
+        // Block internal/private network URLs (SSRF protection)
+        if (!["http:", "https:"].includes(parsedUrl.protocol)) {
+          return reply.status(400).send({ error: "Only HTTP/HTTPS URLs are allowed" });
+        }
+        const hostname = parsedUrl.hostname;
+        if (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "0.0.0.0" ||
+            hostname.startsWith("10.") || hostname.startsWith("172.") || hostname.startsWith("192.168.") ||
+            hostname.startsWith("169.254.") || hostname.endsWith(".internal") || hostname.endsWith(".local")) {
+          return reply.status(400).send({ error: "Internal URLs are not allowed" });
+        }
+
         try {
           const fetchResponse = await fetch(content, { headers: { "User-Agent": "TaskFlow-AI/1.0" } });
           if (!fetchResponse.ok) return reply.status(400).send({ error: `Failed to fetch URL: ${fetchResponse.status}` });
@@ -90,7 +103,7 @@ export default async function aiRoutes(fastify: FastifyInstance) {
     } catch (error) {
       if (error instanceof z.ZodError) return reply.status(400).send({ error: "Validation error", details: error.issues });
       console.error("Error generating tasks:", error);
-      return reply.status(500).send({ error: error instanceof Error ? error.message : "Internal server error" });
+      return reply.status(500).send({ error: "Internal server error" });
     }
   });
 }

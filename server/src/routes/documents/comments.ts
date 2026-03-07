@@ -112,6 +112,17 @@ export default async function documentCommentRoutes(fastify: FastifyInstance) {
       });
       if (!membership) return reply.status(403).send({ error: "Access denied" });
 
+      // Only comment author can edit content; anyone can resolve/unresolve
+      if (body.content !== undefined) {
+        const comment = await db.query.documentComments.findFirst({
+          where: and(eq(documentComments.id, commentId), eq(documentComments.documentId, documentId)),
+        });
+        if (!comment) return reply.status(404).send({ error: "Comment not found" });
+        if (comment.userId !== authResult.userId) {
+          return reply.status(403).send({ error: "Only the comment author can edit content" });
+        }
+      }
+
       const updateData: Record<string, unknown> = { updatedAt: new Date() };
       if (body.content !== undefined) updateData.content = body.content.trim();
       if (body.resolved !== undefined) {

@@ -13,7 +13,10 @@ export const config = {
     }
     return secret || "dev-secret";
   })(),
-  sessionCookieName: "session-token",
+  sessionCookieName: (() => {
+    const isSecure = (process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || "").startsWith("https://");
+    return isSecure ? "__Secure-session-token" : "session-token";
+  })(),
 
   // CORS
   corsOrigin: process.env.CORS_ORIGIN || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",

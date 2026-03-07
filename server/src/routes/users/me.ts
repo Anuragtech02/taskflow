@@ -36,11 +36,11 @@ export default async function userRoutes(fastify: FastifyInstance) {
       const body = request.body as Record<string, unknown>;
       const validatedData = updateUserSchema.parse(body);
 
-      const [user] = await db.update(users).set({
-        name: validatedData.name,
-        avatarUrl: validatedData.avatarUrl || null,
-        updatedAt: new Date(),
-      }).where(eq(users.id, authResult.userId)).returning();
+      const updateData: Record<string, unknown> = { updatedAt: new Date() };
+      if (validatedData.name !== undefined) updateData.name = validatedData.name;
+      if (validatedData.avatarUrl !== undefined) updateData.avatarUrl = validatedData.avatarUrl || null;
+
+      const [user] = await db.update(users).set(updateData).where(eq(users.id, authResult.userId)).returning();
 
       return { user: { id: user.id, name: user.name, email: user.email, avatarUrl: user.avatarUrl } };
     } catch (error) {

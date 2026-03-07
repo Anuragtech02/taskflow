@@ -1,6 +1,6 @@
 import { FastifyInstance } from "fastify";
 import { db, schema } from "../../db/index.js";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, inArray, or, isNull } from "drizzle-orm";
 import { authenticateRequest } from "../../plugins/auth.js";
 
 const { tasks, lists, folders, spaces, workspaceMembers, users } = schema;
@@ -24,18 +24,16 @@ export default async function statsRoutes(fastify: FastifyInstance) {
       const spaceIds = workspaceSpaces.map(s => s.id);
       if (spaceIds.length === 0) return emptyResponse;
 
-      const allFolders = await db.select({ id: folders.id }).from(folders).where(sql`${folders.spaceId} IN ${spaceIds}`);
-      const folderIds = allFolders.map(f => f.id);
-      if (folderIds.length === 0) return emptyResponse;
-
-      const allLists = await db.select({ id: lists.id }).from(lists).where(sql`${lists.folderId} IN ${folderIds}`);
+      // Get lists both directly under spaces AND inside folders
+      const allLists = await db.select({ id: lists.id }).from(lists)
+        .where(inArray(lists.spaceId, spaceIds));
       const listIds = allLists.map(l => l.id);
       if (listIds.length === 0) return emptyResponse;
 
       const allTasks = await db.select({
         id: tasks.id, status: tasks.status, priority: tasks.priority, dueDate: tasks.dueDate,
         creatorId: tasks.creatorId, createdAt: tasks.createdAt, updatedAt: tasks.updatedAt, title: tasks.title,
-      }).from(tasks).where(sql`${tasks.listId} IN ${listIds}`);
+      }).from(tasks).where(inArray(tasks.listId, listIds));
 
       const now = new Date();
       const totalTasks = allTasks.length;

@@ -48,7 +48,7 @@ async function uploadImage(file: File): Promise<string | null> {
   const formData = new FormData()
   formData.append("file", file)
   try {
-    const res = await fetch("/api/upload", { method: "POST", body: formData })
+    const res = await fetch("/api/upload", { method: "POST", credentials: "include", body: formData })
     if (!res.ok) throw new Error("Upload failed")
     const data = await res.json()
     return data.url
@@ -102,9 +102,10 @@ export function CollaborativeEditor({
   useEffect(() => {
     if (!collabToken) return
 
-    const wsUrl = process.env.NEXT_PUBLIC_API_URL
-      ? process.env.NEXT_PUBLIC_API_URL.replace(/^http/, "ws")
-      : `${window.location.protocol === "https:" ? "wss" : "ws"}://${window.location.hostname}:3001`
+    // Use dedicated WS URL, or derive from current page origin (works with proxy)
+    const wsUrl = process.env.NEXT_PUBLIC_WS_URL
+      ? process.env.NEXT_PUBLIC_WS_URL
+      : `${window.location.protocol === "https:" ? "wss" : "ws"}://${window.location.host}`
 
     const provider = new HocuspocusProvider({
       url: `${wsUrl}/collab`,
