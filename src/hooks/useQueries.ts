@@ -1,3 +1,4 @@
+import { useMemo } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import api from "@/lib/axios"
 import {
@@ -688,40 +689,30 @@ export function useTaskAssignees(taskId: string | undefined) {
   })
 }
 
-// Fetch all task assignees for a set of tasks (for list-level filtering/grouping)
-export function useAllTaskAssignees(taskIds: string[]) {
-  return useQuery<Record<string, TaskAssigneeResponse[]>>({
-    queryKey: ["all-task-assignees", taskIds.sort().join(",")],
+// Bulk-fetch assignees + labels for all tasks in one request
+function useBulkTaskMeta(taskIds: string[]) {
+  const sortedKey = useMemo(() => [...taskIds].sort().join(","), [taskIds])
+  return useQuery<{ assignees: Record<string, TaskAssigneeResponse[]>; labels: Record<string, LabelResponse[]> }>({
+    queryKey: ["bulk-task-meta", sortedKey],
     queryFn: async () => {
-      const results = await Promise.all(
-        taskIds.map(async (taskId) => {
-          const assignees = await fetchTaskAssignees(taskId)
-          return [taskId, assignees] as const
-        })
-      )
-      return Object.fromEntries(results)
-    },
-    enabled: taskIds.length > 0,
-    staleTime: 30000, // Cache for 30s to avoid refetching on every render
-  })
-}
-
-// Fetch all task labels for a set of tasks (for list-level filtering/grouping)
-export function useAllTaskLabels(taskIds: string[]) {
-  return useQuery<Record<string, LabelResponse[]>>({
-    queryKey: ["all-task-labels", taskIds.sort().join(",")],
-    queryFn: async () => {
-      const results = await Promise.all(
-        taskIds.map(async (taskId) => {
-          const labels = await fetchTaskLabels(taskId)
-          return [taskId, labels] as const
-        })
-      )
-      return Object.fromEntries(results)
+      const res = await api.post("/tasks/bulk-meta", { taskIds })
+      return res.data
     },
     enabled: taskIds.length > 0,
     staleTime: 30000,
   })
+}
+
+// Fetch all task assignees for a set of tasks (for list-level filtering/grouping)
+export function useAllTaskAssignees(taskIds: string[]) {
+  const { data } = useBulkTaskMeta(taskIds)
+  return { data: data?.assignees }
+}
+
+// Fetch all task labels for a set of tasks (for list-level filtering/grouping)
+export function useAllTaskLabels(taskIds: string[]) {
+  const { data } = useBulkTaskMeta(taskIds)
+  return { data: data?.labels }
 }
 
 export function useAddTaskAssignee() {
@@ -731,6 +722,7 @@ export function useAddTaskAssignee() {
       addTaskAssignee(taskId, userId),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["task-assignees", variables.taskId] })
+      queryClient.invalidateQueries({ queryKey: ["bulk-task-meta"] })
     },
   })
 }
@@ -742,6 +734,7 @@ export function useRemoveTaskAssignee() {
       removeTaskAssignee(taskId, userId),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["task-assignees", variables.taskId] })
+      queryClient.invalidateQueries({ queryKey: ["bulk-task-meta"] })
     },
   })
 }
@@ -1047,7 +1040,7 @@ export function useUpdateLabel() {
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["labels", variables.workspaceId] })
       queryClient.invalidateQueries({ queryKey: ["task-labels"] })
-      queryClient.invalidateQueries({ queryKey: ["all-task-labels"] })
+      queryClient.invalidateQueries({ queryKey: ["bulk-task-meta"] })
     },
   })
 }
@@ -1078,7 +1071,7 @@ export function useAddTaskLabel() {
       addTaskLabel(taskId, labelId),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["task-labels", variables.taskId] })
-      queryClient.invalidateQueries({ queryKey: ["all-task-labels"] })
+      queryClient.invalidateQueries({ queryKey: ["bulk-task-meta"] })
     },
   })
 }
@@ -1090,7 +1083,7 @@ export function useRemoveTaskLabel() {
       removeTaskLabel(taskId, labelId),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["task-labels", variables.taskId] })
-      queryClient.invalidateQueries({ queryKey: ["all-task-labels"] })
+      queryClient.invalidateQueries({ queryKey: ["bulk-task-meta"] })
     },
   })
 }
