@@ -20,7 +20,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { CollaborativeEditor } from "@/components/collaborative-editor"
 import { ShareDialog } from "@/components/documents/share-dialog"
-import { CommentsSidebar } from "@/components/documents/comments-sidebar"
+import { CommentsSidebar, type PendingComment } from "@/components/documents/comments-sidebar"
 import { VersionHistory } from "@/components/documents/version-history"
 import {
   Dialog,
@@ -165,6 +165,7 @@ export default function DocDetailPage() {
   const [shareOpen, setShareOpen] = useState(false)
   const [commentsOpen, setCommentsOpen] = useState(false)
   const [versionsOpen, setVersionsOpen] = useState(false)
+  const [pendingComment, setPendingComment] = useState<PendingComment | null>(null)
 
   useEffect(() => {
     if (data?.document) {
@@ -401,6 +402,10 @@ export default function DocDetailPage() {
                 minHeight="calc(100vh - 250px)"
                 showToolbar={true}
                 className="border rounded-lg overflow-hidden"
+                onAddComment={(data) => {
+                  setPendingComment(data)
+                  setCommentsOpen(true)
+                }}
               />
             </div>
           </div>
@@ -411,6 +416,8 @@ export default function DocDetailPage() {
             currentUserId={session?.user?.id || ""}
             open={commentsOpen}
             onClose={() => setCommentsOpen(false)}
+            pendingComment={pendingComment}
+            onPendingCommentClear={() => setPendingComment(null)}
           />
         </div>
       </div>

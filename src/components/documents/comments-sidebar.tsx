@@ -1,7 +1,7 @@
 "use client"
 
 import api from "@/lib/axios"
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Check, MessageSquare, Reply, Trash2, X } from "lucide-react"
@@ -35,14 +35,22 @@ interface Comment {
   replies: CommentReply[]
 }
 
+export interface PendingComment {
+  markId: string
+  quotedText: string
+}
+
 interface CommentsSidebarProps {
   documentId: string
   currentUserId: string
   open: boolean
   onClose: () => void
+  pendingComment?: PendingComment | null
+  onPendingCommentClear?: () => void
+  onCommentClick?: (markId: string) => void
 }
 
-export function CommentsSidebar({ documentId, currentUserId, open, onClose }: CommentsSidebarProps) {
+export function CommentsSidebar({ documentId, currentUserId, open, onClose, pendingComment, onPendingCommentClear, onCommentClick }: CommentsSidebarProps) {
   const [comments, setComments] = useState<Comment[]>([])
   const [newComment, setNewComment] = useState("")
   const [replyingTo, setReplyingTo] = useState<string | null>(null)
@@ -62,11 +70,27 @@ export function CommentsSidebar({ documentId, currentUserId, open, onClose }: Co
     if (open) fetchComments()
   }, [open, fetchComments])
 
+  const newCommentRef = useRef<HTMLTextAreaElement>(null)
+
+  // Auto-focus when pending comment arrives
+  useEffect(() => {
+    if (pendingComment) {
+      setNewComment("")
+      setTimeout(() => newCommentRef.current?.focus(), 0)
+    }
+  }, [pendingComment])
+
   const handleAddComment = async () => {
     if (!newComment.trim()) return
     try {
-      await api.post(`/documents/${documentId}/comments`, { content: newComment.trim() })
+      const body: Record<string, string> = { content: newComment.trim() }
+      if (pendingComment) {
+        body.markId = pendingComment.markId
+        body.quotedText = pendingComment.quotedText
+      }
+      await api.post(`/documents/${documentId}/comments`, body)
       setNewComment("")
+      onPendingCommentClear?.()
       fetchComments()
     } catch (err) {
       console.error("Failed to add comment:", err)
@@ -137,14 +161,16 @@ export function CommentsSidebar({ documentId, currentUserId, open, onClose }: Co
           <div
             key={comment.id}
             className={cn(
-              "rounded-lg border p-3 space-y-2",
-              comment.resolved && "opacity-60"
+              "rounded-lg border p-3 space-y-2 transition-colors",
+              comment.resolved && "opacity-60",
+              comment.markId && onCommentClick && "cursor-pointer hover:border-primary/50"
             )}
+            onClick={() => comment.markId && onCommentClick?.(comment.markId)}
           >
             {/* Quoted text */}
             {comment.quotedText && (
-              <div className="text-xs bg-muted/50 border-l-2 border-primary px-2 py-1 rounded">
-                {comment.quotedText}
+              <div className="text-xs bg-yellow-500/10 border-l-2 border-yellow-500 px-2 py-1 rounded">
+                &ldquo;{comment.quotedText}&rdquo;
               </div>
             )}
 
@@ -165,7 +191,7 @@ export function CommentsSidebar({ documentId, currentUserId, open, onClose }: Co
             <p className="text-sm">{comment.content}</p>
 
             {/* Actions */}
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
               <Button
                 variant="ghost"
                 size="sm"
@@ -179,7 +205,14 @@ export function CommentsSidebar({ documentId, currentUserId, open, onClose }: Co
                 variant="ghost"
                 size="sm"
                 className="h-6 text-xs px-1.5"
-                onClick={() => setReplyingTo(replyingTo === comment.id ? null : comment.id)}
+                onClick={() => {
+                  if (replyingTo === comment.id) {
+                    setReplyingTo(null)
+                  } else {
+                    setReplyingTo(comment.id)
+                    setReplyContent("")
+                  }
+                }}
               >
                 <Reply className="h-3 w-3 mr-1" />
                 Reply
@@ -215,7 +248,7 @@ export function CommentsSidebar({ documentId, currentUserId, open, onClose }: Co
 
             {/* Reply input */}
             {replyingTo === comment.id && (
-              <div className="flex gap-1.5 mt-1">
+              <div className="flex gap-1.5 mt-1" onClick={(e) => e.stopPropagation()}>
                 <Textarea
                   placeholder="Reply..."
                   value={replyContent}
@@ -245,8 +278,20 @@ export function CommentsSidebar({ documentId, currentUserId, open, onClose }: Co
 
       {/* New comment input */}
       <div className="border-t p-3 space-y-2">
+        {pendingComment && (
+          <div className="flex items-start gap-2 text-xs bg-yellow-500/10 border border-yellow-500/30 rounded p-2">
+            <div className="flex-1">
+              <span className="text-muted-foreground">Commenting on: </span>
+              &ldquo;{pendingComment.quotedText.slice(0, 80)}{pendingComment.quotedText.length > 80 ? "..." : ""}&rdquo;
+            </div>
+            <button type="button" onClick={() => onPendingCommentClear?.()} className="text-muted-foreground hover:text-foreground">
+              <X className="h-3 w-3" />
+            </button>
+          </div>
+        )}
         <Textarea
-          placeholder="Add a comment..."
+          ref={newCommentRef}
+          placeholder={pendingComment ? "Add your comment about this selection..." : "Add a comment..."}
           value={newComment}
           onChange={(e) => setNewComment(e.target.value)}
           className="text-sm min-h-[60px]"
