@@ -34,6 +34,7 @@ import {
   Heading1, Heading2, Heading3,
   AlignLeft, AlignCenter, AlignRight,
   Highlighter, Palette, CheckSquare, MessageSquarePlus, Minus, Braces,
+  Loader2,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import suggestion from "./mention-suggestion"
@@ -84,6 +85,11 @@ async function uploadImage(file: File): Promise<string | null> {
   }
 }
 
+/**
+ * Outer wrapper: handles collab token fetch + provider setup.
+ * Renders loading state until provider is ready, then mounts the inner editor
+ * exactly once — avoiding the tiptap reconfigure crash.
+ */
 export function CollaborativeEditor({
   documentId,
   userName,
@@ -98,8 +104,6 @@ export function CollaborativeEditor({
   onImageClick,
   onAddComment,
 }: CollaborativeEditorProps) {
-  const editorRef = useRef<ReturnType<typeof useEditor>>(null)
-  // Fix: use useState instead of useRef so React re-renders when provider is ready
   const [provider, setProvider] = useState<HocuspocusProvider | null>(null)
   const [collabToken, setCollabToken] = useState<string | null>(null)
   const [connected, setConnected] = useState(false)
@@ -151,11 +155,78 @@ export function CollaborativeEditor({
     }
   }, [collabToken, documentId])
 
+  // Show loading until provider is ready
+  if (!provider) {
+    return (
+      <div className={cn("relative border rounded-md bg-background flex items-center justify-center", className)} style={{ minHeight }}>
+        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+
+  // Provider is guaranteed non-null — mount inner editor once
+  return (
+    <CollaborativeEditorInner
+      provider={provider}
+      connected={connected}
+      collaborators={collaborators}
+      userName={userName}
+      userColor={color.current}
+      content={content}
+      placeholder={placeholder}
+      minHeight={minHeight}
+      className={className}
+      editable={editable}
+      mentions={mentions}
+      showToolbar={showToolbar}
+      onImageClick={onImageClick}
+      onAddComment={onAddComment}
+    />
+  )
+}
+
+/**
+ * Inner editor: created exactly once with provider already available.
+ * No dependency-array-driven recreation — the editor is stable.
+ */
+function CollaborativeEditorInner({
+  provider,
+  connected,
+  collaborators,
+  userName,
+  userColor,
+  content,
+  placeholder,
+  minHeight = "150px",
+  className,
+  editable = true,
+  mentions,
+  showToolbar = true,
+  onImageClick,
+  onAddComment,
+}: {
+  provider: HocuspocusProvider
+  connected: boolean
+  collaborators: { name: string; color: string }[]
+  userName: string
+  userColor: string
+  content?: Record<string, unknown> | null
+  placeholder?: string
+  minHeight?: string
+  className?: string
+  editable?: boolean
+  mentions?: { id: string; name: string; email: string }[]
+  showToolbar?: boolean
+  onImageClick?: (src: string) => void
+  onAddComment?: (data: { markId: string; quotedText: string }) => void
+}) {
+  const editorRef = useRef<ReturnType<typeof useEditor>>(null)
+
   const extensions = useMemo(() => {
     const exts: any[] = [
       StarterKit.configure({
         heading: { levels: [1, 2, 3] },
-        codeBlock: false, // replaced by CodeBlockLowlight
+        codeBlock: false,
         ...({ history: false } as any),
       }),
       Placeholder.configure({ placeholder: placeholder || "Start typing..." }),
@@ -177,6 +248,13 @@ export function CollaborativeEditor({
       Subscript,
       CodeBlockLowlight.configure({ lowlight }),
       CommentMark,
+      Collaboration.configure({
+        document: provider.document,
+      }),
+      CollaborationCursor.configure({
+        provider: provider,
+        user: { name: userName, color: userColor },
+      }),
     ]
 
     if (mentions) {
@@ -188,24 +266,13 @@ export function CollaborativeEditor({
       )
     }
 
-    if (provider) {
-      exts.push(
-        Collaboration.configure({
-          document: provider.document,
-        }),
-        CollaborationCursor.configure({
-          provider: provider,
-          user: { name: userName, color: color.current },
-        })
-      )
-    }
-
     return exts
-  }, [provider, mentions, placeholder, userName])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // Created once — provider is stable for this component's lifetime
 
   const editor = useEditor({
     extensions,
-    content: provider ? undefined : content || "",
+    content: undefined, // Collaboration provides content via Y.Doc
     editable,
     immediatelyRender: false,
     editorProps: {
@@ -249,9 +316,8 @@ export function CollaborativeEditor({
         return false
       },
     },
-  }, [provider])
+  })
 
-  // Keep ref in sync via effect, not during render
   useEffect(() => {
     editorRef.current = editor
   }, [editor])
@@ -374,7 +440,7 @@ export function CollaborativeEditor({
           <div className="ml-auto flex items-center gap-2">
             {collaborators.length > 1 && (
               <div className="flex -space-x-1.5">
-                {collaborators.slice(0, 5).map((c, i) => (
+                {collaborators.slice(0, 5).map((c) => (
                   <div
                     key={`${c.name}-${c.color}`}
                     className="w-6 h-6 rounded-full border-2 border-background flex items-center justify-center text-[10px] font-medium text-white"
