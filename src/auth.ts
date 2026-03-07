@@ -109,9 +109,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       name: `session-token`,
       options: {
         httpOnly: true,
-        sameSite: "lax",
+        sameSite: "none",
         path: "/",
-        secure: process.env.NEXTAUTH_URL?.startsWith("https://") ?? false,
+        secure: true,
         domain: process.env.COOKIE_DOMAIN || (process.env.NODE_ENV === "production" ? `.${MAIN_DOMAIN}` : undefined),
       },
     },
