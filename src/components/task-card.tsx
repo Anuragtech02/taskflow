@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/avatar"
 import { cn } from "@/lib/utils"
 import { extractTextFromTiptap } from "@/lib/tiptap"
-import type { TaskResponse, TaskAssigneeResponse } from "@/lib/api"
+import type { TaskResponse } from "@/lib/api"
 
 const PRIORITY_BORDER_COLORS: Record<string, string> = {
   urgent: "border-l-red-500",

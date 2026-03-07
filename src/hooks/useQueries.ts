@@ -773,6 +773,7 @@ export function useCreateSubtask() {
     }) => createSubtask(taskId, data),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["subtasks", variables.taskId] })
+      queryClient.invalidateQueries({ queryKey: ["bulk-task-meta"] })
     },
   })
 }
@@ -784,6 +785,7 @@ export function useToggleSubtask() {
       toggleSubtask(taskId, subtaskId, completed),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["subtasks", variables.taskId] })
+      queryClient.invalidateQueries({ queryKey: ["bulk-task-meta"] })
     },
   })
 }
@@ -795,6 +797,7 @@ export function useDeleteSubtask() {
       deleteSubtask(taskId, subtaskId),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["subtasks", variables.taskId] })
+      queryClient.invalidateQueries({ queryKey: ["bulk-task-meta"] })
     },
   })
 }
@@ -816,6 +819,7 @@ export function useCreateComment() {
       createComment(taskId, content),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["comments", variables.taskId] })
+      queryClient.invalidateQueries({ queryKey: ["bulk-task-meta"] })
     },
   })
 }
@@ -827,6 +831,7 @@ export function useDeleteComment() {
       deleteComment(taskId, commentId),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["comments", variables.taskId] })
+      queryClient.invalidateQueries({ queryKey: ["bulk-task-meta"] })
     },
   })
 }
