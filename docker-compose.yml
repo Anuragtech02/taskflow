@@ -95,9 +95,8 @@ services:
 
   api:
     build:
-      context: .
-      dockerfile: server/Dockerfile
-      target: production
+      context: ../taskflow-server
+      dockerfile: Dockerfile
     restart: unless-stopped
     depends_on:
       postgres:
