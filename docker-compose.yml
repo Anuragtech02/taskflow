@@ -34,32 +34,21 @@ services:
         NEXT_PUBLIC_MAIN_DOMAIN: ${MAIN_DOMAIN:?Set MAIN_DOMAIN e.g. taskflow.dev}
     restart: unless-stopped
     depends_on:
-      postgres:
-        condition: service_healthy
-      minio:
+      api:
         condition: service_healthy
     environment:
       NODE_ENV: production
-      DATABASE_URL: postgresql://taskflow:${POSTGRES_PASSWORD:-taskflow_secure_pwd}@postgres:5432/taskflow
       NEXTAUTH_URL: https://${DOMAIN}
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:?Set NEXTAUTH_SECRET via openssl rand -base64 32}
-      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       NEXT_PUBLIC_APP_URL: https://${DOMAIN}
       NEXT_PUBLIC_API_URL: http://api:9001
       NEXT_PUBLIC_MAIN_DOMAIN: ${MAIN_DOMAIN}
+      INTERNAL_API_SECRET: ${INTERNAL_API_SECRET:?Set INTERNAL_API_SECRET for service-to-service auth}
       AUTH_TRUST_HOST: "true"
       AUTH_GOOGLE_ID: ${AUTH_GOOGLE_ID:-}
       AUTH_GOOGLE_SECRET: ${AUTH_GOOGLE_SECRET:-}
       AUTH_GITHUB_ID: ${AUTH_GITHUB_ID:-}
       AUTH_GITHUB_SECRET: ${AUTH_GITHUB_SECRET:-}
-      S3_ENDPOINT: http://minio:9000
-      S3_BUCKET: taskflow
-      S3_ACCESS_KEY: ${MINIO_ROOT_USER:-taskflow}
-      S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-taskflow_minio_pwd}
-      S3_REGION: us-east-1
-      RESEND_API_KEY: ${RESEND_API_KEY:-}
-      EMAIL_FROM: ${EMAIL_FROM:-notifications@taskflow.dev}
-      CRON_API_KEY: ${CRON_API_KEY:-}
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.taskflow.rule=Host(`${DOMAIN}`)"
@@ -120,9 +109,10 @@ services:
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       EMAIL_FROM: ${EMAIL_FROM:-notifications@taskflow.dev}
       CRON_API_KEY: ${CRON_API_KEY:-}
+      INTERNAL_API_SECRET: ${INTERNAL_API_SECRET:?Set INTERNAL_API_SECRET for service-to-service auth}
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.taskflow-api.rule=Host(`${API_DOMAIN:-api.${DOMAIN}}`)"
+      - "traefik.http.routers.taskflow-api.rule=Host(`${API_DOMAIN:-api.${DOMAIN}}`) && !PathPrefix(`/auth/oauth`)"
       - "traefik.http.routers.taskflow-api.entrypoints=websecure"
       - "traefik.http.routers.taskflow-api.tls.certresolver=letsencrypt"
       - "traefik.http.services.taskflow-api.loadbalancer.server.port=9001"

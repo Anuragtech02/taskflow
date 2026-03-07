@@ -2,12 +2,10 @@ import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import Google from "next-auth/providers/google";
 import GitHub from "next-auth/providers/github";
-import { compare } from "bcryptjs";
-import { db } from "@/db";
-import { users } from "@/db/schema";
-import { eq } from "drizzle-orm";
 
 const MAIN_DOMAIN = process.env.NEXT_PUBLIC_MAIN_DOMAIN || "72.62.227.33.sslip.io";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+const INTERNAL_API_SECRET = process.env.INTERNAL_API_SECRET || "";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
@@ -22,29 +20,28 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           return null;
         }
 
-        const email = credentials.email as string;
-        const password = credentials.password as string;
+        try {
+          const res = await fetch(`${API_URL}/auth/login`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              email: credentials.email,
+              password: credentials.password,
+            }),
+          });
 
-        const user = await db.query.users.findFirst({
-          where: eq(users.email, email),
-        });
+          if (!res.ok) return null;
 
-        if (!user || !user.passwordHash) {
+          const data = await res.json();
+          return {
+            id: data.user.id,
+            name: data.user.name,
+            email: data.user.email,
+            image: data.user.avatarUrl,
+          };
+        } catch {
           return null;
         }
-
-        const isPasswordValid = await compare(password, user.passwordHash);
-
-        if (!isPasswordValid) {
-          return null;
-        }
-
-        return {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          image: user.avatarUrl,
-        };
       },
     }),
     Google({
@@ -57,6 +54,36 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     }),
   ],
   callbacks: {
+    async signIn({ user, account }) {
+      // For OAuth providers, find or create user via Fastify
+      if (account?.provider === "google" || account?.provider === "github") {
+        try {
+          const res = await fetch(`${API_URL}/auth/oauth`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-internal-secret": INTERNAL_API_SECRET,
+            },
+            body: JSON.stringify({
+              email: user.email,
+              name: user.name,
+              avatarUrl: user.image,
+              provider: account.provider,
+            }),
+          });
+
+          if (!res.ok) return false;
+
+          const data = await res.json();
+          // Update user object with the DB user id so JWT gets the right id
+          user.id = data.user.id;
+          return true;
+        } catch {
+          return false;
+        }
+      }
+      return true;
+    },
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
