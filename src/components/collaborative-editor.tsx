@@ -132,7 +132,7 @@ export function CollaborativeEditor({
   const extensions: any[] = [
     StarterKit.configure({
       heading: { levels: [1, 2, 3] },
-      history: false, // Collaboration has its own undo/redo
+      ...({ history: false } as any), // Collaboration has its own undo/redo
     }),
     Placeholder.configure({ placeholder: placeholder || "Start typing..." }),
     Image.configure({ inline: false, allowBase64: true }),
