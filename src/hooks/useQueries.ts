@@ -689,10 +689,17 @@ export function useTaskAssignees(taskId: string | undefined) {
   })
 }
 
-// Bulk-fetch assignees + labels for all tasks in one request
-function useBulkTaskMeta(taskIds: string[]) {
+// Bulk-fetch assignees + labels + subtasks + comments for all tasks in one request
+interface BulkTaskMetaResponse {
+  assignees: Record<string, TaskAssigneeResponse[]>
+  labels: Record<string, LabelResponse[]>
+  subtasks: Record<string, { id: string; status: string | null }[]>
+  comments: Record<string, number>
+}
+
+export function useBulkTaskMeta(taskIds: string[]) {
   const sortedKey = useMemo(() => [...taskIds].sort().join(","), [taskIds])
-  return useQuery<{ assignees: Record<string, TaskAssigneeResponse[]>; labels: Record<string, LabelResponse[]> }>({
+  return useQuery<BulkTaskMetaResponse>({
     queryKey: ["bulk-task-meta", sortedKey],
     queryFn: async () => {
       const res = await api.post("/tasks/bulk-meta", { taskIds })

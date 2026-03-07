@@ -26,7 +26,7 @@ import { TaskCardOverlay } from "@/components/task-card"
 import { KanbanColumn } from "@/components/kanban-column"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { useUpdateTask, useDeleteTask, useCreateTask, useCreateStatus, useUpdateStatus, useDeleteStatus, useReorderStatuses } from "@/hooks/useQueries"
+import { useUpdateTask, useDeleteTask, useCreateTask, useCreateStatus, useUpdateStatus, useDeleteStatus, useReorderStatuses, useBulkTaskMeta } from "@/hooks/useQueries"
 import { useTaskPanel } from "@/store/useTaskPanel"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
@@ -79,6 +79,10 @@ export function KanbanBoard({ tasks, statuses, listId, workspaceId }: KanbanBoar
   const deleteStatusMutation = useDeleteStatus()
   const reorderStatusesMutation = useReorderStatuses()
   const { setSelectedTask } = useTaskPanel()
+
+  // Bulk-fetch subtasks + comments for all tasks in one request
+  const taskIds = useMemo(() => tasks.map(t => t.id), [tasks])
+  const { data: bulkMeta } = useBulkTaskMeta(taskIds)
 
   // Local state for optimistic updates
   const [localTasks, setLocalTasks] = useState<TaskResponse[]>(tasks)
@@ -597,6 +601,8 @@ export function KanbanBoard({ tasks, statuses, listId, workspaceId }: KanbanBoar
                   canMoveRight={index < localStatuses.length - 1}
                   isDragOver={overColumnId === status.id}
                   isDragging={!!activeTask}
+                  bulkSubtasks={bulkMeta?.subtasks}
+                  bulkComments={bulkMeta?.comments}
                 />
               )
             })}

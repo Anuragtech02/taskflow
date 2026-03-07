@@ -239,6 +239,11 @@ export interface TaskResponse {
   createdAt: string
   updatedAt: string
   activities?: ActivityResponse[]
+  // Returned inline by GET /lists/:id/tasks (JSON columns on tasks table)
+  blockedBy?: string[]
+  blocks?: string[]
+  // Returned inline via join when fetching task lists
+  assignees?: { userId: string; user: { id: string; name: string | null; email: string; avatarUrl: string | null } }[]
 }
 
 export async function fetchTasks(listId: string): Promise<TaskResponse[]> {

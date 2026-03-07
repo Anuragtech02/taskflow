@@ -20,8 +20,7 @@ import {
 } from "@/components/ui/avatar"
 import { cn } from "@/lib/utils"
 import { extractTextFromTiptap } from "@/lib/tiptap"
-import { useTaskAssignees, useSubtasks, useComments, useTaskDependencies } from "@/hooks/useQueries"
-import type { TaskResponse } from "@/lib/api"
+import type { TaskResponse, TaskAssigneeResponse } from "@/lib/api"
 
 const PRIORITY_BORDER_COLORS: Record<string, string> = {
   urgent: "border-l-red-500",
@@ -43,9 +42,12 @@ export interface TaskCardProps {
   onDelete?: (taskId: string) => void
   onAssign?: (taskId: string) => void
   className?: string
+  // Bulk data from parent (avoids per-card API calls)
+  bulkSubtasks?: Record<string, { id: string; status: string | null }[]>
+  bulkComments?: Record<string, number>
 }
 
-export function TaskCard({ task, onClick, onDelete, onAssign, className }: TaskCardProps) {
+export function TaskCard({ task, onClick, onDelete, onAssign, className, bulkSubtasks, bulkComments }: TaskCardProps) {
   const {
     attributes,
     listeners,
@@ -57,11 +59,10 @@ export function TaskCard({ task, onClick, onDelete, onAssign, className }: TaskC
 
   const [isHovered, setIsHovered] = useState(false)
 
-  // Fetch extra data for polish
-  const { data: assignees } = useTaskAssignees(task.id)
-  const { data: subtasks } = useSubtasks(task.id)
-  const { data: comments } = useComments(task.id)
-  const { data: dependencies } = useTaskDependencies(task.id)
+  // Use inline data from task response (assignees from join, dependencies from JSON columns)
+  const assignees = task.assignees ?? []
+  const subtasks = bulkSubtasks?.[task.id] ?? []
+  const commentCount = bulkComments?.[task.id] ?? 0
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -88,21 +89,18 @@ export function TaskCard({ task, onClick, onDelete, onAssign, className }: TaskC
   const description = extractTextFromTiptap(task.description)
 
   // Subtask progress
-  const subtaskTotal = subtasks?.length ?? 0
-  const subtaskCompleted = subtasks?.filter(s => s.status === "done").length ?? 0
+  const subtaskTotal = subtasks.length
+  const subtaskCompleted = subtasks.filter(s => s.status === "done").length
   const subtaskPercent = subtaskTotal > 0 ? Math.round((subtaskCompleted / subtaskTotal) * 100) : 0
-
-  // Comment count
-  const commentCount = comments?.length ?? 0
 
   // Priority border
   const priorityBorder = task.priority && task.priority !== "none"
     ? PRIORITY_BORDER_COLORS[task.priority] || ""
     : ""
 
-  // Dependencies
-  const isBlocked = (dependencies?.blockedBy?.length ?? 0) > 0
-  const hasDeps = isBlocked || (dependencies?.blocks?.length ?? 0) > 0
+  // Dependencies (from JSON columns on task)
+  const isBlocked = (task.blockedBy?.length ?? 0) > 0
+  const hasDeps = isBlocked || (task.blocks?.length ?? 0) > 0
 
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -119,8 +117,8 @@ export function TaskCard({ task, onClick, onDelete, onAssign, className }: TaskC
   }
 
   // Max 3 avatars, show +N for overflow
-  const displayedAssignees = assignees?.slice(0, 3) ?? []
-  const overflowCount = (assignees?.length ?? 0) - 3
+  const displayedAssignees = assignees.slice(0, 3)
+  const overflowCount = assignees.length - 3
 
   return (
     <TooltipProvider>
@@ -233,7 +231,7 @@ export function TaskCard({ task, onClick, onDelete, onAssign, className }: TaskC
                 </Badge>
               </TooltipTrigger>
               <TooltipContent>
-                <p>Blocked by {dependencies!.blockedBy.length} task{dependencies!.blockedBy.length !== 1 ? "s" : ""}</p>
+                <p>Blocked by {task.blockedBy!.length} task{task.blockedBy!.length !== 1 ? "s" : ""}</p>
               </TooltipContent>
             </Tooltip>
           )}

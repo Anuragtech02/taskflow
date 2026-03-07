@@ -53,6 +53,8 @@ export interface KanbanColumnProps {
   canMoveRight?: boolean
   isDragOver?: boolean
   isDragging?: boolean
+  bulkSubtasks?: Record<string, { id: string; status: string | null }[]>
+  bulkComments?: Record<string, number>
 }
 
 export function KanbanColumn({
@@ -71,6 +73,8 @@ export function KanbanColumn({
   canMoveRight = false,
   isDragOver = false,
   isDragging = false,
+  bulkSubtasks,
+  bulkComments,
 }: KanbanColumnProps) {
   const { setNodeRef: setDroppableRef } = useDroppable({
     id: status.id,
@@ -244,6 +248,8 @@ export function KanbanColumn({
               onClick={() => onTaskClick(task.id)}
               onDelete={onTaskDelete}
               onAssign={onTaskAssign}
+              bulkSubtasks={bulkSubtasks}
+              bulkComments={bulkComments}
             />
           ))}
         </SortableContext>

@@ -10,7 +10,6 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Calendar } from "@/components/ui/calendar"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
-import { useTaskDependencies } from "@/hooks/useQueries"
 import type { TaskResponse, WorkspaceSpaceWithLists } from "@/lib/api"
 import { Input } from "@/components/ui/input"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
@@ -132,9 +131,8 @@ export function TaskTableRow({
   const [isEditing, setIsEditing] = React.useState(false)
   const [editTitle, setEditTitle] = React.useState(task.title)
   const inputRef = React.useRef<HTMLInputElement>(null)
-  const { data: deps } = useTaskDependencies(task.id)
-  const isBlocked = (deps?.blockedBy?.length ?? 0) > 0
-  const hasDeps = isBlocked || (deps?.blocks?.length ?? 0) > 0
+  const isBlocked = (task.blockedBy?.length ?? 0) > 0
+  const hasDeps = isBlocked || (task.blocks?.length ?? 0) > 0
   const workspaceListsData = workspaceLists ?? []
 
   // Resolve the matched custom status for display (no fallback to [0] — show actual status if unmatched)
@@ -311,7 +309,7 @@ export function TaskTableRow({
               <TooltipTrigger asChild>
                 <Lock className="h-3 w-3 text-orange-500 flex-shrink-0 ml-1" />
               </TooltipTrigger>
-              <TooltipContent><p>Blocked by {deps!.blockedBy.length} task{deps!.blockedBy.length !== 1 ? "s" : ""}</p></TooltipContent>
+              <TooltipContent><p>Blocked by {task.blockedBy!.length} task{task.blockedBy!.length !== 1 ? "s" : ""}</p></TooltipContent>
             </Tooltip>
           </TooltipProvider>
         )}
