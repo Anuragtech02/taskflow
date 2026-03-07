@@ -697,28 +697,28 @@ interface BulkTaskMetaResponse {
   comments: Record<string, number>
 }
 
-export function useBulkTaskMeta(taskIds: string[]) {
+export function useBulkTaskMeta(taskIds: string[], workspaceId?: string) {
   const sortedKey = useMemo(() => [...taskIds].sort().join(","), [taskIds])
   return useQuery<BulkTaskMetaResponse>({
     queryKey: ["bulk-task-meta", sortedKey],
     queryFn: async () => {
-      const res = await api.post("/tasks/bulk-meta", { taskIds })
+      const res = await api.post("/tasks/bulk-meta", { taskIds, workspaceId })
       return res.data
     },
-    enabled: taskIds.length > 0,
+    enabled: taskIds.length > 0 && !!workspaceId,
     staleTime: 30000,
   })
 }
 
 // Fetch all task assignees for a set of tasks (for list-level filtering/grouping)
-export function useAllTaskAssignees(taskIds: string[]) {
-  const { data } = useBulkTaskMeta(taskIds)
+export function useAllTaskAssignees(taskIds: string[], workspaceId?: string) {
+  const { data } = useBulkTaskMeta(taskIds, workspaceId)
   return { data: data?.assignees }
 }
 
 // Fetch all task labels for a set of tasks (for list-level filtering/grouping)
-export function useAllTaskLabels(taskIds: string[]) {
-  const { data } = useBulkTaskMeta(taskIds)
+export function useAllTaskLabels(taskIds: string[], workspaceId?: string) {
+  const { data } = useBulkTaskMeta(taskIds, workspaceId)
   return { data: data?.labels }
 }
 

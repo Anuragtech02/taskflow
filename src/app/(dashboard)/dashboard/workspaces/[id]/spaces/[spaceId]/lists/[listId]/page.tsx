@@ -493,8 +493,8 @@ export default function ListPage({
 
   // Fetch all task assignees and labels for filtering/grouping
   const taskIds = useMemo(() => (tasks || []).map((t) => t.id), [tasks])
-  const { data: allTaskAssignees } = useAllTaskAssignees(taskIds)
-  const { data: allTaskLabels } = useAllTaskLabels(taskIds)
+  const { data: allTaskAssignees } = useAllTaskAssignees(taskIds, workspaceId)
+  const { data: allTaskLabels } = useAllTaskLabels(taskIds, workspaceId)
 
   // SessionStorage key prefix for this list
   const storageKey = `listView:${listId}`

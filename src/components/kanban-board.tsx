@@ -82,7 +82,7 @@ export function KanbanBoard({ tasks, statuses, listId, workspaceId }: KanbanBoar
 
   // Bulk-fetch subtasks + comments for all tasks in one request
   const taskIds = useMemo(() => tasks.map(t => t.id), [tasks])
-  const { data: bulkMeta } = useBulkTaskMeta(taskIds)
+  const { data: bulkMeta } = useBulkTaskMeta(taskIds, workspaceId)
 
   // Local state for optimistic updates
   const [localTasks, setLocalTasks] = useState<TaskResponse[]>(tasks)
