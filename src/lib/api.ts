@@ -1,16 +1,10 @@
-const BASE_URL = "/api"
+import api from "./axios"
 
 async function fetchJSON<T>(url: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE_URL}${url}`, {
-    credentials: "include",
-    headers: { "Content-Type": "application/json", ...init?.headers },
-    ...init,
-  })
-  if (!res.ok) {
-    const error = await res.json().catch(() => ({ error: "Unknown error" }))
-    throw new Error(error.error || `HTTP ${res.status}`)
-  }
-  return res.json()
+  const method = (init?.method || "GET").toLowerCase() as "get" | "post" | "put" | "patch" | "delete"
+  const data = init?.body ? JSON.parse(init.body as string) : undefined
+  const res = await api.request<T>({ url, method, data })
+  return res.data
 }
 
 // ── Workspaces ──────────────────────────────────────────────────────────────

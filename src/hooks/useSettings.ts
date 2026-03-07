@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { fetchWorkspaces, updateWorkspace, type WorkspaceResponse } from "@/lib/api"
+import api from "@/lib/axios"
 
 // ── API Key Types ──────────────────────────────────────────────────────────
 
@@ -22,10 +23,8 @@ export function useApiKeys() {
   return useQuery<ApiKeyResponse[]>({
     queryKey: ["api-keys"],
     queryFn: async () => {
-      const res = await fetch("/api/users/me/api-keys")
-      if (!res.ok) throw new Error("Failed to fetch API keys")
-      const data = await res.json()
-      return data.apiKeys
+      const res = await api.get("/users/me/api-keys")
+      return res.data.apiKeys
     },
   })
 }
@@ -35,16 +34,8 @@ export function useCreateApiKey() {
 
   return useMutation<CreateApiKeyResponse, Error, { name: string }>({
     mutationFn: async (data) => {
-      const res = await fetch("/api/users/me/api-keys", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      })
-      if (!res.ok) {
-        const error = await res.json().catch(() => ({ error: "Failed to create API key" }))
-        throw new Error(error.error || "Failed to create API key")
-      }
-      return res.json()
+      const res = await api.post("/users/me/api-keys", data)
+      return res.data
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["api-keys"] })
@@ -57,13 +48,7 @@ export function useDeleteApiKey() {
 
   return useMutation<void, Error, string>({
     mutationFn: async (keyId) => {
-      const res = await fetch(`/api/users/me/api-keys?keyId=${keyId}`, {
-        method: "DELETE",
-      })
-      if (!res.ok) {
-        const error = await res.json().catch(() => ({ error: "Failed to delete API key" }))
-        throw new Error(error.error || "Failed to delete API key")
-      }
+      await api.delete(`/users/me/api-keys?keyId=${keyId}`)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["api-keys"] })
@@ -87,18 +72,8 @@ export function useUpdateUser() {
   
   return useMutation({
     mutationFn: async (data: { name: string; avatarUrl?: string }) => {
-      const res = await fetch("/api/users/me", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      })
-      
-      if (!res.ok) {
-        const error = await res.json().catch(() => ({ error: "Failed to update profile" }))
-        throw new Error(error.error || "Failed to update profile")
-      }
-      
-      return res.json()
+      const res = await api.patch("/users/me", data)
+      return res.data
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["session"] })
@@ -111,18 +86,8 @@ export function useUpdateUserPassword() {
   
   return useMutation({
     mutationFn: async (data: { currentPassword: string; newPassword: string }) => {
-      const res = await fetch("/api/users/me/password", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      })
-      
-      if (!res.ok) {
-        const error = await res.json().catch(() => ({ error: "Failed to change password" }))
-        throw new Error(error.error || "Failed to change password")
-      }
-      
-      return res.json()
+      const res = await api.patch("/users/me/password", data)
+      return res.data
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["session"] })
@@ -137,18 +102,8 @@ export function useUpdateWorkspace() {
   
   return useMutation({
     mutationFn: async ({ workspaceId, name }: { workspaceId: string; name: string }) => {
-      const res = await fetch(`/api/workspaces/${workspaceId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name }),
-      })
-      
-      if (!res.ok) {
-        const error = await res.json().catch(() => ({ error: "Failed to update workspace" }))
-        throw new Error(error.error || "Failed to update workspace")
-      }
-      
-      return res.json()
+      const res = await api.patch(`/workspaces/${workspaceId}`, { name })
+      return res.data
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["workspaces"] })

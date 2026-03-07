@@ -1,5 +1,6 @@
 "use client"
 
+import api from "@/lib/axios"
 import { useState, useEffect, useCallback } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
@@ -36,11 +37,8 @@ export function ShareDialog({ documentId, open, onOpenChange }: ShareDialogProps
 
   const fetchShares = useCallback(async () => {
     try {
-      const res = await fetch(`/api/documents/${documentId}/shares`, { credentials: "include" })
-      if (res.ok) {
-        const data = await res.json()
-        setShares(data.shares)
-      }
+      const res = await api.get(`/documents/${documentId}/shares`)
+      setShares(res.data.shares)
     } catch (err) {
       console.error("Failed to fetch shares:", err)
     }
@@ -54,16 +52,9 @@ export function ShareDialog({ documentId, open, onOpenChange }: ShareDialogProps
     if (!email.trim()) return
     setLoading(true)
     try {
-      const res = await fetch(`/api/documents/${documentId}/shares`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, role, shareType: "user" }),
-      })
-      if (res.ok) {
-        setEmail("")
-        fetchShares()
-      }
+      await api.post(`/documents/${documentId}/shares`, { email, role, shareType: "user" })
+      setEmail("")
+      fetchShares()
     } finally {
       setLoading(false)
     }
@@ -72,33 +63,20 @@ export function ShareDialog({ documentId, open, onOpenChange }: ShareDialogProps
   const handleCreateLink = async () => {
     setLoading(true)
     try {
-      const res = await fetch(`/api/documents/${documentId}/shares`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ shareType: "link", role: "viewer" }),
-      })
-      if (res.ok) fetchShares()
+      await api.post(`/documents/${documentId}/shares`, { shareType: "link", role: "viewer" })
+      fetchShares()
     } finally {
       setLoading(false)
     }
   }
 
   const handleUpdateRole = async (shareId: string, newRole: string) => {
-    await fetch(`/api/documents/${documentId}/shares/${shareId}`, {
-      method: "PATCH",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ role: newRole }),
-    })
+    await api.patch(`/documents/${documentId}/shares/${shareId}`, { role: newRole })
     fetchShares()
   }
 
   const handleRemoveShare = async (shareId: string) => {
-    await fetch(`/api/documents/${documentId}/shares/${shareId}`, {
-      method: "DELETE",
-      credentials: "include",
-    })
+    await api.delete(`/documents/${documentId}/shares/${shareId}`)
     fetchShares()
   }
 

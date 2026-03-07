@@ -1,3 +1,5 @@
+import api from "../axios"
+
 // Automations API Types
 export interface AutomationResponse {
   id: string
@@ -15,9 +17,8 @@ export interface AutomationResponse {
 export async function fetchAutomations(
   workspaceId: string
 ): Promise<AutomationResponse[]> {
-  const res = await fetch(`/api/workspaces/${workspaceId}/automations`, { credentials: "include" })
-  const data = await res.json()
-  return data.automations || []
+  const res = await api.get(`/workspaces/${workspaceId}/automations`)
+  return res.data.automations || []
 }
 
 export async function createAutomation(
@@ -31,13 +32,8 @@ export async function createAutomation(
     actionConfig: Record<string, unknown>
   }
 ): Promise<{ automation: AutomationResponse }> {
-  const res = await fetch(`/api/workspaces/${workspaceId}/automations`, {
-    method: "POST",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-  })
-  return res.json()
+  const res = await api.post(`/workspaces/${workspaceId}/automations`, data)
+  return res.data
 }
 
 export async function updateAutomation(
@@ -51,18 +47,10 @@ export async function updateAutomation(
     actionConfig: Record<string, unknown>
   }>
 ): Promise<{ automation: AutomationResponse }> {
-  const res = await fetch(`/api/automations/${automationId}`, {
-    method: "PATCH",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-  })
-  return res.json()
+  const res = await api.patch(`/automations/${automationId}`, data)
+  return res.data
 }
 
 export async function deleteAutomation(automationId: string): Promise<void> {
-  await fetch(`/api/automations/${automationId}`, {
-    method: "DELETE",
-    credentials: "include",
-  })
+  await api.delete(`/automations/${automationId}`)
 }

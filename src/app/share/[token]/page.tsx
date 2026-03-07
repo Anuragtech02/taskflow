@@ -1,5 +1,6 @@
 "use client"
 
+import api from "@/lib/axios"
 import { useEffect, useState } from "react"
 import { useParams } from "next/navigation"
 import { RichTextEditor } from "@/components/rich-text-editor"
@@ -26,15 +27,9 @@ export default function SharedDocumentPage() {
   useEffect(() => {
     async function fetchSharedDoc() {
       try {
-        const res = await fetch(`/api/shared/${token}`)
-        if (!res.ok) {
-          const data = await res.json().catch(() => ({ error: "Not found" }))
-          setError(data.error || "Document not found")
-          return
-        }
-        const data = await res.json()
-        setDoc(data.document)
-        setRole(data.role)
+        const res = await api.get(`/shared/${token}`)
+        setDoc(res.data.document)
+        setRole(res.data.role)
       } catch {
         setError("Failed to load document")
       } finally {

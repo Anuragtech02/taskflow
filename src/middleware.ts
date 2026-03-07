@@ -31,11 +31,8 @@ export default auth((req) => {
     pathname === "/login" ||
     pathname === "/register" ||
     pathname.startsWith("/api/auth") ||
-    pathname.startsWith("/api/health") ||
     pathname.startsWith("/forms/") ||
-    pathname.startsWith("/api/forms/") ||
-    pathname.startsWith("/share/") ||
-    pathname.startsWith("/api/shared/");
+    pathname.startsWith("/share/");
 
   // Handle subdomain tenants
   if (!isMainApp && subdomain) {

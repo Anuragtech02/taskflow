@@ -39,10 +39,11 @@ export function useSSE(workspaceId?: string, currentUserId?: string) {
     }
 
     try {
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || ""
       const url = workspaceId
-        ? `/api/sse?workspaceId=${workspaceId}`
-        : "/api/sse"
-      const eventSource = new EventSource(url)
+        ? `${baseUrl}/sse?workspaceId=${workspaceId}`
+        : `${baseUrl}/sse`
+      const eventSource = new EventSource(url, { withCredentials: true })
       eventSourceRef.current = eventSource
 
       eventSource.onopen = () => {

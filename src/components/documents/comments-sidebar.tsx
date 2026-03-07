@@ -1,5 +1,6 @@
 "use client"
 
+import api from "@/lib/axios"
 import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
@@ -50,11 +51,8 @@ export function CommentsSidebar({ documentId, currentUserId, open, onClose }: Co
 
   const fetchComments = useCallback(async () => {
     try {
-      const res = await fetch(`/api/documents/${documentId}/comments`, { credentials: "include" })
-      if (res.ok) {
-        const data = await res.json()
-        setComments(data.comments)
-      }
+      const res = await api.get(`/documents/${documentId}/comments`)
+      setComments(res.data.comments)
     } catch (err) {
       console.error("Failed to fetch comments:", err)
     }
@@ -67,12 +65,7 @@ export function CommentsSidebar({ documentId, currentUserId, open, onClose }: Co
   const handleAddComment = async () => {
     if (!newComment.trim()) return
     try {
-      await fetch(`/api/documents/${documentId}/comments`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: newComment.trim() }),
-      })
+      await api.post(`/documents/${documentId}/comments`, { content: newComment.trim() })
       setNewComment("")
       fetchComments()
     } catch (err) {
@@ -83,12 +76,7 @@ export function CommentsSidebar({ documentId, currentUserId, open, onClose }: Co
   const handleReply = async (parentCommentId: string) => {
     if (!replyContent.trim()) return
     try {
-      await fetch(`/api/documents/${documentId}/comments`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: replyContent.trim(), parentCommentId }),
-      })
+      await api.post(`/documents/${documentId}/comments`, { content: replyContent.trim(), parentCommentId })
       setReplyContent("")
       setReplyingTo(null)
       fetchComments()
@@ -99,12 +87,7 @@ export function CommentsSidebar({ documentId, currentUserId, open, onClose }: Co
 
   const handleResolve = async (commentId: string, resolved: boolean) => {
     try {
-      await fetch(`/api/documents/${documentId}/comments/${commentId}`, {
-        method: "PATCH",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ resolved }),
-      })
+      await api.patch(`/documents/${documentId}/comments/${commentId}`, { resolved })
       fetchComments()
     } catch (err) {
       console.error("Failed to resolve:", err)
@@ -113,10 +96,7 @@ export function CommentsSidebar({ documentId, currentUserId, open, onClose }: Co
 
   const handleDelete = async (commentId: string) => {
     try {
-      await fetch(`/api/documents/${documentId}/comments/${commentId}`, {
-        method: "DELETE",
-        credentials: "include",
-      })
+      await api.delete(`/documents/${documentId}/comments/${commentId}`)
       fetchComments()
     } catch (err) {
       console.error("Failed to delete:", err)

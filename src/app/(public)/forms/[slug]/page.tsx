@@ -1,5 +1,6 @@
 "use client"
 
+import api from "@/lib/axios"
 import { useState, useEffect } from "react"
 import { useParams } from "next/navigation"
 import { CheckCircle, Send, Loader2 } from "lucide-react"
@@ -45,13 +46,11 @@ export default function PublicFormPage() {
   useEffect(() => {
     async function loadForm() {
       try {
-        const res = await fetch(`/api/forms/${slug}`)
-        if (!res.ok) throw new Error("Form not found")
-        const data = await res.json()
-        setForm(data.form)
+        const res = await api.get(`/forms/${slug}`)
+        setForm(res.data.form)
         // Initialize values
         const initial: Record<string, string> = {}
-        ;(data.form.fields || []).forEach((f: FormField) => {
+        ;(res.data.form.fields || []).forEach((f: FormField) => {
           initial[f.id] = ""
         })
         setValues(initial)
@@ -86,12 +85,7 @@ export default function PublicFormPage() {
       if (titleField) {
         submissionData.title = values[titleField.id] || ""
       }
-      const res = await fetch(`/api/forms/${slug}/submit`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(submissionData),
-      })
-      if (!res.ok) throw new Error("Submission failed")
+      await api.post(`/forms/${slug}/submit`, submissionData)
       setSubmitted(true)
     } catch {
       setError("Failed to submit form. Please try again.")

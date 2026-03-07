@@ -1,5 +1,6 @@
 "use client"
 
+import api from "@/lib/axios"
 import * as React from "react"
 import { useRouter } from "next/navigation"
 import { Search, FileText, CheckSquare, Loader2 } from "lucide-react"
@@ -49,11 +50,8 @@ export function SearchCommand() {
     const timer = setTimeout(async () => {
       setLoading(true)
       try {
-        const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`)
-        if (res.ok) {
-          const data = await res.json()
-          setResults(data.results || [])
-        }
+        const res = await api.get(`/search?q=${encodeURIComponent(query)}`)
+        setResults(res.data.results || [])
       } catch (err) {
         console.error("Search error:", err)
       } finally {

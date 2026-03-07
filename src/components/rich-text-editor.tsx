@@ -17,6 +17,7 @@ import { useCallback, useRef } from "react"
 import { Bold, Italic, Underline as UnderlineIcon, Strikethrough, Code, Quote, List, ListOrdered, Image as ImageIcon, Link as LinkIcon, Table as TableIcon, Heading1, Heading2, Heading3, Undo, Redo } from "lucide-react"
 import { cn } from "@/lib/utils"
 import suggestion from "./mention-suggestion"
+import api from "@/lib/axios"
 
 interface RichTextEditorProps {
   content: string | Record<string, unknown> | null
@@ -34,10 +35,8 @@ async function uploadImage(file: File): Promise<string | null> {
   const formData = new FormData()
   formData.append("file", file)
   try {
-    const res = await fetch("/api/upload", { method: "POST", body: formData })
-    if (!res.ok) throw new Error("Upload failed")
-    const data = await res.json()
-    return data.url
+    const res = await api.post("/upload", formData)
+    return res.data.url
   } catch (e) {
     console.error("Image upload failed:", e)
     return null

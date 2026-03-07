@@ -1,5 +1,6 @@
 "use client"
 
+import api from "@/lib/axios"
 import { useState } from "react"
 import { useParams } from "next/navigation"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
@@ -70,8 +71,8 @@ export default function FormsPage() {
   const { data, isLoading } = useQuery<{ forms: FormResponse[] }>({
     queryKey: ["forms", workspaceId],
     queryFn: async () => {
-      const res = await fetch(`/api/workspaces/${workspaceId}/forms`)
-      return res.json()
+      const res = await api.get(`/workspaces/${workspaceId}/forms`)
+      return res.data
     },
     enabled: !!workspaceId,
   })
@@ -84,12 +85,8 @@ export default function FormsPage() {
       slug: string
       isPublic: boolean
     }) => {
-      const res = await fetch(`/api/workspaces/${workspaceId}/forms`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      })
-      return res.json()
+      const res = await api.post(`/workspaces/${workspaceId}/forms`, data)
+      return res.data
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["forms", workspaceId] })
@@ -98,7 +95,7 @@ export default function FormsPage() {
 
   const deleteMutation = useMutation({
     mutationFn: async (formId: string) => {
-      await fetch(`/api/forms/${formId}`, { method: "DELETE" })
+      await api.delete(`/forms/${formId}`)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["forms", workspaceId] })

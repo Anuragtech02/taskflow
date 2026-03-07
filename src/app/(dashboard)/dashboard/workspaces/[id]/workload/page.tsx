@@ -1,5 +1,6 @@
 "use client"
 
+import api from "@/lib/axios"
 import { useParams } from "next/navigation"
 import { useQuery } from "@tanstack/react-query"
 import { Users, TrendingUp, AlertTriangle, CheckCircle, MinusCircle } from "lucide-react"
@@ -61,8 +62,8 @@ export default function WorkloadPage() {
   const { data, isLoading } = useQuery<{ workload: WorkloadEntry[] }>({
     queryKey: ["workload", workspaceId],
     queryFn: async () => {
-      const res = await fetch(`/api/workspaces/${workspaceId}/reports/workload`)
-      return res.json()
+      const res = await api.get(`/workspaces/${workspaceId}/reports/workload`)
+      return res.data
     },
     enabled: !!workspaceId,
   })

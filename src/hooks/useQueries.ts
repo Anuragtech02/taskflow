@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import api from "@/lib/axios"
 import {
   fetchWorkspaces,
   createWorkspace,
@@ -345,9 +346,8 @@ export function useTask(taskId: string | undefined) {
   return useQuery<TaskResponse>({
     queryKey: ["task", taskId],
     queryFn: async () => {
-      const res = await fetch(`/api/tasks/${taskId}`)
-      if (!res.ok) throw new Error("Failed to fetch task")
-      const data = await res.json()
+      const res = await api.get(`/tasks/${taskId}`)
+      const data = res.data
       return data.task || data
     },
     enabled: !!taskId,
@@ -985,7 +985,7 @@ export interface TaskAttachmentResponse {
 export function useTaskAttachments(taskId: string | undefined) {
   return useQuery<TaskAttachmentResponse[]>({
     queryKey: ["task-attachments", taskId],
-    queryFn: () => fetch(`/api/tasks/${taskId}/attachments`).then(r => r.json()),
+    queryFn: () => api.get(`/tasks/${taskId}/attachments`).then(r => r.data),
     enabled: !!taskId,
   })
 }
@@ -996,9 +996,8 @@ export function useUploadAttachment() {
     mutationFn: async ({ taskId, file }: { taskId: string; file: File }) => {
       const formData = new FormData()
       formData.append("file", file)
-      const res = await fetch(`/api/tasks/${taskId}/attachments`, { method: "POST", body: formData })
-      if (!res.ok) throw new Error("Upload failed")
-      return res.json()
+      const res = await api.post(`/tasks/${taskId}/attachments`, formData)
+      return res.data
     },
     onSuccess: (_data, { taskId }) => {
       queryClient.invalidateQueries({ queryKey: ["task-attachments", taskId] })
@@ -1010,9 +1009,8 @@ export function useDeleteAttachment() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async ({ taskId, attachmentId }: { taskId: string; attachmentId: string }) => {
-      const res = await fetch(`/api/tasks/${taskId}/attachments?attachmentId=${attachmentId}`, { method: "DELETE" })
-      if (!res.ok) throw new Error("Delete failed")
-      return res.json()
+      const res = await api.delete(`/tasks/${taskId}/attachments?attachmentId=${attachmentId}`)
+      return res.data
     },
     onSuccess: (_data, { taskId }) => {
       queryClient.invalidateQueries({ queryKey: ["task-attachments", taskId] })

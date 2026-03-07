@@ -1,5 +1,6 @@
 "use client"
 
+import api from "@/lib/axios"
 import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { X, Calendar, Clock, CheckSquare, MessageSquare, Play, Pause, Square, Trash2, Plus, Check, Search, Link2, ChevronRight, Tag, Paperclip, AlertCircle, ArrowUpRight, MoreHorizontal, CircleCheckBig, Flag, Users, Timer, Gauge, ChevronDown, FolderKanban, FileText, Film, Edit3, Lock, ExternalLink, List as ListIcon, Maximize, Minimize, Download } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -706,11 +707,7 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
     const effectiveId = currentTask?.id || task?.id
     if (!effectiveId) return
     try {
-      await fetch(`/api/tasks/${effectiveId}/time-entries`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "start" }),
-      })
+      await api.post(`/tasks/${effectiveId}/time-entries`, { action: "start" })
     } catch (error) {
       console.error("Failed to start timer:", error)
     }
@@ -734,11 +731,7 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
     const effectiveId = currentTask?.id || task?.id
     if (!effectiveId) return
     try {
-      await fetch(`/api/tasks/${effectiveId}/time-entries`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "stop" }),
-      })
+      await api.post(`/tasks/${effectiveId}/time-entries`, { action: "stop" })
       queryClient.invalidateQueries({ queryKey: ["time-entries", effectiveId] })
       queryClient.invalidateQueries({ queryKey: ["task", effectiveId] })
     } catch (error) {

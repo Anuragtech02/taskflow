@@ -1,3 +1,5 @@
+import api from "../axios"
+
 // Documents API Types
 export interface DocumentResponse {
   id: string
@@ -14,14 +16,13 @@ export interface DocumentResponse {
 }
 
 export async function fetchDocuments(workspaceId: string): Promise<DocumentResponse[]> {
-  const res = await fetch(`/api/workspaces/${workspaceId}/documents`, { credentials: "include" })
-  const data = await res.json()
-  return data.documents || []
+  const res = await api.get(`/workspaces/${workspaceId}/documents`)
+  return res.data.documents || []
 }
 
 export async function fetchDocument(documentId: string): Promise<{ document: DocumentResponse }> {
-  const res = await fetch(`/api/documents/${documentId}`, { credentials: "include" })
-  return res.json()
+  const res = await api.get(`/documents/${documentId}`)
+  return res.data
 }
 
 export async function createDocument(
@@ -33,13 +34,8 @@ export async function createDocument(
     icon?: string
   }
 ): Promise<{ document: DocumentResponse }> {
-  const res = await fetch(`/api/workspaces/${workspaceId}/documents`, {
-    method: "POST",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-  })
-  return res.json()
+  const res = await api.post(`/workspaces/${workspaceId}/documents`, data)
+  return res.data
 }
 
 export async function updateDocument(
@@ -52,18 +48,10 @@ export async function updateDocument(
     parentDocumentId: string
   }>
 ): Promise<{ document: DocumentResponse }> {
-  const res = await fetch(`/api/documents/${documentId}`, {
-    method: "PATCH",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-  })
-  return res.json()
+  const res = await api.patch(`/documents/${documentId}`, data)
+  return res.data
 }
 
 export async function deleteDocument(documentId: string): Promise<void> {
-  await fetch(`/api/documents/${documentId}`, {
-    method: "DELETE",
-    credentials: "include",
-  })
+  await api.delete(`/documents/${documentId}`)
 }

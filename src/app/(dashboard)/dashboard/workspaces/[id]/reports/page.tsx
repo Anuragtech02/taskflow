@@ -1,5 +1,6 @@
 "use client"
 
+import api from "@/lib/axios"
 import { useState } from "react"
 import { useParams } from "next/navigation"
 import { useQuery } from "@tanstack/react-query"
@@ -48,10 +49,10 @@ export default function ReportsPage() {
     queryFn: async () => {
       const start = startDate ? format(startDate, "yyyy-MM-dd") : ""
       const end = endDate ? format(endDate, "yyyy-MM-dd") : ""
-      const res = await fetch(
-        `/api/workspaces/${workspaceId}/reports/time?startDate=${start}&endDate=${end}`
+      const res = await api.get(
+        `/workspaces/${workspaceId}/reports/time?startDate=${start}&endDate=${end}`
       )
-      return res.json()
+      return res.data
     },
     enabled: !!workspaceId && !!startDate && !!endDate,
   })

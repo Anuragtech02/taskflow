@@ -20,6 +20,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { Bold, Italic, Underline as UnderlineIcon, Strikethrough, Code, Quote, List, ListOrdered, Image as ImageIcon, Link as LinkIcon, Table as TableIcon, Heading1, Heading2, Heading3, Undo, Redo } from "lucide-react"
 import { cn } from "@/lib/utils"
 import suggestion from "./mention-suggestion"
+import api from "@/lib/axios"
 
 interface CollaborativeEditorProps {
   documentId: string
@@ -48,10 +49,8 @@ async function uploadImage(file: File): Promise<string | null> {
   const formData = new FormData()
   formData.append("file", file)
   try {
-    const res = await fetch("/api/upload", { method: "POST", credentials: "include", body: formData })
-    if (!res.ok) throw new Error("Upload failed")
-    const data = await res.json()
-    return data.url
+    const res = await api.post("/upload", formData)
+    return res.data.url
   } catch (e) {
     console.error("Image upload failed:", e)
     return null
@@ -83,13 +82,8 @@ export function CollaborativeEditor({
     let cancelled = false
     async function fetchToken() {
       try {
-        const res = await fetch(`/api/documents/${documentId}/collab-token`, {
-          method: "POST",
-          credentials: "include",
-        })
-        if (!res.ok) return
-        const data = await res.json()
-        if (!cancelled) setCollabToken(data.token)
+        const res = await api.post(`/documents/${documentId}/collab-token`)
+        if (!cancelled) setCollabToken(res.data.token)
       } catch (err) {
         console.error("Failed to get collab token:", err)
       }

@@ -1,5 +1,6 @@
 "use client"
 
+import api from "@/lib/axios"
 import { useState, useEffect, useCallback } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
@@ -38,11 +39,8 @@ export function VersionHistory({ documentId, open, onOpenChange, onRestore }: Ve
 
   const fetchVersions = useCallback(async () => {
     try {
-      const res = await fetch(`/api/documents/${documentId}/versions`, { credentials: "include" })
-      if (res.ok) {
-        const data = await res.json()
-        setVersions(data.versions)
-      }
+      const res = await api.get(`/documents/${documentId}/versions`)
+      setVersions(res.data.versions)
     } catch (err) {
       console.error("Failed to fetch versions:", err)
     }
@@ -57,11 +55,8 @@ export function VersionHistory({ documentId, open, onOpenChange, onRestore }: Ve
 
   const handleSelectVersion = async (versionId: string) => {
     try {
-      const res = await fetch(`/api/documents/${documentId}/versions/${versionId}`, { credentials: "include" })
-      if (res.ok) {
-        const data = await res.json()
-        setSelectedVersion(data.version)
-      }
+      const res = await api.get(`/documents/${documentId}/versions/${versionId}`)
+      setSelectedVersion(res.data.version)
     } catch (err) {
       console.error("Failed to fetch version:", err)
     }
@@ -70,14 +65,9 @@ export function VersionHistory({ documentId, open, onOpenChange, onRestore }: Ve
   const handleRestore = async (versionId: string) => {
     setRestoring(true)
     try {
-      const res = await fetch(`/api/documents/${documentId}/versions/${versionId}/restore`, {
-        method: "POST",
-        credentials: "include",
-      })
-      if (res.ok) {
-        onOpenChange(false)
-        onRestore?.()
-      }
+      await api.post(`/documents/${documentId}/versions/${versionId}/restore`)
+      onOpenChange(false)
+      onRestore?.()
     } finally {
       setRestoring(false)
     }
@@ -85,10 +75,7 @@ export function VersionHistory({ documentId, open, onOpenChange, onRestore }: Ve
 
   const handleSaveVersion = async () => {
     try {
-      await fetch(`/api/documents/${documentId}/versions`, {
-        method: "POST",
-        credentials: "include",
-      })
+      await api.post(`/documents/${documentId}/versions`)
       fetchVersions()
     } catch (err) {
       console.error("Failed to save version:", err)

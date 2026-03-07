@@ -1,5 +1,6 @@
 "use client"
 
+import api from "@/lib/axios"
 import React, { useState, useCallback } from "react"
 import {
   X,
@@ -105,31 +106,13 @@ export function AIGenerateModal({
     setError(null)
 
     try {
-      const response = await fetch("/api/ai/generate-tasks", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          type: inputType === "url" ? "url" : content.startsWith("data:image/") ? "image" : "text",
-          content: inputType === "url" ? url : content,
-          listId,
-        }),
+      const response = await api.post("/ai/generate-tasks", {
+        type: inputType === "url" ? "url" : content.startsWith("data:image/") ? "image" : "text",
+        content: inputType === "url" ? url : content,
+        listId,
       })
 
-      if (!response.ok) {
-        const text = await response.text()
-        let errorMsg = "Failed to generate tasks"
-        try {
-          const data = JSON.parse(text)
-          errorMsg = data.error || errorMsg
-        } catch {
-          errorMsg = `Server error (${response.status})`
-        }
-        throw new Error(errorMsg)
-      }
-
-      const data = await response.json()
+      const data = response.data
 
       // Convert AI response to our format with unique IDs (including subtasks and effort)
       const tasks: GeneratedTask[] = (data.tasks || []).map(
@@ -209,23 +192,11 @@ export function AIGenerateModal({
         timeEstimate: task.effort ? parseEffortToMinutes(task.effort) : undefined,
       }))
 
-      const response = await fetch(`/api/lists/${listId}/tasks/bulk`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          tasks: parentTasks,
-        }),
+      const response = await api.post(`/lists/${listId}/tasks/bulk`, {
+        tasks: parentTasks,
       })
 
-      if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.error || "Failed to create tasks")
-      }
-
-      const result = await response.json()
-      const createdTasks = result.tasks || []
+      const createdTasks = response.data.tasks || []
 
       // Now create subtasks for each parent task that has subtasks
       for (let i = 0; i < createdTasks.length; i++) {
@@ -242,14 +213,8 @@ export function AIGenerateModal({
           }))
 
           // Create subtasks
-          await fetch(`/api/lists/${listId}/tasks/bulk`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              tasks: subtaskTasks,
-            }),
+          await api.post(`/lists/${listId}/tasks/bulk`, {
+            tasks: subtaskTasks,
           })
         }
       }
