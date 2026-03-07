@@ -30,7 +30,9 @@ export default auth((req) => {
     pathname.startsWith("/api/health") ||
     pathname.startsWith("/api/ai/generate-tasks") ||
     pathname.startsWith("/forms/") ||
-    pathname.startsWith("/api/forms/");
+    pathname.startsWith("/api/forms/") ||
+    pathname.startsWith("/share/") ||
+    pathname.startsWith("/api/shared/");
 
   // Handle subdomain tenants
   if (!isMainApp && subdomain) {

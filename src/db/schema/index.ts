@@ -9,6 +9,7 @@ import {
   jsonb,
   primaryKey,
   index,
+  customType,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
@@ -713,6 +714,11 @@ export const documents = pgTable(
     creatorId: uuid("creator_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
+    ydocState: customType<{ data: Buffer }>({
+      dataType() { return "bytea"; },
+    })("ydoc_state"),
+    isPublic: boolean("is_public").default(false),
+    lastVersionAt: timestamp("last_version_at"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
@@ -720,6 +726,80 @@ export const documents = pgTable(
     index("documents_workspace_idx").on(t.workspaceId),
     index("documents_space_idx").on(t.spaceId),
     index("documents_parent_idx").on(t.parentDocumentId),
+  ]
+);
+
+// ─── Document Shares ─────────────────────────────────────────────────────────
+export const documentShares = pgTable(
+  "document_shares",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    documentId: uuid("document_id")
+      .notNull()
+      .references(() => documents.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
+    role: varchar("role", { length: 20 }).notNull().default("viewer"), // viewer | editor | commenter
+    shareToken: varchar("share_token", { length: 64 }).unique(),
+    shareType: varchar("share_type", { length: 20 }).notNull().default("user"), // user | link
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [
+    index("doc_shares_document_idx").on(t.documentId),
+    index("doc_shares_user_idx").on(t.userId),
+    index("doc_shares_token_idx").on(t.shareToken),
+  ]
+);
+
+// ─── Document Comments ───────────────────────────────────────────────────────
+export const documentComments = pgTable(
+  "document_comments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    documentId: uuid("document_id")
+      .notNull()
+      .references(() => documents.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    content: text("content").notNull(),
+    markId: varchar("mark_id", { length: 64 }),
+    quotedText: text("quoted_text"),
+    parentCommentId: uuid("parent_comment_id"),
+    resolved: boolean("resolved").default(false),
+    resolvedBy: uuid("resolved_by").references(() => users.id, { onDelete: "set null" }),
+    resolvedAt: timestamp("resolved_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (t) => [
+    index("doc_comments_document_idx").on(t.documentId),
+    index("doc_comments_mark_idx").on(t.markId),
+    index("doc_comments_parent_idx").on(t.parentCommentId),
+  ]
+);
+
+// ─── Document Versions ───────────────────────────────────────────────────────
+export const documentVersions = pgTable(
+  "document_versions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    documentId: uuid("document_id")
+      .notNull()
+      .references(() => documents.id, { onDelete: "cascade" }),
+    versionNumber: integer("version_number").notNull(),
+    title: varchar("title", { length: 255 }).notNull(),
+    content: jsonb("content").default({}),
+    ydocState: customType<{ data: Buffer }>({
+      dataType() { return "bytea"; },
+    })("ydoc_state"),
+    createdBy: uuid("created_by")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [
+    index("doc_versions_document_idx").on(t.documentId),
+    index("doc_versions_number_idx").on(t.documentId, t.versionNumber),
   ]
 );
 
@@ -819,6 +899,53 @@ export const documentsRelations = relations(documents, ({ one, many }) => ({
     fields: [documents.creatorId],
     references: [users.id],
   }),
+  shares: many(documentShares),
+  comments: many(documentComments),
+  versions: many(documentVersions),
+}));
+
+export const documentSharesRelations = relations(documentShares, ({ one }) => ({
+  document: one(documents, {
+    fields: [documentShares.documentId],
+    references: [documents.id],
+  }),
+  user: one(users, {
+    fields: [documentShares.userId],
+    references: [users.id],
+  }),
+}));
+
+export const documentCommentsRelations = relations(documentComments, ({ one, many }) => ({
+  document: one(documents, {
+    fields: [documentComments.documentId],
+    references: [documents.id],
+  }),
+  user: one(users, {
+    fields: [documentComments.userId],
+    references: [users.id],
+  }),
+  parent: one(documentComments, {
+    fields: [documentComments.parentCommentId],
+    references: [documentComments.id],
+    relationName: "replies",
+  }),
+  replies: many(documentComments, { relationName: "replies" }),
+  resolver: one(users, {
+    fields: [documentComments.resolvedBy],
+    references: [users.id],
+    relationName: "resolvedComments",
+  }),
+}));
+
+export const documentVersionsRelations = relations(documentVersions, ({ one }) => ({
+  document: one(documents, {
+    fields: [documentVersions.documentId],
+    references: [documents.id],
+  }),
+  creator: one(users, {
+    fields: [documentVersions.createdBy],
+    references: [users.id],
+  }),
 }));
 
 export const formsRelations = relations(forms, ({ one }) => ({
@@ -905,3 +1032,9 @@ export type Reminder = typeof reminders.$inferSelect;
 export type NewReminder = typeof reminders.$inferInsert;
 export type ApiKey = typeof apiKeys.$inferSelect;
 export type NewApiKey = typeof apiKeys.$inferInsert;
+export type DocumentShare = typeof documentShares.$inferSelect;
+export type NewDocumentShare = typeof documentShares.$inferInsert;
+export type DocumentComment = typeof documentComments.$inferSelect;
+export type NewDocumentComment = typeof documentComments.$inferInsert;
+export type DocumentVersion = typeof documentVersions.$inferSelect;
+export type NewDocumentVersion = typeof documentVersions.$inferInsert;

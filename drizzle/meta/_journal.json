@@ -71,6 +71,13 @@
       "when": 1700000009000,
       "tag": "0007_smooth_black_tom",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1772851980781,
+      "tag": "0010_clear_bedlam",
+      "breakpoints": true
     }
   ]
 }

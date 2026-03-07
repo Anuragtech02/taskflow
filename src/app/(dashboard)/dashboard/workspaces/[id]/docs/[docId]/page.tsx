@@ -2,20 +2,26 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { useParams, useRouter } from "next/navigation"
+import { useSession } from "next-auth/react"
 import {
   ArrowLeft,
   ChevronRight,
   ChevronLeft,
   FileText,
-  Save,
   Trash2,
   Plus,
   FolderOpen,
+  Share2,
+  MessageSquare,
+  Clock,
 } from "lucide-react"
 import { useDocument, useDocuments, useUpdateDocument, useDeleteDocument, useCreateDocument } from "@/hooks/useDocuments"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { RichTextEditor } from "@/components/rich-text-editor"
+import { CollaborativeEditor } from "@/components/collaborative-editor"
+import { ShareDialog } from "@/components/documents/share-dialog"
+import { CommentsSidebar } from "@/components/documents/comments-sidebar"
+import { VersionHistory } from "@/components/documents/version-history"
 import {
   Dialog,
   DialogContent,
@@ -68,17 +74,6 @@ function DocTreeItem({
   const [expanded, setExpanded] = useState(false)
   const hasChildren = doc.children && doc.children.length > 0
   const isActive = doc.id === currentDocId
-
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr)
-    const now = new Date()
-    const diff = now.getTime() - date.getTime()
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24))
-    if (days === 0) return "Today"
-    if (days === 1) return "Yesterday"
-    if (days < 7) return `${days} days ago`
-    return date.toLocaleDateString("en-US", { month: "short", day: "numeric" })
-  }
 
   return (
     <div>
@@ -153,10 +148,11 @@ function DocTreeItem({
 export default function DocDetailPage() {
   const params = useParams()
   const router = useRouter()
+  const { data: session } = useSession()
   const workspaceId = params.id as string
   const docId = params.docId as string
 
-  const { data, isLoading } = useDocument(docId)
+  const { data, isLoading, refetch } = useDocument(docId)
   const { data: allDocuments } = useDocuments(workspaceId)
   const updateMutation = useUpdateDocument()
   const deleteMutation = useDeleteDocument()
@@ -166,61 +162,24 @@ export default function DocDetailPage() {
   const [createOpen, setCreateOpen] = useState(false)
   const [newDocTitle, setNewDocTitle] = useState("")
   const [title, setTitle] = useState("")
-  const [content, setContent] = useState<Record<string, unknown> | null>(null)
-  const [dirty, setDirty] = useState(false)
+  const [shareOpen, setShareOpen] = useState(false)
+  const [commentsOpen, setCommentsOpen] = useState(false)
+  const [versionsOpen, setVersionsOpen] = useState(false)
 
   useEffect(() => {
     if (data?.document) {
       setTitle(data.document.title)
-      const c = data.document.content
-      // Handle TipTap JSON content or legacy text format
-      if (c && typeof c === "object" && "type" in c) {
-        // TipTap JSON format
-        setContent(c as Record<string, unknown>)
-      } else if (typeof c === "string") {
-        // Legacy text format - convert to TipTap paragraph
-        setContent({
-          type: "doc",
-          content: [{ type: "paragraph", content: [{ type: "text", text: c }] }],
-        })
-      } else {
-        // Empty content
-        setContent({
-          type: "doc",
-          content: [{ type: "paragraph" }],
-        })
-      }
-      setDirty(false)
     }
   }, [data])
 
-  const handleContentChange = useCallback((newContent: Record<string, unknown>) => {
-    setContent(newContent)
-    setDirty(true)
-  }, [])
-
-  const handleSave = useCallback(() => {
-    updateMutation.mutate({
-      documentId: docId,
-      data: {
-        title,
-        content,
-      },
-    })
-    setDirty(false)
-  }, [docId, title, content, updateMutation])
-
-  // Ctrl+S to save
+  // Auto-save title on change (debounced)
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "s") {
-        e.preventDefault()
-        handleSave()
-      }
-    }
-    document.addEventListener("keydown", handler)
-    return () => document.removeEventListener("keydown", handler)
-  }, [handleSave])
+    if (!data?.document || title === data.document.title) return
+    const timer = setTimeout(() => {
+      updateMutation.mutate({ documentId: docId, data: { title } })
+    }, 1000)
+    return () => clearTimeout(timer)
+  }, [title, docId, data?.document])
 
   const handleDelete = () => {
     if (confirm("Delete this document?")) {
@@ -340,7 +299,7 @@ export default function DocDetailPage() {
             </DialogContent>
           </Dialog>
         </div>
-        
+
         <div className="flex-1 overflow-auto p-2">
           {tree.length === 0 ? (
             <div className="text-sm text-muted-foreground p-3 text-center">
@@ -387,18 +346,31 @@ export default function DocDetailPage() {
               {data.document.title}
             </span>
           </div>
-          <div className="flex items-center gap-2">
-            {dirty && (
-              <span className="text-xs text-muted-foreground">Unsaved changes</span>
-            )}
+          <div className="flex items-center gap-1">
             <Button
-              variant="outline"
+              variant="ghost"
               size="sm"
-              onClick={handleSave}
-              disabled={!dirty}
+              onClick={() => setShareOpen(true)}
+              title="Share"
             >
-              <Save className="h-4 w-4 mr-1" />
-              Save
+              <Share2 className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setCommentsOpen(!commentsOpen)}
+              title="Comments"
+              className={cn(commentsOpen && "bg-accent")}
+            >
+              <MessageSquare className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setVersionsOpen(true)}
+              title="Version history"
+            >
+              <Clock className="h-4 w-4" />
             </Button>
             <Button
               variant="ghost"
@@ -411,29 +383,52 @@ export default function DocDetailPage() {
           </div>
         </div>
 
-        {/* Editor */}
-        <div className="flex-1 overflow-auto">
-          <div className="py-8 px-8 max-w-4xl mx-auto space-y-4">
-            <Input
-              value={title}
-              onChange={(e) => {
-                setTitle(e.target.value)
-                setDirty(true)
-              }}
-              placeholder="Untitled Document"
-              className="text-4xl font-bold border-none shadow-none p-0 h-auto focus-visible:ring-0 placeholder:text-muted-foreground/40 bg-transparent"
-            />
-            <RichTextEditor
-              content={content}
-              onChange={handleContentChange}
-              placeholder="Start writing..."
-              minHeight="calc(100vh - 250px)"
-              showToolbar={true}
-              className="border rounded-lg overflow-hidden"
-            />
+        {/* Editor + Comments */}
+        <div className="flex-1 flex overflow-hidden">
+          <div className="flex-1 overflow-auto">
+            <div className="py-8 px-8 max-w-4xl mx-auto space-y-4">
+              <Input
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Untitled Document"
+                className="text-4xl font-bold border-none shadow-none p-0 h-auto focus-visible:ring-0 placeholder:text-muted-foreground/40 bg-transparent"
+              />
+              <CollaborativeEditor
+                documentId={docId}
+                userName={session?.user?.name || "Anonymous"}
+                content={data.document.content as Record<string, unknown> | null}
+                placeholder="Start writing..."
+                minHeight="calc(100vh - 250px)"
+                showToolbar={true}
+                className="border rounded-lg overflow-hidden"
+              />
+            </div>
           </div>
+
+          {/* Comments Sidebar */}
+          <CommentsSidebar
+            documentId={docId}
+            currentUserId={session?.user?.id || ""}
+            open={commentsOpen}
+            onClose={() => setCommentsOpen(false)}
+          />
         </div>
       </div>
+
+      {/* Share Dialog */}
+      <ShareDialog
+        documentId={docId}
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+      />
+
+      {/* Version History */}
+      <VersionHistory
+        documentId={docId}
+        open={versionsOpen}
+        onOpenChange={setVersionsOpen}
+        onRestore={() => refetch()}
+      />
     </div>
   )
 }

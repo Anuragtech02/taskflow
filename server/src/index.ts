@@ -1,10 +1,12 @@
 import Fastify from "fastify";
 import cookie from "@fastify/cookie";
+import websocket from "@fastify/websocket";
 import { config } from "./config.js";
 import corsPlugin from "./plugins/cors.js";
 import authPlugin from "./plugins/auth.js";
 import multipartPlugin from "./plugins/multipart.js";
 import ssePlugin from "./plugins/sse.js";
+import hocuspocusPlugin from "./plugins/hocuspocus.js";
 import healthRoutes from "./routes/health/index.js";
 import registerRoutes from "./routes/auth/register.js";
 import userRoutes from "./routes/users/me.js";
@@ -34,6 +36,11 @@ import sseRoutes from "./routes/sse/index.js";
 import reminderCheckRoutes from "./routes/reminders/check.js";
 import workspaceListRoutes from "./routes/workspaces/lists.js";
 import reportRoutes from "./routes/workspaces/reports.js";
+import documentShareRoutes from "./routes/documents/shares.js";
+import documentCommentRoutes from "./routes/documents/comments.js";
+import documentVersionRoutes from "./routes/documents/versions.js";
+import collabTokenRoutes from "./routes/documents/collab-token.js";
+import sharedTokenRoutes from "./routes/shared/token.js";
 
 const fastify = Fastify({
   logger: {
@@ -48,6 +55,8 @@ await fastify.register(corsPlugin);
 await fastify.register(authPlugin);
 await fastify.register(multipartPlugin);
 await fastify.register(ssePlugin);
+await fastify.register(websocket);
+await fastify.register(hocuspocusPlugin);
 
 // Register routes
 await fastify.register(healthRoutes);
@@ -79,6 +88,11 @@ await fastify.register(sseRoutes);
 await fastify.register(reminderCheckRoutes);
 await fastify.register(workspaceListRoutes);
 await fastify.register(reportRoutes);
+await fastify.register(documentShareRoutes);
+await fastify.register(documentCommentRoutes);
+await fastify.register(documentVersionRoutes);
+await fastify.register(collabTokenRoutes);
+await fastify.register(sharedTokenRoutes);
 
 // Start server
 try {
