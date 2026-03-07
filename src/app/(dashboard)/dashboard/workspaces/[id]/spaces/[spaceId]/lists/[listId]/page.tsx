@@ -1521,6 +1521,8 @@ export default function ListPage({
                                   onDelete={handleDeleteTask}
                                   columnWidths={columnWidths}
                                   availableStatuses={availableStatuses}
+                                  bulkAssignees={allTaskAssignees}
+                                  bulkLabels={allTaskLabels}
                                 />
                                 {addingSubtaskFor === task.id && (
                                   <InlineSubtaskInput
