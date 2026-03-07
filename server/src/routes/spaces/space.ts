@@ -76,6 +76,7 @@ export default async function spaceRoutes(fastify: FastifyInstance) {
     try {
       const access = await checkSpaceAccess(id, authResult.userId);
       if (!access) return reply.status(404).send({ error: "Space not found" });
+      if (!["owner", "admin"].includes(access.membership.role)) return reply.status(403).send({ error: "Only owners and admins can delete spaces" });
       await db.delete(spaces).where(eq(spaces.id, id));
       return { success: true };
     } catch (error) {

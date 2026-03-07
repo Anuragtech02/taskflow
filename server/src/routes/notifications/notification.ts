@@ -22,8 +22,8 @@ export default async function notificationRoutes(fastify: FastifyInstance) {
     if (!authResult) return reply.status(401).send({ error: "Unauthorized" });
     try {
       const { limit: l, offset: o, unread } = request.query as { limit?: string; offset?: string; unread?: string };
-      const limit = parseInt(l || "50");
-      const offset = parseInt(o || "0");
+      const limit = Math.min(Math.max(parseInt(l || "50", 10) || 50, 1), 200);
+      const offset = Math.max(parseInt(o || "0", 10) || 0, 0);
       const unreadOnly = unread === "true";
 
       const baseWhere = unreadOnly

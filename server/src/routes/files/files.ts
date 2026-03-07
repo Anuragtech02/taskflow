@@ -56,11 +56,13 @@ export default async function fileRoutes(fastify: FastifyInstance) {
   // GET /files/*
   fastify.get("/files/*", async (request, reply) => {
     if (!initialized) { await ensureBucket(); initialized = true; }
+    const authResult = await authenticateRequest(request);
+    if (!authResult) return reply.status(401).send({ error: "Unauthorized" });
     try {
       const key = (request.params as { "*": string })["*"];
 
       // Validate key to prevent path traversal
-      if (!key || key.includes("..") || !key.startsWith("uploads/")) {
+      if (!key || key.includes("..") || !key.startsWith("uploads/") && !key.startsWith("attachments/")) {
         return reply.status(400).send({ error: "Invalid file path" });
       }
 

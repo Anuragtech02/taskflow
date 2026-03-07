@@ -50,6 +50,7 @@ export default async function goalRoutes(fastify: FastifyInstance) {
         where: eq(goals.workspaceId, workspaceId),
         with: { keyResults: true },
         orderBy: (goals, { desc }) => [desc(goals.createdAt)],
+        limit: 200,
       });
 
       const goalsWithProgress = goalsList.map(goal => {
@@ -164,8 +165,10 @@ export default async function goalRoutes(fastify: FastifyInstance) {
       });
       if (!membership || !["owner", "admin"].includes(membership.role)) return reply.status(403).send({ error: "Access denied" });
 
-      await db.delete(keyResults).where(eq(keyResults.goalId, goalId));
-      await db.delete(goals).where(eq(goals.id, goalId));
+      await db.transaction(async (tx) => {
+        await tx.delete(keyResults).where(eq(keyResults.goalId, goalId));
+        await tx.delete(goals).where(eq(goals.id, goalId));
+      });
       return { success: true };
     } catch (error) {
       console.error("Error deleting goal:", error);

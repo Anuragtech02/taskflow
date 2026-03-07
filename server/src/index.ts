@@ -42,11 +42,25 @@ import documentVersionRoutes from "./routes/documents/versions.js";
 import collabTokenRoutes from "./routes/documents/collab-token.js";
 import sharedTokenRoutes from "./routes/shared/token.js";
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 const fastify = Fastify({
   logger: {
     level: process.env.LOG_LEVEL || "info",
   },
   bodyLimit: 10 * 1024 * 1024, // 10MB
+  trustProxy: true,
+});
+
+// Global preHandler: validate UUID format on all :id-style route params
+fastify.addHook("preHandler", async (request, reply) => {
+  const params = request.params as Record<string, string> | undefined;
+  if (!params) return;
+  for (const [key, value] of Object.entries(params)) {
+    if ((key === "id" || key.endsWith("Id")) && typeof value === "string" && !UUID_REGEX.test(value)) {
+      return reply.status(400).send({ error: `Invalid ${key} format` });
+    }
+  }
 });
 
 // Register plugins

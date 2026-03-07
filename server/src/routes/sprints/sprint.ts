@@ -105,8 +105,10 @@ export default async function sprintRoutes(fastify: FastifyInstance) {
       if (!access) return reply.status(404).send({ error: "Sprint not found" });
       if (!["owner", "admin"].includes(access.membership.role)) return reply.status(403).send({ error: "Access denied" });
 
-      await db.delete(sprintTasks).where(eq(sprintTasks.sprintId, sprintId));
-      await db.delete(sprints).where(eq(sprints.id, sprintId));
+      await db.transaction(async (tx) => {
+        await tx.delete(sprintTasks).where(eq(sprintTasks.sprintId, sprintId));
+        await tx.delete(sprints).where(eq(sprints.id, sprintId));
+      });
       return { success: true };
     } catch (error) {
       console.error("Error deleting sprint:", error);
@@ -125,8 +127,14 @@ export default async function sprintRoutes(fastify: FastifyInstance) {
 
       const body = request.body as Record<string, unknown>;
       const validatedData = addTaskSchema.parse(body);
-      const task = await db.query.tasks.findFirst({ where: eq(tasks.id, validatedData.taskId) });
+      const task = await db.query.tasks.findFirst({
+        where: eq(tasks.id, validatedData.taskId),
+        with: { list: { with: { space: true } } },
+      });
       if (!task) return reply.status(404).send({ error: "Task not found" });
+      if (task.list.space.workspaceId !== access.sprint.workspaceId) {
+        return reply.status(400).send({ error: "Task must belong to the same workspace as the sprint" });
+      }
 
       const existing = await db.query.sprintTasks.findFirst({
         where: and(eq(sprintTasks.sprintId, sprintId), eq(sprintTasks.taskId, validatedData.taskId)),
@@ -221,8 +229,10 @@ export default async function sprintRoutes(fastify: FastifyInstance) {
       const toAccess = await checkSprintAccess(toSprintId, authResult.userId);
       if (!toAccess) return reply.status(403).send({ error: "Access denied to destination sprint" });
 
-      await db.delete(sprintTasks).where(and(eq(sprintTasks.sprintId, fromSprintId), eq(sprintTasks.taskId, taskId)));
-      await db.insert(sprintTasks).values({ sprintId: toSprintId, taskId }).onConflictDoNothing();
+      await db.transaction(async (tx) => {
+        await tx.delete(sprintTasks).where(and(eq(sprintTasks.sprintId, fromSprintId), eq(sprintTasks.taskId, taskId)));
+        await tx.insert(sprintTasks).values({ sprintId: toSprintId, taskId }).onConflictDoNothing();
+      });
       return { success: true };
     } catch (error) {
       if (error instanceof z.ZodError) return reply.status(400).send({ error: "Validation error", details: error.issues });

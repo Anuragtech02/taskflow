@@ -22,7 +22,7 @@ export default async function sharedTokenRoutes(fastify: FastifyInstance) {
 
       const doc = await db.query.documents.findFirst({
         where: eq(documents.id, share.documentId),
-        with: { creator: true },
+        with: { creator: { columns: { id: true, name: true } } },
       });
 
       if (!doc) return reply.status(404).send({ error: "Document not found" });

@@ -1,8 +1,12 @@
 import { FastifyInstance } from "fastify";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { z } from "zod";
+import { eq, and } from "drizzle-orm";
+import { db, schema } from "../../db/index.js";
 import { authenticateRequest } from "../../plugins/auth.js";
 import { config } from "../../config.js";
+
+const { lists, spaces, workspaceMembers } = schema;
 
 const inputSchema = z.object({
   type: z.enum(["text", "image", "file", "url"]),
@@ -47,6 +51,19 @@ export default async function aiRoutes(fastify: FastifyInstance) {
     try {
       const body = request.body as Record<string, unknown>;
       const { type, content, listId } = inputSchema.parse(body);
+
+      // Verify workspace membership if listId provided
+      if (listId) {
+        const list = await db.query.lists.findFirst({
+          where: eq(lists.id, listId),
+          with: { space: true },
+        });
+        if (!list) return reply.status(404).send({ error: "List not found" });
+        const membership = await db.query.workspaceMembers.findFirst({
+          where: and(eq(workspaceMembers.workspaceId, list.space.workspaceId), eq(workspaceMembers.userId, authResult.userId)),
+        });
+        if (!membership) return reply.status(403).send({ error: "Access denied" });
+      }
 
       const genAI = new GoogleGenerativeAI(config.geminiApiKey);
       const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });

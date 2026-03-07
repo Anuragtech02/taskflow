@@ -1,22 +1,23 @@
 import { FastifyInstance } from "fastify";
 import fp from "fastify-plugin";
+import { ServerResponse } from "http";
 
-type SSEController = ReadableStreamDefaultController;
+type SSEConnection = ServerResponse;
 
 // Store active connections per workspace
-const workspaceConnections = new Map<string, Set<SSEController>>();
+const workspaceConnections = new Map<string, Set<SSEConnection>>();
 
-export function addConnection(workspaceId: string, controller: SSEController) {
+export function addConnection(workspaceId: string, connection: SSEConnection) {
   if (!workspaceConnections.has(workspaceId)) {
     workspaceConnections.set(workspaceId, new Set());
   }
-  workspaceConnections.get(workspaceId)!.add(controller);
+  workspaceConnections.get(workspaceId)!.add(connection);
 }
 
-export function removeConnection(workspaceId: string, controller: SSEController) {
+export function removeConnection(workspaceId: string, connection: SSEConnection) {
   const connections = workspaceConnections.get(workspaceId);
   if (connections) {
-    connections.delete(controller);
+    connections.delete(connection);
     if (connections.size === 0) {
       workspaceConnections.delete(workspaceId);
     }
@@ -45,13 +46,12 @@ export function broadcastToWorkspace(workspaceId: string, event: SSEEvent) {
   if (!connections || connections.size === 0) return;
 
   const message = `event: ${event.type}\ndata: ${JSON.stringify(event.data)}\n\n`;
-  const encoded = new TextEncoder().encode(message);
 
-  for (const controller of connections) {
+  for (const connection of connections) {
     try {
-      controller.enqueue(encoded);
+      connection.write(message);
     } catch {
-      connections.delete(controller);
+      connections.delete(connection);
     }
   }
 

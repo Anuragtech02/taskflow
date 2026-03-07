@@ -29,7 +29,7 @@ export default async function dashboardRoutes(fastify: FastifyInstance) {
 
       let workspaceTasks: typeof tasks.$inferSelect[] = [];
       if (listIds.length > 0) {
-        workspaceTasks = await db.query.tasks.findMany({ where: inArray(tasks.listId, listIds) });
+        workspaceTasks = await db.query.tasks.findMany({ where: inArray(tasks.listId, listIds), limit: 5000 });
       }
 
       const now = new Date();

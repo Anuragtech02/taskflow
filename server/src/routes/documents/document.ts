@@ -116,6 +116,7 @@ export default async function documentRoutes(fastify: FastifyInstance) {
       const workspaceDocuments = await db.query.documents.findMany({
         where: and(...whereConditions),
         with: { creator: { columns: { id: true, name: true, avatarUrl: true } } },
+        limit: 500,
       });
       return { documents: workspaceDocuments };
     } catch (error) {

@@ -9,6 +9,13 @@ export default auth((req) => {
   const hostname = req.headers.get("x-forwarded-host") || req.headers.get("host") || "";
   const host = hostname.split(":")[0];
 
+  // Validate host to prevent host header injection in production
+  if (MAIN_DOMAIN !== "taskflow.dev") {
+    if (host !== "localhost" && host !== "127.0.0.1" && host !== MAIN_DOMAIN && !host.endsWith(`.${MAIN_DOMAIN}`)) {
+      return NextResponse.json({ error: "Invalid host" }, { status: 400 });
+    }
+  }
+
   // Determine if this is a tenant subdomain
   let subdomain: string | null = null;
   let isMainApp = true;

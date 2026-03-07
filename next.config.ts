@@ -5,9 +5,6 @@ const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 const nextConfig: NextConfig = {
   output: "standalone",
   serverExternalPackages: ["postgres"],
-  typescript: {
-    ignoreBuildErrors: true,
-  },
   eslint: {
     ignoreDuringBuilds: true,
   },

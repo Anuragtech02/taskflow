@@ -50,6 +50,7 @@ export default async function folderRoutes(fastify: FastifyInstance) {
     try {
       const access = await checkFolderAccess(id, authResult.userId);
       if (!access) return reply.status(404).send({ error: "Folder not found" });
+      if (!["owner", "admin"].includes(access.membership.role)) return reply.status(403).send({ error: "Only owners and admins can delete folders" });
       await db.delete(folders).where(eq(folders.id, id));
       return { success: true };
     } catch (error) {

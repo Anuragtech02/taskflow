@@ -162,20 +162,34 @@ export default async function taskRoutes(fastify: FastifyInstance) {
       if (validatedData.order !== undefined) updateData.order = validatedData.order;
       if (validatedData.customFields !== undefined) updateData.customFields = validatedData.customFields;
       if (validatedData.parentTaskId !== undefined) updateData.parentTaskId = validatedData.parentTaskId;
-      if (validatedData.listId !== undefined) updateData.listId = validatedData.listId;
-
-      const [updatedTask] = await db.update(tasks).set(updateData).where(eq(tasks.id, taskId)).returning();
-
-      // Log activity for each changed field
-      const oldTask = access.task;
-      const changedFields = Object.keys(validatedData) as Array<keyof typeof validatedData>;
-      for (const field of changedFields) {
-        const oldValue = String(oldTask[field as keyof typeof oldTask] ?? "");
-        const newValue = String(validatedData[field] ?? "");
-        if (oldValue !== newValue) {
-          await db.insert(taskActivities).values({ taskId, userId: authResult.userId, action: "updated", field, oldValue, newValue });
+      if (validatedData.listId !== undefined) {
+        // Verify target list belongs to the same workspace
+        const targetList = await db.query.lists.findFirst({
+          where: eq(lists.id, validatedData.listId),
+          with: { space: true },
+        });
+        if (!targetList) return reply.status(404).send({ error: "Target list not found" });
+        if (targetList.space.workspaceId !== access.task.list.space.workspaceId) {
+          return reply.status(400).send({ error: "Cannot move task to a list in a different workspace" });
         }
+        updateData.listId = validatedData.listId;
       }
+
+      const oldTask = access.task;
+      const [updatedTask] = await db.transaction(async (tx) => {
+        const [result] = await tx.update(tasks).set(updateData).where(eq(tasks.id, taskId)).returning();
+
+        // Log activity for each changed field
+        const changedFields = Object.keys(validatedData) as Array<keyof typeof validatedData>;
+        for (const field of changedFields) {
+          const oldValue = String(oldTask[field as keyof typeof oldTask] ?? "");
+          const newValue = String(validatedData[field] ?? "");
+          if (oldValue !== newValue) {
+            await tx.insert(taskActivities).values({ taskId, userId: authResult.userId, action: "updated", field, oldValue, newValue });
+          }
+        }
+        return [result];
+      });
 
       // Trigger automations for status change
       if (validatedData.status && validatedData.status !== oldTask.status) {
@@ -238,12 +252,16 @@ export default async function taskRoutes(fastify: FastifyInstance) {
     if (!authResult) return reply.status(401).send({ error: "Unauthorized" });
     const { id: taskId } = request.params as { id: string };
     if (!UUID_REGEX.test(taskId)) return reply.status(400).send({ error: "Invalid task ID format" });
+    const { limit: l, offset: o } = request.query as { limit?: string; offset?: string };
+    const limit = Math.min(Math.max(parseInt(l || "100", 10) || 100, 1), 500);
+    const offset = Math.max(parseInt(o || "0", 10) || 0, 0);
     try {
       const access = await checkTaskAccess(taskId, authResult.userId);
       if (!access) return reply.status(404).send({ error: "Task not found or access denied" });
       const comments = await db.query.taskComments.findMany({
         where: eq(taskComments.taskId, taskId),
         orderBy: [desc(taskComments.createdAt)],
+        limit, offset,
         with: { user: { columns: { id: true, name: true, email: true, avatarUrl: true } } },
       });
       return { comments };
@@ -376,9 +394,14 @@ export default async function taskRoutes(fastify: FastifyInstance) {
       });
       if (existing) return reply.status(400).send({ error: "User is already assigned to this task" });
 
-      const [assignee] = await db.insert(taskAssignees).values({ taskId, userId: validatedData.userId }).onConflictDoNothing().returning();
       const assignedUser = await db.query.users.findFirst({ where: eq(users.id, validatedData.userId), columns: { id: true, name: true, email: true, avatarUrl: true } });
       const currentUser = await db.query.users.findFirst({ where: eq(users.id, authResult.userId), columns: { name: true } });
+
+      const [assignee] = await db.transaction(async (tx) => {
+        const [result] = await tx.insert(taskAssignees).values({ taskId, userId: validatedData.userId }).onConflictDoNothing().returning();
+        await tx.insert(taskActivities).values({ taskId, userId: authResult.userId, action: "added_assignee", field: "assignee", newValue: assignedUser?.name || assignedUser?.email || "user" });
+        return [result];
+      });
 
       await createNotification({
         userId: validatedData.userId, type: "task_assigned",
@@ -386,7 +409,6 @@ export default async function taskRoutes(fastify: FastifyInstance) {
         entityType: "task", entityId: taskId, taskTitle: access.task.title,
         assignedBy: currentUser?.name || "Someone", workspaceId: access.task.list.space.workspaceId,
       });
-      await db.insert(taskActivities).values({ taskId, userId: authResult.userId, action: "added_assignee", field: "assignee", newValue: assignedUser?.name || assignedUser?.email || "user" });
 
       const previousAssignees = await db.query.taskAssignees.findMany({ where: eq(taskAssignees.taskId, taskId) });
       try {
@@ -417,8 +439,10 @@ export default async function taskRoutes(fastify: FastifyInstance) {
       if (!userId) return reply.status(400).send({ error: "userId is required" });
 
       const removedUser = await db.query.users.findFirst({ where: eq(users.id, userId), columns: { id: true, name: true, email: true } });
-      await db.delete(taskAssignees).where(and(eq(taskAssignees.taskId, taskId), eq(taskAssignees.userId, userId)));
-      await db.insert(taskActivities).values({ taskId, userId: authResult.userId, action: "removed_assignee", field: "assignee", oldValue: removedUser?.name || removedUser?.email || "user" });
+      await db.transaction(async (tx) => {
+        await tx.delete(taskAssignees).where(and(eq(taskAssignees.taskId, taskId), eq(taskAssignees.userId, userId)));
+        await tx.insert(taskActivities).values({ taskId, userId: authResult.userId, action: "removed_assignee", field: "assignee", oldValue: removedUser?.name || removedUser?.email || "user" });
+      });
       return { success: true };
     } catch (error) {
       console.error("Error removing assignee:", error);
@@ -534,14 +558,16 @@ export default async function taskRoutes(fastify: FastifyInstance) {
       const body = request.body as Record<string, unknown>;
       const validatedData = createSubtaskSchema.parse(body);
 
-      const [subtask] = await db.insert(tasks).values({
-        listId: access.task.listId, title: validatedData.title, description: validatedData.description ?? {},
-        status: validatedData.status ?? "todo", priority: validatedData.priority ?? "none",
-        creatorId: authResult.userId, dueDate: validatedData.dueDate ? new Date(validatedData.dueDate) : null,
-        timeEstimate: validatedData.timeEstimate, order: validatedData.order ?? 0, parentTaskId: taskId,
-      }).returning();
-
-      await db.insert(taskActivities).values({ taskId, userId: authResult.userId, action: "subtask_created", newValue: subtask.id });
+      const [subtask] = await db.transaction(async (tx) => {
+        const [result] = await tx.insert(tasks).values({
+          listId: access.task.listId, title: validatedData.title, description: validatedData.description ?? {},
+          status: validatedData.status ?? "todo", priority: validatedData.priority ?? "none",
+          creatorId: authResult.userId, dueDate: validatedData.dueDate ? new Date(validatedData.dueDate) : null,
+          timeEstimate: validatedData.timeEstimate, order: validatedData.order ?? 0, parentTaskId: taskId,
+        }).returning();
+        await tx.insert(taskActivities).values({ taskId, userId: authResult.userId, action: "subtask_created", newValue: result.id });
+        return [result];
+      });
       return reply.status(201).send({ subtask });
     } catch (error) {
       if (error instanceof z.ZodError) return reply.status(400).send({ error: "Validation error", details: error.issues });
@@ -620,15 +646,17 @@ export default async function taskRoutes(fastify: FastifyInstance) {
 
       await s3Client.send(new PutObjectCommand({ Bucket: BUCKET, Key: key, Body: buffer, ContentType: mimeType }));
 
-      const [attachment] = await db.insert(taskAttachments).values({
-        taskId, filename: data.filename, fileKey: key, fileSize: buffer.length, mimeType, uploadedBy: authResult.userId,
-      }).returning({
-        id: taskAttachments.id, taskId: taskAttachments.taskId, filename: taskAttachments.filename,
-        fileKey: taskAttachments.fileKey, fileSize: taskAttachments.fileSize, mimeType: taskAttachments.mimeType,
-        uploadedBy: taskAttachments.uploadedBy, createdAt: taskAttachments.createdAt,
+      const [attachment] = await db.transaction(async (tx) => {
+        const [result] = await tx.insert(taskAttachments).values({
+          taskId, filename: data.filename, fileKey: key, fileSize: buffer.length, mimeType, uploadedBy: authResult.userId,
+        }).returning({
+          id: taskAttachments.id, taskId: taskAttachments.taskId, filename: taskAttachments.filename,
+          fileKey: taskAttachments.fileKey, fileSize: taskAttachments.fileSize, mimeType: taskAttachments.mimeType,
+          uploadedBy: taskAttachments.uploadedBy, createdAt: taskAttachments.createdAt,
+        });
+        await tx.insert(taskActivities).values({ taskId, userId: authResult.userId, action: "added_attachment", field: "attachment", newValue: data.filename });
+        return [result];
       });
-
-      await db.insert(taskActivities).values({ taskId, userId: authResult.userId, action: "added_attachment", field: "attachment", newValue: data.filename });
       return { ...attachment, url: `/api/files/${attachment.fileKey}` };
     } catch (error) {
       console.error("Upload error:", error);
@@ -651,9 +679,14 @@ export default async function taskRoutes(fastify: FastifyInstance) {
         .from(taskAttachments).where(and(eq(taskAttachments.id, attachmentId), eq(taskAttachments.taskId, taskId))).limit(1);
       if (!attachment) return reply.status(404).send({ error: "Attachment not found" });
 
-      await s3Client.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: attachment.fileKey }));
-      await db.delete(taskAttachments).where(eq(taskAttachments.id, attachmentId));
-      await db.insert(taskActivities).values({ taskId, userId: authResult.userId, action: "removed_attachment", field: "attachment", oldValue: attachment.filename });
+      await db.transaction(async (tx) => {
+        await tx.delete(taskAttachments).where(eq(taskAttachments.id, attachmentId));
+        await tx.insert(taskActivities).values({ taskId, userId: authResult.userId, action: "removed_attachment", field: "attachment", oldValue: attachment.filename });
+      });
+      // Delete from S3 after DB commit succeeds
+      await s3Client.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: attachment.fileKey })).catch((err) => {
+        console.error("Failed to delete file from S3:", err);
+      });
       return { success: true };
     } catch (error) {
       console.error("Delete error:", error);
@@ -706,15 +739,18 @@ export default async function taskRoutes(fastify: FastifyInstance) {
         const startTime = new Date(runningEntry.startTime);
         const duration = Math.floor((endTime.getTime() - startTime.getTime()) / 1000);
 
-        const [updatedEntry] = await db.update(timeEntries).set({
-          endTime, duration, description: (body as { description?: string }).description || runningEntry.description,
-        }).where(eq(timeEntries.id, runningEntry.id)).returning();
+        const [updatedEntry] = await db.transaction(async (tx) => {
+          const [result] = await tx.update(timeEntries).set({
+            endTime, duration, description: (body as { description?: string }).description || runningEntry.description,
+          }).where(eq(timeEntries.id, runningEntry.id)).returning();
 
-        const allEntries = await db.query.timeEntries.findMany({ where: eq(timeEntries.taskId, taskId) });
-        const totalTimeSpent = allEntries.reduce((sum, e) => sum + (e.duration || 0), 0);
-        await db.update(tasks).set({ timeSpent: totalTimeSpent }).where(eq(tasks.id, taskId));
+          const allEntries = await db.query.timeEntries.findMany({ where: eq(timeEntries.taskId, taskId) });
+          const totalTimeSpent = allEntries.reduce((sum, e) => sum + (e.duration || 0), 0);
+          await tx.update(tasks).set({ timeSpent: totalTimeSpent }).where(eq(tasks.id, taskId));
 
-        await db.insert(taskActivities).values({ taskId, userId: authResult.userId, action: "stopped_timer", field: "time_tracking", newValue: `${Math.floor(duration / 60)} minutes` });
+          await tx.insert(taskActivities).values({ taskId, userId: authResult.userId, action: "stopped_timer", field: "time_tracking", newValue: `${Math.floor(duration / 60)} minutes` });
+          return [result];
+        });
         return { timeEntry: updatedEntry };
       }
 
@@ -724,11 +760,13 @@ export default async function taskRoutes(fastify: FastifyInstance) {
         });
         if (existingTimer) return reply.status(400).send({ error: "Timer already running. Stop it first." });
 
-        const [entry] = await db.insert(timeEntries).values({
-          taskId, userId: authResult.userId, startTime: new Date(), description: (body as { description?: string }).description,
-        }).returning();
-
-        await db.insert(taskActivities).values({ taskId, userId: authResult.userId, action: "started_timer", field: "time_tracking" });
+        const [entry] = await db.transaction(async (tx) => {
+          const [result] = await tx.insert(timeEntries).values({
+            taskId, userId: authResult.userId, startTime: new Date(), description: (body as { description?: string }).description,
+          }).returning();
+          await tx.insert(taskActivities).values({ taskId, userId: authResult.userId, action: "started_timer", field: "time_tracking" });
+          return [result];
+        });
         return reply.status(201).send({ timeEntry: entry });
       }
 
@@ -745,15 +783,18 @@ export default async function taskRoutes(fastify: FastifyInstance) {
         duration = validatedData.duration;
       }
 
-      const [entry] = await db.insert(timeEntries).values({
-        taskId, userId: authResult.userId, startTime, endTime, duration, description: validatedData.description,
-      }).returning();
+      const [entry] = await db.transaction(async (tx) => {
+        const [result] = await tx.insert(timeEntries).values({
+          taskId, userId: authResult.userId, startTime, endTime, duration, description: validatedData.description,
+        }).returning();
 
-      if (duration) {
-        const allEntries = await db.query.timeEntries.findMany({ where: eq(timeEntries.taskId, taskId) });
-        const totalTimeSpent = allEntries.reduce((sum, e) => sum + (e.duration || 0), 0);
-        await db.update(tasks).set({ timeSpent: totalTimeSpent }).where(eq(tasks.id, taskId));
-      }
+        if (duration) {
+          const allEntries = await db.query.timeEntries.findMany({ where: eq(timeEntries.taskId, taskId) });
+          const totalTimeSpent = allEntries.reduce((sum, e) => sum + (e.duration || 0), 0);
+          await tx.update(tasks).set({ timeSpent: totalTimeSpent }).where(eq(tasks.id, taskId));
+        }
+        return [result];
+      });
       return reply.status(201).send({ timeEntry: entry });
     } catch (error) {
       if (error instanceof z.ZodError) return reply.status(400).send({ error: "Validation error", details: error.issues });
@@ -779,12 +820,13 @@ export default async function taskRoutes(fastify: FastifyInstance) {
       if (!entry) return reply.status(404).send({ error: "Time entry not found" });
       if (entry.userId !== authResult.userId) return reply.status(403).send({ error: "Not authorized to delete this time entry" });
 
-      await db.delete(timeEntries).where(eq(timeEntries.id, entryId));
-
-      // Recalculate total time spent
-      const allEntries = await db.query.timeEntries.findMany({ where: eq(timeEntries.taskId, taskId) });
-      const totalTimeSpent = allEntries.reduce((sum, e) => sum + (e.duration || 0), 0);
-      await db.update(tasks).set({ timeSpent: totalTimeSpent }).where(eq(tasks.id, taskId));
+      await db.transaction(async (tx) => {
+        await tx.delete(timeEntries).where(eq(timeEntries.id, entryId));
+        // Recalculate total time spent
+        const allEntries = await db.query.timeEntries.findMany({ where: eq(timeEntries.taskId, taskId) });
+        const totalTimeSpent = allEntries.reduce((sum, e) => sum + (e.duration || 0), 0);
+        await tx.update(tasks).set({ timeSpent: totalTimeSpent }).where(eq(tasks.id, taskId));
+      });
 
       return { success: true };
     } catch (error) {
@@ -925,12 +967,13 @@ export default async function taskRoutes(fastify: FastifyInstance) {
       }
 
       const newBlockedBy = [...taskBlockedBy, blockedTaskId];
-      await db.update(tasks).set({ blockedBy: newBlockedBy, updatedAt: new Date() }).where(eq(tasks.id, taskId));
-
       const currentBlocks = (blockedTask.blocks as string[] || []);
-      await db.update(tasks).set({ blocks: [...currentBlocks, taskId], updatedAt: new Date() }).where(eq(tasks.id, blockedTaskId));
 
-      await db.insert(taskActivities).values({ taskId, userId: authResult.userId, action: "dependency_added", field: "blockedBy", newValue: blockedTaskId });
+      await db.transaction(async (tx) => {
+        await tx.update(tasks).set({ blockedBy: newBlockedBy, updatedAt: new Date() }).where(eq(tasks.id, taskId));
+        await tx.update(tasks).set({ blocks: [...currentBlocks, taskId], updatedAt: new Date() }).where(eq(tasks.id, blockedTaskId));
+        await tx.insert(taskActivities).values({ taskId, userId: authResult.userId, action: "dependency_added", field: "blockedBy", newValue: blockedTaskId });
+      });
       return { success: true, blockedBy: newBlockedBy };
     } catch (error) {
       if (error instanceof z.ZodError) return reply.status(400).send({ error: "Validation error", details: error.issues });
@@ -955,13 +998,14 @@ export default async function taskRoutes(fastify: FastifyInstance) {
 
       const currentBlockedBy = (access.task.blockedBy as string[] || []);
       const newBlockedBy = currentBlockedBy.filter((id: string) => id !== blockedTaskId);
-      await db.update(tasks).set({ blockedBy: newBlockedBy, updatedAt: new Date() }).where(eq(tasks.id, taskId));
-
       const currentBlocks = (blockedTask.blocks as string[] || []);
       const newBlocks = currentBlocks.filter((id: string) => id !== taskId);
-      await db.update(tasks).set({ blocks: newBlocks, updatedAt: new Date() }).where(eq(tasks.id, blockedTaskId));
 
-      await db.insert(taskActivities).values({ taskId, userId: authResult.userId, action: "dependency_removed", field: "blockedBy", oldValue: blockedTaskId });
+      await db.transaction(async (tx) => {
+        await tx.update(tasks).set({ blockedBy: newBlockedBy, updatedAt: new Date() }).where(eq(tasks.id, taskId));
+        await tx.update(tasks).set({ blocks: newBlocks, updatedAt: new Date() }).where(eq(tasks.id, blockedTaskId));
+        await tx.insert(taskActivities).values({ taskId, userId: authResult.userId, action: "dependency_removed", field: "blockedBy", oldValue: blockedTaskId });
+      });
       return { success: true, blockedBy: newBlockedBy };
     } catch (error) {
       console.error("Error unlinking dependency:", error);

@@ -26,7 +26,7 @@ export default async function workspaceAutomationRoutes(fastify: FastifyInstance
         where: and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.userId, authResult.userId)),
       });
       if (!membership) return reply.status(403).send({ error: "Access denied" });
-      const workspaceAutomations = await db.query.automations.findMany({ where: eq(automations.workspaceId, workspaceId) });
+      const workspaceAutomations = await db.query.automations.findMany({ where: eq(automations.workspaceId, workspaceId), limit: 200 });
       return { automations: workspaceAutomations };
     } catch (error) {
       console.error("Error fetching automations:", error);

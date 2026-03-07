@@ -93,6 +93,7 @@ export default async function listRoutes(fastify: FastifyInstance) {
     try {
       const access = await checkListAccess(id, authResult.userId);
       if (!access) return reply.status(404).send({ error: "List not found" });
+      if (!["owner", "admin"].includes(access.membership.role)) return reply.status(403).send({ error: "Only owners and admins can delete lists" });
       await db.delete(lists).where(eq(lists.id, id));
       return { success: true };
     } catch (error) {
@@ -106,11 +107,15 @@ export default async function listRoutes(fastify: FastifyInstance) {
     const authResult = await authenticateRequest(request);
     if (!authResult) return reply.status(401).send({ error: "Unauthorized" });
     const { id: listId } = request.params as { id: string };
+    const { limit: l, offset: o } = request.query as { limit?: string; offset?: string };
+    const limit = Math.min(Math.max(parseInt(l || "200", 10) || 200, 1), 500);
+    const offset = Math.max(parseInt(o || "0", 10) || 0, 0);
     try {
       const access = await checkListAccess(listId, authResult.userId);
       if (!access) return reply.status(404).send({ error: "List not found" });
       const listTasks = await db.query.tasks.findMany({
         where: eq(tasks.listId, listId), orderBy: [asc(tasks.order)],
+        limit, offset,
         with: {
           assignees: { with: { user: { columns: { id: true, name: true, email: true, avatarUrl: true } } } },
           creator: { columns: { id: true, name: true, email: true, avatarUrl: true } },
@@ -268,6 +273,7 @@ export default async function listRoutes(fastify: FastifyInstance) {
     try {
       const access = await checkListAccess(listId, authResult.userId);
       if (!access) return reply.status(403).send({ error: "Access denied" });
+      if (!["owner", "admin"].includes(access.membership.role)) return reply.status(403).send({ error: "Only owners and admins can delete statuses" });
 
       const existing = await db.select().from(statuses).where(and(eq(statuses.id, statusId), eq(statuses.listId, listId))).limit(1);
       if (existing.length === 0) return reply.status(404).send({ error: "Status not found" });
@@ -387,6 +393,7 @@ export default async function listRoutes(fastify: FastifyInstance) {
     try {
       const access = await checkListAccess(listId, authResult.userId);
       if (!access) return reply.status(403).send({ error: "Access denied" });
+      if (!["owner", "admin"].includes(access.membership.role)) return reply.status(403).send({ error: "Only owners and admins can delete custom fields" });
       const [deleted] = await db.delete(customFieldDefinitions).where(and(eq(customFieldDefinitions.id, fieldId), eq(customFieldDefinitions.listId, listId))).returning();
       if (!deleted) return reply.status(404).send({ error: "Custom field not found" });
       return { success: true };
