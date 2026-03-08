@@ -4,7 +4,6 @@ import { useEditor, EditorContent, ReactNodeViewRenderer } from "@tiptap/react"
 import { BubbleMenu } from "@tiptap/react/menus"
 import StarterKit from "@tiptap/starter-kit"
 import Placeholder from "@tiptap/extension-placeholder"
-import Image from "@tiptap/extension-image"
 import Link from "@tiptap/extension-link"
 import Underline from "@tiptap/extension-underline"
 import Typography from "@tiptap/extension-typography"
@@ -33,6 +32,7 @@ import { InternalEmbedNode } from "@/lib/editor/internal-embed-node"
 import { parseInternalUrl } from "@/lib/editor/internal-link-utils"
 import { looksLikeMarkdown, markdownToHtml } from "@/lib/editor/markdown-paste"
 import { HeadingWithAnchor } from "@/lib/editor/heading-anchor"
+import { ImageWithBaseUrl } from "@/lib/editor/image-with-base-url"
 import { CodeBlockNodeView } from "./editor/code-block-node-view"
 import { PasteLinkPopover } from "./editor/paste-link-popover"
 
@@ -136,7 +136,7 @@ export function RichTextEditor({ content, onChange, placeholder, minHeight = "15
     }),
     HeadingWithAnchor,
     Placeholder.configure({ placeholder: placeholder || "Type something..." }),
-    Image.configure({ inline: false, allowBase64: true }),
+    ImageWithBaseUrl,
     Link.configure({ openOnClick: false, autolink: true }),
     Underline,
     Typography,
