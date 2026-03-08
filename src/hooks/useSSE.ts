@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useCallback, useState } from "react"
 import { useQueryClient } from "@tanstack/react-query"
+import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 
 // Debounce to prevent error spam
@@ -21,6 +22,9 @@ const showErrorOnce = () => {
 
 export function useSSE(workspaceId?: string, currentUserId?: string) {
   const queryClient = useQueryClient()
+  const router = useRouter()
+  const routerRef = useRef(router)
+  routerRef.current = router
   const eventSourceRef = useRef<EventSource | null>(null)
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const reconnectAttemptsRef = useRef(0)
@@ -71,8 +75,15 @@ export function useSSE(workspaceId?: string, currentUserId?: string) {
           queryClient.invalidateQueries({ queryKey: ["task"] })
           // Only show toast for changes made by OTHER users
           if (!currentUserId || data.userId !== currentUserId) {
+            const canNavigate = workspaceId && data.spaceId && data.listId
             toast.info("Task updated", {
               description: data.task?.title || "A task was updated",
+              ...(canNavigate && {
+                action: {
+                  label: "View",
+                  onClick: () => routerRef.current.push(`/dashboard/workspaces/${workspaceId}/spaces/${data.spaceId}/lists/${data.listId}`),
+                },
+              }),
             })
           }
         } catch (error) {
@@ -85,8 +96,15 @@ export function useSSE(workspaceId?: string, currentUserId?: string) {
           const data = JSON.parse(event.data)
           queryClient.invalidateQueries({ queryKey: ["tasks"] })
           if (!currentUserId || data.userId !== currentUserId) {
+            const canNavigate = workspaceId && data.spaceId && data.listId
             toast.success("Task created", {
               description: data.task?.title || "A new task was created",
+              ...(canNavigate && {
+                action: {
+                  label: "View",
+                  onClick: () => routerRef.current.push(`/dashboard/workspaces/${workspaceId}/spaces/${data.spaceId}/lists/${data.listId}`),
+                },
+              }),
             })
           }
         } catch (error) {
@@ -98,8 +116,15 @@ export function useSSE(workspaceId?: string, currentUserId?: string) {
         try {
           const data = JSON.parse(event.data)
           queryClient.invalidateQueries({ queryKey: ["notifications"] })
+          const canNavigate = workspaceId && data.entityType === "task" && data.spaceId && data.listId
           toast(data.title || "Notification", {
             description: data.message,
+            ...(canNavigate && {
+              action: {
+                label: "View",
+                onClick: () => routerRef.current.push(`/dashboard/workspaces/${workspaceId}/spaces/${data.spaceId}/lists/${data.listId}`),
+              },
+            }),
           })
         } catch (error) {
           console.error("Error parsing notification event:", error)
