@@ -671,7 +671,7 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
         isDirtyRef.current = false
         pendingSaveDataRef.current = null
       }
-    }, 1000)
+    }, 300)
   }, [currentTask, task, title, description, status, priority, dueDate, startDate, timeEstimate])
 
   // Keep pendingSaveDataRef in sync after each render so flush-on-switch
@@ -703,6 +703,23 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
       isDirtyRef.current = false
     }
   }, [open, handleSave])
+
+  // Flush pending save on page unload / navigation
+  useEffect(() => {
+    const flush = () => {
+      if (isDirtyRef.current) {
+        if (autoSaveTimeoutRef.current) clearTimeout(autoSaveTimeoutRef.current)
+        autoSaveTimeoutRef.current = null
+        handleSaveRef.current()
+        isDirtyRef.current = false
+      }
+    }
+    window.addEventListener("beforeunload", flush)
+    return () => {
+      window.removeEventListener("beforeunload", flush)
+      flush() // also flush on component unmount
+    }
+  }, [])
 
   const handleDelete = useCallback(() => {
     const effectiveId = currentTask?.id || task?.id
