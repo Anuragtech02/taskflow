@@ -199,6 +199,7 @@ export default function DocDetailPage() {
       workspaceId,
       data: {
         title: newDocTitle.trim(),
+        parentDocumentId: docId,
       },
     }, {
       onSuccess: (data) => {
@@ -273,9 +274,9 @@ export default function DocDetailPage() {
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Create Document</DialogTitle>
+                <DialogTitle>Create Child Document</DialogTitle>
                 <DialogDescription>
-                  Create a new document in your workspace
+                  Create a new document under the current document
                 </DialogDescription>
               </DialogHeader>
               <div className="grid gap-4 py-4">
@@ -331,9 +332,9 @@ export default function DocDetailPage() {
           )}
         >
           {sidebarOpen ? (
-            <ChevronLeft className="h-4 w-4 text-muted-foreground" />
-          ) : (
             <ChevronRight className="h-4 w-4 text-muted-foreground" />
+          ) : (
+            <ChevronLeft className="h-4 w-4 text-muted-foreground" />
           )}
         </button>
       </div>
