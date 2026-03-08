@@ -50,7 +50,11 @@ async function uploadImage(file: File): Promise<string | null> {
   formData.append("file", file)
   try {
     const res = await api.post("/upload", formData)
-    return res.data.url
+    const url = res.data.url as string
+    if (url.startsWith("/")) {
+      return `${process.env.NEXT_PUBLIC_API_URL}${url}`
+    }
+    return url
   } catch (e) {
     console.error("Image upload failed:", e)
     return null
