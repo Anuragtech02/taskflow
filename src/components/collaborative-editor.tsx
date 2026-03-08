@@ -1,6 +1,6 @@
 "use client"
 
-import { useEditor, EditorContent } from "@tiptap/react"
+import { useEditor, EditorContent, ReactNodeViewRenderer } from "@tiptap/react"
 import { BubbleMenu } from "@tiptap/react/menus"
 import StarterKit from "@tiptap/starter-kit"
 import Placeholder from "@tiptap/extension-placeholder"
@@ -41,6 +41,7 @@ import suggestion from "./mention-suggestion"
 import api from "@/lib/axios"
 import { ColorPicker } from "./editor/color-picker"
 import { CommentMark } from "@/lib/editor/comment-mark"
+import { CodeBlockNodeView } from "./editor/code-block-node-view"
 import {
   Popover,
   PopoverContent,
@@ -261,7 +262,11 @@ function CollaborativeEditorInner({
       TaskItem.configure({ nested: true }),
       Superscript,
       Subscript,
-      CodeBlockLowlight.configure({ lowlight }),
+      CodeBlockLowlight.configure({ lowlight }).extend({
+        addNodeView() {
+          return ReactNodeViewRenderer(CodeBlockNodeView)
+        },
+      }),
       CommentMark,
       Collaboration.configure({
         document: provider.document,
