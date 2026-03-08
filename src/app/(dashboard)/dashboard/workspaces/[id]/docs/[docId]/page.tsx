@@ -166,6 +166,7 @@ export default function DocDetailPage() {
   const [commentsOpen, setCommentsOpen] = useState(false)
   const [versionsOpen, setVersionsOpen] = useState(false)
   const [pendingComment, setPendingComment] = useState<PendingComment | null>(null)
+  const [activeCommentMarkId, setActiveCommentMarkId] = useState<string | null>(null)
 
   useEffect(() => {
     if (data?.document) {
@@ -410,6 +411,10 @@ export default function DocDetailPage() {
                 setPendingComment(data)
                 setCommentsOpen(true)
               }}
+              onCommentMarkClick={(markId) => {
+                setActiveCommentMarkId(markId)
+                setCommentsOpen(true)
+              }}
             />
           </div>
 
@@ -421,6 +426,8 @@ export default function DocDetailPage() {
             onClose={() => setCommentsOpen(false)}
             pendingComment={pendingComment}
             onPendingCommentClear={() => setPendingComment(null)}
+            activeCommentMarkId={activeCommentMarkId}
+            onActiveCommentClear={() => setActiveCommentMarkId(null)}
           />
         </div>
       </div>

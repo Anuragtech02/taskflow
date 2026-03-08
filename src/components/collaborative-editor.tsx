@@ -62,6 +62,7 @@ interface CollaborativeEditorProps {
   showToolbar?: boolean
   onImageClick?: (src: string) => void
   onAddComment?: (data: { markId: string; quotedText: string }) => void
+  onCommentMarkClick?: (markId: string) => void
   titleSlot?: React.ReactNode
   contentClassName?: string
 }
@@ -105,6 +106,7 @@ export function CollaborativeEditor({
   showToolbar = true,
   onImageClick,
   onAddComment,
+  onCommentMarkClick,
   titleSlot,
   contentClassName,
 }: CollaborativeEditorProps) {
@@ -185,6 +187,7 @@ export function CollaborativeEditor({
       showToolbar={showToolbar}
       onImageClick={onImageClick}
       onAddComment={onAddComment}
+      onCommentMarkClick={onCommentMarkClick}
       titleSlot={titleSlot}
       contentClassName={contentClassName}
     />
@@ -210,6 +213,7 @@ function CollaborativeEditorInner({
   showToolbar = true,
   onImageClick,
   onAddComment,
+  onCommentMarkClick,
   titleSlot,
   contentClassName,
 }: {
@@ -227,6 +231,7 @@ function CollaborativeEditorInner({
   showToolbar?: boolean
   onImageClick?: (src: string) => void
   onAddComment?: (data: { markId: string; quotedText: string }) => void
+  onCommentMarkClick?: (markId: string) => void
   titleSlot?: React.ReactNode
   contentClassName?: string
 }) {
@@ -372,15 +377,23 @@ function CollaborativeEditorInner({
   }, [editor, onAddComment])
 
   const handleEditorClick = useCallback((e: React.MouseEvent) => {
-    if (!onImageClick) return
     const target = e.target as HTMLElement
-    if (target.tagName === "IMG") {
+
+    // Check for comment highlight click
+    const commentEl = target.closest("[data-comment-id]") as HTMLElement | null
+    if (commentEl && onCommentMarkClick) {
+      const markId = commentEl.getAttribute("data-comment-id")
+      if (markId) onCommentMarkClick(markId)
+    }
+
+    // Check for image click
+    if (onImageClick && target.tagName === "IMG") {
       e.preventDefault()
       e.stopPropagation()
       const src = (target as HTMLImageElement).src
       if (src) onImageClick(src)
     }
-  }, [onImageClick])
+  }, [onImageClick, onCommentMarkClick])
 
   if (!editor) return null
 

@@ -48,14 +48,18 @@ interface CommentsSidebarProps {
   pendingComment?: PendingComment | null
   onPendingCommentClear?: () => void
   onCommentClick?: (markId: string) => void
+  activeCommentMarkId?: string | null
+  onActiveCommentClear?: () => void
 }
 
-export function CommentsSidebar({ documentId, currentUserId, open, onClose, pendingComment, onPendingCommentClear, onCommentClick }: CommentsSidebarProps) {
+export function CommentsSidebar({ documentId, currentUserId, open, onClose, pendingComment, onPendingCommentClear, onCommentClick, activeCommentMarkId, onActiveCommentClear }: CommentsSidebarProps) {
   const [comments, setComments] = useState<Comment[]>([])
   const [newComment, setNewComment] = useState("")
   const [replyingTo, setReplyingTo] = useState<string | null>(null)
   const [replyContent, setReplyContent] = useState("")
   const [showResolved, setShowResolved] = useState(false)
+  const [loadingIds, setLoadingIds] = useState<Set<string>>(new Set())
+  const commentRefs = useRef<Map<string, HTMLDivElement>>(new Map())
 
   const fetchComments = useCallback(async () => {
     try {
@@ -79,6 +83,19 @@ export function CommentsSidebar({ documentId, currentUserId, open, onClose, pend
       setTimeout(() => newCommentRef.current?.focus(), 0)
     }
   }, [pendingComment])
+
+  // Scroll to active comment when clicking highlighted text
+  useEffect(() => {
+    if (!activeCommentMarkId || !open) return
+    // Find the comment matching this markId
+    const comment = comments.find((c) => c.markId === activeCommentMarkId)
+    if (comment) {
+      const el = commentRefs.current.get(comment.id)
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" })
+      }
+    }
+  }, [activeCommentMarkId, open, comments])
 
   const handleAddComment = async () => {
     if (!newComment.trim()) return
@@ -110,20 +127,34 @@ export function CommentsSidebar({ documentId, currentUserId, open, onClose, pend
   }
 
   const handleResolve = async (commentId: string, resolved: boolean) => {
+    setLoadingIds((prev) => new Set(prev).add(commentId))
     try {
       await api.patch(`/documents/${documentId}/comments/${commentId}`, { resolved })
-      fetchComments()
+      await fetchComments()
     } catch (err) {
       console.error("Failed to resolve:", err)
+    } finally {
+      setLoadingIds((prev) => {
+        const next = new Set(prev)
+        next.delete(commentId)
+        return next
+      })
     }
   }
 
   const handleDelete = async (commentId: string) => {
+    setLoadingIds((prev) => new Set(prev).add(commentId))
     try {
       await api.delete(`/documents/${documentId}/comments/${commentId}`)
-      fetchComments()
+      await fetchComments()
     } catch (err) {
       console.error("Failed to delete:", err)
+    } finally {
+      setLoadingIds((prev) => {
+        const next = new Set(prev)
+        next.delete(commentId)
+        return next
+      })
     }
   }
 
@@ -157,117 +188,134 @@ export function CommentsSidebar({ documentId, currentUserId, open, onClose, pend
       </div>
 
       <div className="flex-1 overflow-y-auto p-3 space-y-3">
-        {filteredComments.map((comment) => (
-          <div
-            key={comment.id}
-            className={cn(
-              "rounded-lg border p-3 space-y-2 transition-colors",
-              comment.resolved && "opacity-60",
-              comment.markId && onCommentClick && "cursor-pointer hover:border-primary/50"
-            )}
-            onClick={() => comment.markId && onCommentClick?.(comment.markId)}
-          >
-            {/* Quoted text */}
-            {comment.quotedText && (
-              <div className="text-xs bg-yellow-500/10 border-l-2 border-yellow-500 px-2 py-1 rounded">
-                &ldquo;{comment.quotedText}&rdquo;
-              </div>
-            )}
-
-            {/* Comment header */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5">
-                <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center text-[10px] font-medium">
-                  {(comment.user.name || comment.user.email).charAt(0).toUpperCase()}
+        {filteredComments.map((comment) => {
+          const isLoading = loadingIds.has(comment.id)
+          const isActive = activeCommentMarkId != null && comment.markId === activeCommentMarkId
+          return (
+            <div
+              key={comment.id}
+              ref={(el) => {
+                if (el) commentRefs.current.set(comment.id, el)
+                else commentRefs.current.delete(comment.id)
+              }}
+              className={cn(
+                "rounded-lg border p-3 space-y-2 transition-all duration-300",
+                comment.resolved && "opacity-60",
+                isLoading && "opacity-40 pointer-events-none",
+                isActive && "ring-2 ring-yellow-500/50 border-yellow-500/50",
+                comment.markId && onCommentClick && "cursor-pointer hover:border-primary/50"
+              )}
+              onClick={() => {
+                if (comment.markId) {
+                  onCommentClick?.(comment.markId)
+                  onActiveCommentClear?.()
+                }
+              }}
+            >
+              {/* Quoted text */}
+              {comment.quotedText && (
+                <div className="text-xs bg-yellow-500/10 border-l-2 border-yellow-500 px-2 py-1 rounded">
+                  &ldquo;{comment.quotedText}&rdquo;
                 </div>
-                <span className="text-xs font-medium">{comment.user.name || comment.user.email}</span>
+              )}
+
+              {/* Comment header */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center text-[10px] font-medium">
+                    {(comment.user.name || comment.user.email).charAt(0).toUpperCase()}
+                  </div>
+                  <span className="text-xs font-medium">{comment.user.name || comment.user.email}</span>
+                </div>
+                <span className="text-[10px] text-muted-foreground">
+                  {formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true })}
+                </span>
               </div>
-              <span className="text-[10px] text-muted-foreground">
-                {formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true })}
-              </span>
-            </div>
 
-            {/* Content */}
-            <p className="text-sm">{comment.content}</p>
+              {/* Content */}
+              <p className="text-sm">{comment.content}</p>
 
-            {/* Actions */}
-            <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-6 text-xs px-1.5"
-                onClick={() => handleResolve(comment.id, !comment.resolved)}
-              >
-                <Check className="h-3 w-3 mr-1" />
-                {comment.resolved ? "Unresolve" : "Resolve"}
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-6 text-xs px-1.5"
-                onClick={() => {
-                  if (replyingTo === comment.id) {
-                    setReplyingTo(null)
-                  } else {
-                    setReplyingTo(comment.id)
-                    setReplyContent("")
-                  }
-                }}
-              >
-                <Reply className="h-3 w-3 mr-1" />
-                Reply
-              </Button>
-              {comment.user.id === currentUserId && (
+              {/* Actions */}
+              <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-6 text-xs px-1.5 text-destructive"
-                  onClick={() => handleDelete(comment.id)}
+                  className="h-6 text-xs px-1.5"
+                  disabled={isLoading}
+                  onClick={() => handleResolve(comment.id, !comment.resolved)}
                 >
-                  <Trash2 className="h-3 w-3" />
+                  <Check className="h-3 w-3 mr-1" />
+                  {comment.resolved ? "Unresolve" : "Resolve"}
                 </Button>
-              )}
-            </div>
-
-            {/* Replies */}
-            {comment.replies.length > 0 && (
-              <div className="ml-4 space-y-2 border-l pl-3">
-                {comment.replies.map((reply) => (
-                  <div key={reply.id} className="space-y-1">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-xs font-medium">{reply.user.name || reply.user.email}</span>
-                      <span className="text-[10px] text-muted-foreground">
-                        {formatDistanceToNow(new Date(reply.createdAt), { addSuffix: true })}
-                      </span>
-                    </div>
-                    <p className="text-xs">{reply.content}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Reply input */}
-            {replyingTo === comment.id && (
-              <div className="flex gap-1.5 mt-1" onClick={(e) => e.stopPropagation()}>
-                <Textarea
-                  placeholder="Reply..."
-                  value={replyContent}
-                  onChange={(e) => setReplyContent(e.target.value)}
-                  className="text-xs min-h-[60px]"
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault()
-                      handleReply(comment.id)
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 text-xs px-1.5"
+                  onClick={() => {
+                    if (replyingTo === comment.id) {
+                      setReplyingTo(null)
+                    } else {
+                      setReplyingTo(comment.id)
+                      setReplyContent("")
                     }
                   }}
-                />
-                <Button size="sm" className="h-8 self-end" onClick={() => handleReply(comment.id)}>
-                  Send
+                >
+                  <Reply className="h-3 w-3 mr-1" />
+                  Reply
                 </Button>
+                {comment.user.id === currentUserId && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 text-xs px-1.5 text-destructive"
+                    disabled={isLoading}
+                    onClick={() => handleDelete(comment.id)}
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                )}
               </div>
-            )}
-          </div>
-        ))}
+
+              {/* Replies */}
+              {comment.replies.length > 0 && (
+                <div className="ml-4 space-y-2 border-l pl-3">
+                  {comment.replies.map((reply) => (
+                    <div key={reply.id} className="space-y-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-medium">{reply.user.name || reply.user.email}</span>
+                        <span className="text-[10px] text-muted-foreground">
+                          {formatDistanceToNow(new Date(reply.createdAt), { addSuffix: true })}
+                        </span>
+                      </div>
+                      <p className="text-xs">{reply.content}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Reply input */}
+              {replyingTo === comment.id && (
+                <div className="flex gap-1.5 mt-1" onClick={(e) => e.stopPropagation()}>
+                  <Textarea
+                    placeholder="Reply..."
+                    value={replyContent}
+                    onChange={(e) => setReplyContent(e.target.value)}
+                    className="text-xs min-h-[60px]"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault()
+                        handleReply(comment.id)
+                      }
+                    }}
+                  />
+                  <Button size="sm" className="h-8 self-end" onClick={() => handleReply(comment.id)}>
+                    Send
+                  </Button>
+                </div>
+              )}
+            </div>
+          )
+        })}
 
         {filteredComments.length === 0 && (
           <div className="text-center py-8 text-sm text-muted-foreground">
