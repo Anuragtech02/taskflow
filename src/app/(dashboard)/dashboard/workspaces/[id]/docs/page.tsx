@@ -66,8 +66,8 @@ function DocTreeItem({
   onDelete: (id: string) => void
 }) {
   const router = useRouter()
-  const [expanded, setExpanded] = useState(false)
   const hasChildren = doc.children && doc.children.length > 0
+  const [expanded, setExpanded] = useState(hasChildren)
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr)

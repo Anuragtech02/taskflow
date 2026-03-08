@@ -57,6 +57,14 @@ function buildDocTree(docs: DocumentResponse[]): (DocumentResponse & { children:
 }
 
 // Tree item component
+function isAncestorOf(doc: DocumentResponse & { children: DocumentResponse[] }, targetId: string): boolean {
+  for (const child of doc.children) {
+    if (child.id === targetId) return true
+    if ((child as any).children?.length && isAncestorOf(child as any, targetId)) return true
+  }
+  return false
+}
+
 function DocTreeItem({
   doc,
   workspaceId,
@@ -71,8 +79,8 @@ function DocTreeItem({
   onDelete: (id: string) => void
 }) {
   const router = useRouter()
-  const [expanded, setExpanded] = useState(false)
   const hasChildren = doc.children && doc.children.length > 0
+  const [expanded, setExpanded] = useState(hasChildren && isAncestorOf(doc, currentDocId))
   const isActive = doc.id === currentDocId
 
   return (
