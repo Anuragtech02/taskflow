@@ -291,8 +291,9 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
   // Always fetch the full task (includes activities, comments, etc.)
   const effectiveTaskId = taskIdProp || task?.id
   const { data: fetchedTask } = useTask(effectiveTaskId)
-  // Prefer fetchedTask (richer data with activities) once loaded; use task prop for instant display while loading
-  const currentTask = fetchedTask || task
+  // Prefer fetchedTask once loaded, but only if it matches the requested task ID
+  // (fetchedTask may be stale from a previous task while the new one is loading)
+  const currentTask = (fetchedTask && fetchedTask.id === effectiveTaskId) ? fetchedTask : task
 
   const { data: session } = useSession()
   const currentUserId = session?.user?.id
