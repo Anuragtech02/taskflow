@@ -32,8 +32,9 @@ export function InternalEmbedCardView({ node, selected, editor }: NodeViewProps)
     staleTime: 30_000,
   })
 
-  const title = data?.title || data?.name
-  const status = data?.status
+  const entity = isTask ? data?.task : data?.document
+  const title = entity?.title || entity?.name
+  const status = entity?.status
   const isEditable = editor?.isEditable
 
   const handleClick = () => {

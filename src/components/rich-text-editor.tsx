@@ -31,6 +31,7 @@ import api from "@/lib/axios"
 import { CommentMark } from "@/lib/editor/comment-mark"
 import { InternalEmbedNode } from "@/lib/editor/internal-embed-node"
 import { parseInternalUrl } from "@/lib/editor/internal-link-utils"
+import { looksLikeMarkdown, markdownToHtml } from "@/lib/editor/markdown-paste"
 import { CodeBlockNodeView } from "./editor/code-block-node-view"
 import { PasteLinkPopover } from "./editor/paste-link-popover"
 
@@ -211,6 +212,18 @@ export function RichTextEditor({ content, onChange, placeholder, minHeight = "15
             })
             return true
           }
+        }
+
+        // Auto-format pasted markdown (only when no HTML is provided)
+        const hasHtml = !!event.clipboardData?.getData("text/html")
+        if (text && !hasHtml && looksLikeMarkdown(text)) {
+          event.preventDefault()
+          if (editorRef.current) {
+            editorRef.current.commands.insertContent(markdownToHtml(text), {
+              parseOptions: { preserveWhitespace: false },
+            })
+          }
+          return true
         }
 
         const items = event.clipboardData?.items
