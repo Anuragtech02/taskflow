@@ -448,6 +448,15 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
   }
 
+  // Resolve relative file URLs to absolute API URLs
+  const resolveFileUrl = (url: string): string => {
+    const base = process.env.NEXT_PUBLIC_API_URL || ""
+    if (!base) return url
+    if (url.startsWith("/api/files/")) return `${base}${url.slice(4)}`
+    if (url.startsWith("/files/")) return `${base}${url}`
+    return url
+  }
+
   // Check if file is image
   const isImageFile = (mimeType: string): boolean => {
     return mimeType.startsWith("image/")
@@ -2277,10 +2286,10 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
                         {isImageFile(attachment.mimeType) ? (
                           <div
                             className="h-10 w-10 rounded overflow-hidden flex-shrink-0 bg-muted cursor-pointer hover:ring-2 hover:ring-primary"
-                            onClick={() => setPreviewImage(attachment.url)}
+                            onClick={() => setPreviewImage(resolveFileUrl(attachment.url))}
                           >
                             <img
-                              src={attachment.url}
+                              src={resolveFileUrl(attachment.url)}
                               alt={attachment.filename}
                               className="h-full w-full object-cover"
                             />
@@ -2300,9 +2309,9 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
                           <button
                             onClick={() => {
                               if (isImageFile(attachment.mimeType) || isVideoFile(attachment.mimeType)) {
-                                setPreviewImage(attachment.url)
+                                setPreviewImage(resolveFileUrl(attachment.url))
                               } else {
-                                window.open(attachment.url, "_blank")
+                                window.open(resolveFileUrl(attachment.url), "_blank")
                               }
                             }}
                             className="text-sm font-medium hover:underline truncate block text-left"
