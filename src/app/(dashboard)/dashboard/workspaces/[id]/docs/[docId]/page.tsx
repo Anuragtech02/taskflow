@@ -386,28 +386,31 @@ export default function DocDetailPage() {
 
         {/* Editor + Comments */}
         <div className="flex-1 flex overflow-hidden">
-          <div className="flex-1 overflow-auto">
-            <div className="py-8 px-8 max-w-4xl mx-auto space-y-4">
-              <Input
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Untitled Document"
-                className="text-4xl font-bold border-none shadow-none p-0 h-auto focus-visible:ring-0 placeholder:text-muted-foreground/40 bg-transparent"
-              />
-              <CollaborativeEditor
-                documentId={docId}
-                userName={session?.user?.name || "Anonymous"}
-                content={data.document.content as Record<string, unknown> | null}
-                placeholder="Start writing..."
-                minHeight="calc(100vh - 250px)"
-                showToolbar={true}
-                className="border rounded-lg overflow-hidden"
-                onAddComment={(data) => {
-                  setPendingComment(data)
-                  setCommentsOpen(true)
-                }}
-              />
-            </div>
+          <div className="flex-1 flex flex-col overflow-hidden">
+            <CollaborativeEditor
+              documentId={docId}
+              userName={session?.user?.name || "Anonymous"}
+              content={data.document.content as Record<string, unknown> | null}
+              placeholder="Start writing..."
+              minHeight="calc(100vh - 300px)"
+              showToolbar={true}
+              className="flex-1 flex flex-col overflow-auto"
+              titleSlot={
+                <div className="py-8 px-8 max-w-4xl mx-auto w-full">
+                  <Input
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder="Untitled Document"
+                    className="text-4xl font-bold border-none shadow-none p-0 h-auto focus-visible:ring-0 placeholder:text-muted-foreground/40 bg-transparent"
+                  />
+                </div>
+              }
+              contentClassName="px-8 max-w-4xl mx-auto w-full"
+              onAddComment={(data) => {
+                setPendingComment(data)
+                setCommentsOpen(true)
+              }}
+            />
           </div>
 
           {/* Comments Sidebar */}

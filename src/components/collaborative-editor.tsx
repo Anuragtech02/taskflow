@@ -62,6 +62,8 @@ interface CollaborativeEditorProps {
   showToolbar?: boolean
   onImageClick?: (src: string) => void
   onAddComment?: (data: { markId: string; quotedText: string }) => void
+  titleSlot?: React.ReactNode
+  contentClassName?: string
 }
 
 const CURSOR_COLORS = [
@@ -103,6 +105,8 @@ export function CollaborativeEditor({
   showToolbar = true,
   onImageClick,
   onAddComment,
+  titleSlot,
+  contentClassName,
 }: CollaborativeEditorProps) {
   const [provider, setProvider] = useState<HocuspocusProvider | null>(null)
   const [collabToken, setCollabToken] = useState<string | null>(null)
@@ -181,6 +185,8 @@ export function CollaborativeEditor({
       showToolbar={showToolbar}
       onImageClick={onImageClick}
       onAddComment={onAddComment}
+      titleSlot={titleSlot}
+      contentClassName={contentClassName}
     />
   )
 }
@@ -204,6 +210,8 @@ function CollaborativeEditorInner({
   showToolbar = true,
   onImageClick,
   onAddComment,
+  titleSlot,
+  contentClassName,
 }: {
   provider: HocuspocusProvider
   connected: boolean
@@ -219,6 +227,8 @@ function CollaborativeEditorInner({
   showToolbar?: boolean
   onImageClick?: (src: string) => void
   onAddComment?: (data: { markId: string; quotedText: string }) => void
+  titleSlot?: React.ReactNode
+  contentClassName?: string
 }) {
   const editorRef = useRef<ReturnType<typeof useEditor>>(null)
 
@@ -375,9 +385,9 @@ function CollaborativeEditorInner({
   if (!editor) return null
 
   return (
-    <div className={cn("relative border rounded-md bg-background", className)} onClick={handleEditorClick}>
+    <div className={cn("relative bg-background", className)} onClick={handleEditorClick}>
       {showToolbar && editable && (
-        <div className="flex items-center gap-0.5 flex-wrap border-b p-2 bg-muted/30 rounded-t-md">
+        <div className="flex items-center gap-0.5 flex-wrap border-b p-2 bg-muted/30 sticky top-0 z-10">
           <button type="button" onClick={() => editor.chain().focus().toggleBold().run()} className={cn("p-1.5 rounded hover:bg-muted", editor.isActive("bold") && "bg-muted text-primary")}><Bold className="h-4 w-4" /></button>
           <button type="button" onClick={() => editor.chain().focus().toggleItalic().run()} className={cn("p-1.5 rounded hover:bg-muted", editor.isActive("italic") && "bg-muted text-primary")}><Italic className="h-4 w-4" /></button>
           <button type="button" onClick={() => editor.chain().focus().toggleUnderline().run()} className={cn("p-1.5 rounded hover:bg-muted", editor.isActive("underline") && "bg-muted text-primary")}><UnderlineIcon className="h-4 w-4" /></button>
@@ -486,7 +496,10 @@ function CollaborativeEditorInner({
           </div>
         </BubbleMenu>
       )}
-      <EditorContent editor={editor} />
+      {titleSlot}
+      <div className={contentClassName}>
+        <EditorContent editor={editor} />
+      </div>
     </div>
   )
 }

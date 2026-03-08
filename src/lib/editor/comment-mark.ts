@@ -11,6 +11,8 @@ declare module "@tiptap/core" {
 
 export const CommentMark = Mark.create({
   name: "commentMark",
+  inclusive: false,
+  excludes: "",
 
   addAttributes() {
     return {
