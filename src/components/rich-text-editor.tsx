@@ -32,6 +32,7 @@ import { CommentMark } from "@/lib/editor/comment-mark"
 import { InternalEmbedNode } from "@/lib/editor/internal-embed-node"
 import { parseInternalUrl } from "@/lib/editor/internal-link-utils"
 import { looksLikeMarkdown, markdownToHtml } from "@/lib/editor/markdown-paste"
+import { HeadingWithAnchor } from "@/lib/editor/heading-anchor"
 import { CodeBlockNodeView } from "./editor/code-block-node-view"
 import { PasteLinkPopover } from "./editor/paste-link-popover"
 
@@ -130,9 +131,10 @@ export function RichTextEditor({ content, onChange, placeholder, minHeight = "15
   // Build extensions array
   const extensions: any[] = [
     StarterKit.configure({
-      heading: { levels: [1, 2, 3] },
+      heading: false,
       codeBlock: false,
     }),
+    HeadingWithAnchor,
     Placeholder.configure({ placeholder: placeholder || "Type something..." }),
     Image.configure({ inline: false, allowBase64: true }),
     Link.configure({ openOnClick: false, autolink: true }),
@@ -326,8 +328,23 @@ export function RichTextEditor({ content, onChange, placeholder, minHeight = "15
   )
 
   const handleEditorClick = useCallback((e: React.MouseEvent) => {
-    if (!onImageClick) return
     const target = e.target as HTMLElement
+
+    // Check for anchor link click — scroll to heading instead of navigating
+    const anchor = target.closest("a") as HTMLAnchorElement | null
+    if (anchor) {
+      const href = anchor.getAttribute("href")
+      if (href?.startsWith("#")) {
+        e.preventDefault()
+        e.stopPropagation()
+        const id = href.slice(1)
+        const heading = document.getElementById(id)
+        if (heading) heading.scrollIntoView({ behavior: "smooth", block: "start" })
+        return
+      }
+    }
+
+    if (!onImageClick) return
     if (target.tagName === "IMG") {
       e.preventDefault()
       e.stopPropagation()

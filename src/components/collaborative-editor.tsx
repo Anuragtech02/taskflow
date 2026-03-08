@@ -44,6 +44,7 @@ import { CommentMark } from "@/lib/editor/comment-mark"
 import { InternalEmbedNode } from "@/lib/editor/internal-embed-node"
 import { parseInternalUrl } from "@/lib/editor/internal-link-utils"
 import { looksLikeMarkdown, markdownToHtml } from "@/lib/editor/markdown-paste"
+import { HeadingWithAnchor } from "@/lib/editor/heading-anchor"
 import { CodeBlockNodeView } from "./editor/code-block-node-view"
 import { PasteLinkPopover } from "./editor/paste-link-popover"
 import {
@@ -255,10 +256,11 @@ function CollaborativeEditorInner({
   const extensions = useMemo(() => {
     const exts: any[] = [
       StarterKit.configure({
-        heading: { levels: [1, 2, 3] },
+        heading: false,
         codeBlock: false,
         ...({ history: false } as any),
       }),
+      HeadingWithAnchor,
       Placeholder.configure({ placeholder: placeholder || "Start typing..." }),
       Image.configure({ inline: false, allowBase64: true }),
       Link.configure({ openOnClick: false, autolink: true }),
@@ -455,6 +457,20 @@ function CollaborativeEditorInner({
   const handleEditorClick = useCallback((e: React.MouseEvent) => {
     const target = e.target as HTMLElement
 
+    // Check for anchor link click — scroll to heading instead of navigating
+    const anchor = target.closest("a") as HTMLAnchorElement | null
+    if (anchor) {
+      const href = anchor.getAttribute("href")
+      if (href?.startsWith("#")) {
+        e.preventDefault()
+        e.stopPropagation()
+        const id = href.slice(1)
+        const heading = document.getElementById(id)
+        if (heading) heading.scrollIntoView({ behavior: "smooth", block: "start" })
+        return
+      }
+    }
+
     // Check for comment highlight click
     const commentEl = target.closest("[data-comment-id]") as HTMLElement | null
     if (commentEl && onCommentMarkClick) {
@@ -476,7 +492,7 @@ function CollaborativeEditorInner({
   return (
     <div className={cn("relative bg-background", className)} onClick={handleEditorClick}>
       {showToolbar && editable && (
-        <div className="flex items-center gap-0.5 flex-wrap border-b p-2 bg-muted/30 sticky top-0 z-10">
+        <div className="flex items-center gap-0.5 flex-wrap border-b p-2 bg-background sticky top-0 z-10">
           <button type="button" onClick={() => editor.chain().focus().toggleBold().run()} className={cn("p-1.5 rounded hover:bg-muted", editor.isActive("bold") && "bg-muted text-primary")}><Bold className="h-4 w-4" /></button>
           <button type="button" onClick={() => editor.chain().focus().toggleItalic().run()} className={cn("p-1.5 rounded hover:bg-muted", editor.isActive("italic") && "bg-muted text-primary")}><Italic className="h-4 w-4" /></button>
           <button type="button" onClick={() => editor.chain().focus().toggleUnderline().run()} className={cn("p-1.5 rounded hover:bg-muted", editor.isActive("underline") && "bg-muted text-primary")}><UnderlineIcon className="h-4 w-4" /></button>
