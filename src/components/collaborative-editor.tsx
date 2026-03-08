@@ -41,7 +41,10 @@ import suggestion from "./mention-suggestion"
 import api from "@/lib/axios"
 import { ColorPicker } from "./editor/color-picker"
 import { CommentMark } from "@/lib/editor/comment-mark"
+import { InternalEmbedNode } from "@/lib/editor/internal-embed-node"
+import { parseInternalUrl } from "@/lib/editor/internal-link-utils"
 import { CodeBlockNodeView } from "./editor/code-block-node-view"
+import { PasteLinkPopover } from "./editor/paste-link-popover"
 import {
   Popover,
   PopoverContent,
@@ -242,6 +245,11 @@ function CollaborativeEditorInner({
   contentClassName?: string
 }) {
   const editorRef = useRef<ReturnType<typeof useEditor>>(null)
+  const [pastePopover, setPastePopover] = useState<{
+    position: { top: number; left: number }
+    url: string
+    parsed: ReturnType<typeof parseInternalUrl>
+  } | null>(null)
 
   const extensions = useMemo(() => {
     const exts: any[] = [
@@ -273,6 +281,7 @@ function CollaborativeEditorInner({
         },
       }),
       CommentMark,
+      InternalEmbedNode,
       Collaboration.configure({
         document: provider.document,
       }),
@@ -320,7 +329,23 @@ function CollaborativeEditorInner({
         }
         return false
       },
-      handlePaste: (_view, event) => {
+      handlePaste: (view, event) => {
+        // Check for internal URL paste — only if the plain text is a bare URL
+        const text = event.clipboardData?.getData("text/plain")?.trim()
+        if (text && /^(https?:\/\/\S+|\/\S+)$/.test(text)) {
+          const parsed = parseInternalUrl(text)
+          if (parsed) {
+            event.preventDefault()
+            const coords = view.coordsAtPos(view.state.selection.from)
+            setPastePopover({
+              position: { top: coords.bottom + 4, left: coords.left },
+              url: text,
+              parsed,
+            })
+            return true
+          }
+        }
+
         const items = event.clipboardData?.items
         if (items) {
           for (const item of items) {
@@ -385,6 +410,34 @@ function CollaborativeEditorInner({
     editor.chain().focus().setCommentMark(markId).run()
     onAddComment({ markId, quotedText })
   }, [editor, onAddComment])
+
+  const handlePastePopoverSelect = useCallback(
+    (choice: "embed" | "link") => {
+      if (!pastePopover?.parsed || !editorRef.current) return
+      const ed = editorRef.current
+      if (choice === "embed") {
+        ed.chain()
+          .focus()
+          .insertInternalEmbed({
+            entityType: pastePopover.parsed.type,
+            entityId: pastePopover.parsed.entityId,
+            workspaceId: pastePopover.parsed.workspaceId,
+          })
+          .run()
+      } else {
+        ed.chain()
+          .focus()
+          .insertContent({
+            type: "text",
+            text: pastePopover.url,
+            marks: [{ type: "link", attrs: { href: pastePopover.url } }],
+          })
+          .run()
+      }
+      setPastePopover(null)
+    },
+    [pastePopover]
+  )
 
   const handleEditorClick = useCallback((e: React.MouseEvent) => {
     const target = e.target as HTMLElement
@@ -523,6 +576,13 @@ function CollaborativeEditorInner({
       <div className={contentClassName}>
         <EditorContent editor={editor} />
       </div>
+      {pastePopover && (
+        <PasteLinkPopover
+          position={pastePopover.position}
+          onSelect={handlePastePopoverSelect}
+          onDismiss={() => setPastePopover(null)}
+        />
+      )}
     </div>
   )
 }

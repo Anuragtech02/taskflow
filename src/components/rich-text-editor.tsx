@@ -23,13 +23,16 @@ import Superscript from "@tiptap/extension-superscript"
 import Subscript from "@tiptap/extension-subscript"
 import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight"
 import { common, createLowlight } from "lowlight"
-import { useCallback, useRef } from "react"
+import { useCallback, useRef, useState } from "react"
 import { Bold, Italic, Underline as UnderlineIcon, Strikethrough, Code, Quote, List, ListOrdered, Image as ImageIcon, Link as LinkIcon, Table as TableIcon, Heading1, Heading2, Heading3, Undo, Redo } from "lucide-react"
 import { cn } from "@/lib/utils"
 import suggestion from "./mention-suggestion"
 import api from "@/lib/axios"
 import { CommentMark } from "@/lib/editor/comment-mark"
+import { InternalEmbedNode } from "@/lib/editor/internal-embed-node"
+import { parseInternalUrl } from "@/lib/editor/internal-link-utils"
 import { CodeBlockNodeView } from "./editor/code-block-node-view"
+import { PasteLinkPopover } from "./editor/paste-link-popover"
 
 const lowlight = createLowlight(common)
 
@@ -117,6 +120,11 @@ async function processHtmlImages(html: string): Promise<string> {
 
 export function RichTextEditor({ content, onChange, placeholder, minHeight = "150px", className, editable = true, mentions, showToolbar = false, onImageClick }: RichTextEditorProps) {
   const editorRef = useRef<ReturnType<typeof useEditor>>(null)
+  const [pastePopover, setPastePopover] = useState<{
+    position: { top: number; left: number }
+    url: string
+    parsed: ReturnType<typeof parseInternalUrl>
+  } | null>(null)
 
   // Build extensions array
   const extensions: any[] = [
@@ -147,6 +155,7 @@ export function RichTextEditor({ content, onChange, placeholder, minHeight = "15
       },
     }),
     CommentMark,
+    InternalEmbedNode,
   ]
 
   // Always add Mention extension (works with empty array too)
@@ -187,7 +196,23 @@ export function RichTextEditor({ content, onChange, placeholder, minHeight = "15
         }
         return false
       },
-      handlePaste: (_view, event) => {
+      handlePaste: (view, event) => {
+        // Check for internal URL paste — only if the plain text is a bare URL
+        const text = event.clipboardData?.getData("text/plain")?.trim()
+        if (text && /^(https?:\/\/\S+|\/\S+)$/.test(text)) {
+          const parsed = parseInternalUrl(text)
+          if (parsed) {
+            event.preventDefault()
+            const coords = view.coordsAtPos(view.state.selection.from)
+            setPastePopover({
+              position: { top: coords.bottom + 4, left: coords.left },
+              url: text,
+              parsed,
+            })
+            return true
+          }
+        }
+
         const items = event.clipboardData?.items
         if (items) {
           // 1. Check for raw image files (e.g. screenshot paste)
@@ -259,6 +284,34 @@ export function RichTextEditor({ content, onChange, placeholder, minHeight = "15
     }
   }, [])
 
+  const handlePastePopoverSelect = useCallback(
+    (choice: "embed" | "link") => {
+      if (!pastePopover?.parsed || !editorRef.current) return
+      const ed = editorRef.current
+      if (choice === "embed") {
+        ed.chain()
+          .focus()
+          .insertInternalEmbed({
+            entityType: pastePopover.parsed.type,
+            entityId: pastePopover.parsed.entityId,
+            workspaceId: pastePopover.parsed.workspaceId,
+          })
+          .run()
+      } else {
+        ed.chain()
+          .focus()
+          .insertContent({
+            type: "text",
+            text: pastePopover.url,
+            marks: [{ type: "link", attrs: { href: pastePopover.url } }],
+          })
+          .run()
+      }
+      setPastePopover(null)
+    },
+    [pastePopover]
+  )
+
   const handleEditorClick = useCallback((e: React.MouseEvent) => {
     if (!onImageClick) return
     const target = e.target as HTMLElement
@@ -319,6 +372,13 @@ export function RichTextEditor({ content, onChange, placeholder, minHeight = "15
         </BubbleMenu>
       )}
       <EditorContent editor={editor} />
+      {pastePopover && (
+        <PasteLinkPopover
+          position={pastePopover.position}
+          onSelect={handlePastePopoverSelect}
+          onDismiss={() => setPastePopover(null)}
+        />
+      )}
     </div>
   )
 }
