@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { signIn } from "next-auth/react";
 import Link from "next/link";
+import { ArrowRight, Github, Mail } from "lucide-react";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -30,93 +31,159 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center px-4">
-      <div className="w-full max-w-md">
-        {/* Logo */}
-        <div className="text-center mb-8">
-          <Link href="/" className="inline-flex items-center gap-2">
-            <div className="w-10 h-10 bg-indigo-500 rounded-lg flex items-center justify-center font-bold text-white">
+    <div className="min-h-screen bg-black text-zinc-100 flex flex-col md:flex-row font-sans selection:bg-white/20">
+      {/* Left side - Branding/Hero (hidden on mobile) */}
+      <div className="hidden lg:flex flex-1 flex-col justify-between p-12 bg-[#050505] border-r border-white/[0.08] relative overflow-hidden">
+        {/* Structural Grid Background */}
+        <div className="absolute inset-0 z-0 bg-grid-white pointer-events-none mask-radial-gradient opacity-10" />
+
+        <div className="relative z-10">
+          <Link href="/" className="inline-flex items-center gap-3 group">
+            <div className="w-8 h-8 bg-white rounded-md flex items-center justify-center font-bold text-black text-xs tracking-tighter shadow-lg group-hover:scale-105 transition-transform duration-300">
               TF
             </div>
-            <span className="text-white font-semibold text-xl">TaskFlow</span>
+            <span className="text-white font-semibold text-lg tracking-tight">
+              TaskFlow
+            </span>
+            <div className="h-4 w-[1px] bg-white/[0.1] mx-1"></div>
+            <span className="text-[10px] uppercase tracking-widest text-zinc-500 font-medium">Enterprise</span>
           </Link>
         </div>
 
-        {/* Card */}
-        <div className="bg-slate-800/50 border border-slate-700 rounded-2xl p-8 backdrop-blur-sm">
-          <h2 className="text-2xl font-bold text-white mb-6 text-center">
-            Sign in to your account
-          </h2>
+        <div className="relative z-10 max-w-lg mt-auto mb-20">
+          <h1 className="text-4xl md:text-5xl font-bold mb-6 leading-[0.9] tracking-tighter text-white">
+            Access your <br/><span className="text-zinc-500">mission control.</span>
+          </h1>
+          <p className="text-zinc-500 text-lg leading-relaxed font-medium tracking-tight">
+            The powerful, self-hosted project management tool designed for teams who demand speed, flexibility, and absolute control.
+          </p>
+        </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label
-                htmlFor="email"
-                className="block text-sm font-medium text-slate-300 mb-1"
-              >
-                Email
-              </label>
-              <input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-2.5 bg-slate-900/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                placeholder="you@example.com"
-                required
-              />
-            </div>
-            <div>
-              <label
-                htmlFor="password"
-                className="block text-sm font-medium text-slate-300 mb-1"
-              >
-                Password
-              </label>
-              <input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-2.5 bg-slate-900/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                placeholder="••••••••"
-                required
-              />
+        <div className="relative z-10 flex items-center justify-between">
+          <p className="text-xs text-zinc-600 font-medium tracking-tight">
+            © {new Date().getFullYear()} TaskFlow Inc.
+          </p>
+          <div className="flex items-center gap-4 text-xs font-medium text-zinc-600">
+             <Link href="#" className="hover:text-zinc-300 transition-colors">Privacy</Link>
+             <Link href="#" className="hover:text-zinc-300 transition-colors">Terms</Link>
+          </div>
+        </div>
+      </div>
+
+      {/* Right side - Login Form */}
+      <div className="flex-1 flex items-center justify-center p-6 sm:p-12 relative">
+        <div className="w-full max-w-[400px] space-y-8 relative z-10">
+          
+          {/* Mobile Logo */}
+          <div className="lg:hidden text-center justify-center flex mb-10">
+            <Link href="/" className="inline-flex items-center gap-2">
+              <div className="w-8 h-8 bg-white rounded-md flex items-center justify-center font-bold text-black text-xs shadow-lg">
+                TF
+              </div>
+              <span className="text-white font-semibold text-lg tracking-tight">
+                TaskFlow
+              </span>
+            </Link>
+          </div>
+
+          <div className="text-center lg:text-left">
+            <h2 className="text-2xl font-bold tracking-tight text-white mb-2">
+              Log in to TaskFlow
+            </h2>
+            <p className="text-zinc-500 text-sm font-medium">
+              Enter your email and password to access your workspace.
+            </p>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-700">
+            <div className="space-y-4">
+              <div className="space-y-1.5">
+                <label
+                  htmlFor="email"
+                  className="block text-xs font-semibold text-zinc-400 uppercase tracking-widest"
+                >
+                  Email Address
+                </label>
+                <div className="relative">
+                  <input
+                    id="email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full px-4 py-2 bg-transparent border border-white/[0.1] rounded-md text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:ring-1 focus:ring-white/[0.2] focus:border-white/[0.2] transition-all bg-[#050505] shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]"
+                    placeholder="name@company.com"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label
+                    htmlFor="password"
+                    className="block text-xs font-semibold text-zinc-400 uppercase tracking-widest"
+                  >
+                    Password
+                  </label>
+                  <Link href="#" className="text-xs text-zinc-500 hover:text-white transition-colors">
+                    Forgot password?
+                  </Link>
+                </div>
+                <input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full px-4 py-2 bg-transparent border border-white/[0.1] rounded-md text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:ring-1 focus:ring-white/[0.2] focus:border-white/[0.2] transition-all bg-[#050505] shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]"
+                  placeholder="••••••••"
+                  required
+                />
+              </div>
             </div>
 
             {error && (
-              <div className="text-red-400 text-sm text-center">{error}</div>
+              <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-md text-red-400 text-xs font-medium flex items-center gap-2">
+                <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span>{error}</span>
+              </div>
             )}
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-indigo-500 hover:bg-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed text-white py-2.5 rounded-lg font-medium transition-colors"
+              className="w-full flex items-center justify-center gap-2 bg-white hover:bg-zinc-200 text-black py-2.5 rounded-md text-sm font-semibold transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed group active:scale-[0.98] mt-2 shadow-[0_1px_2px_rgba(0,0,0,0.5)]"
             >
-              {loading ? "Signing in..." : "Sign In"}
+              {loading ? (
+                <div className="w-4 h-4 border-2 border-zinc-900 border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <>
+                  Log in
+                  <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+                </>
+              )}
             </button>
           </form>
 
-          {/* OAuth Divider */}
-          <div className="relative my-6">
+          <div className="relative py-2">
             <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-slate-600" />
+              <div className="w-full border-t border-zinc-800" />
             </div>
             <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-slate-800/50 text-slate-400">
+              <span className="px-4 bg-[#09090b] text-zinc-500">
                 Or continue with
               </span>
             </div>
           </div>
 
-          {/* OAuth Buttons */}
           <div className="grid grid-cols-2 gap-3">
             <button
               onClick={() => signIn("google", { callbackUrl: "/dashboard" })}
-              className="flex items-center justify-center gap-2 px-4 py-2.5 border border-slate-600 rounded-lg text-slate-300 hover:bg-slate-700/50 transition-colors"
+              className="flex items-center justify-center gap-2 px-4 py-3 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700 rounded-xl text-zinc-300 transition-all duration-200 active:scale-[0.98]"
             >
               <svg className="w-5 h-5" viewBox="0 0 24 24">
-                <path
+                 <path
                   fill="currentColor"
                   d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"
                 />
@@ -137,23 +204,20 @@ export default function LoginPage() {
             </button>
             <button
               onClick={() => signIn("github", { callbackUrl: "/dashboard" })}
-              className="flex items-center justify-center gap-2 px-4 py-2.5 border border-slate-600 rounded-lg text-slate-300 hover:bg-slate-700/50 transition-colors"
+              className="flex items-center justify-center gap-2 px-4 py-3 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700 rounded-xl text-zinc-300 transition-all duration-200 active:scale-[0.98]"
             >
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
-              </svg>
+              <Github className="w-5 h-5" />
               GitHub
             </button>
           </div>
 
-          {/* Sign up link */}
-          <p className="mt-6 text-center text-sm text-slate-400">
+          <p className="text-center text-sm text-zinc-400">
             Don&apos;t have an account?{" "}
             <Link
               href="/register"
-              className="text-indigo-400 hover:text-indigo-300 font-medium"
+              className="text-white hover:text-indigo-400 font-medium transition-colors border-b border-transparent hover:border-indigo-400/50 pb-0.5"
             >
-              Sign up
+              Create workspace
             </Link>
           </p>
         </div>
