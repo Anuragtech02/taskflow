@@ -29,6 +29,7 @@ export function useSSE(workspaceId?: string, currentUserId?: string) {
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const reconnectAttemptsRef = useRef(0)
   const [isConnected, setIsConnected] = useState(false)
+  const [activeUsers, setActiveUsers] = useState<{ id: string; name: string; avatarUrl?: string | null }[]>([])
 
   const MAX_RECONNECT_ATTEMPTS = 5
 
@@ -66,6 +67,15 @@ export function useSSE(workspaceId?: string, currentUserId?: string) {
 
       eventSource.addEventListener("connected", () => {
         setIsConnected(true)
+      })
+
+      eventSource.addEventListener("presence_update", (event) => {
+        try {
+          const data = JSON.parse(event.data)
+          setActiveUsers(data.activeUsers || [])
+        } catch (error) {
+          console.error("Error parsing presence_update event:", error)
+        }
       })
 
       eventSource.addEventListener("task_updated", (event) => {
@@ -155,9 +165,24 @@ export function useSSE(workspaceId?: string, currentUserId?: string) {
     // Don't connect until we have a workspace to subscribe to
     if (!workspaceId) return
 
+    // Reset state for new workspace
+    setActiveUsers([])
+    reconnectAttemptsRef.current = 0
+
+    let cancelled = false
     connect()
 
+    // Fetch initial presence
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL || ""
+    fetch(`${baseUrl}/sse/presence?workspaceId=${workspaceId}`, { credentials: "include" })
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (!cancelled && data?.activeUsers) setActiveUsers(data.activeUsers)
+      })
+      .catch(() => {})
+
     return () => {
+      cancelled = true
       if (eventSourceRef.current) {
         eventSourceRef.current.close()
         eventSourceRef.current = null
@@ -177,5 +202,6 @@ export function useSSE(workspaceId?: string, currentUserId?: string) {
   return {
     reconnect,
     isConnected,
+    activeUsers,
   }
 }

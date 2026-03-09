@@ -68,6 +68,7 @@ interface CollaborativeEditorProps {
   showToolbar?: boolean
   onImageClick?: (src: string) => void
   onAddComment?: (data: { markId: string; quotedText: string }) => void
+  onCollaboratorsChange?: (users: { name: string; color: string }[]) => void
   onCommentMarkClick?: (markId: string) => void
   titleSlot?: React.ReactNode
   contentClassName?: string
@@ -117,6 +118,7 @@ export function CollaborativeEditor({
   showToolbar = true,
   onImageClick,
   onAddComment,
+  onCollaboratorsChange,
   onCommentMarkClick,
   titleSlot,
   contentClassName,
@@ -126,6 +128,10 @@ export function CollaborativeEditor({
   const [connected, setConnected] = useState(false)
   const [collaborators, setCollaborators] = useState<{ name: string; color: string }[]>([])
   const color = useRef(userColor || getRandomColor())
+
+  useEffect(() => {
+    onCollaboratorsChange?.(collaborators)
+  }, [collaborators, onCollaboratorsChange])
 
   // Fetch collab token
   useEffect(() => {
@@ -145,6 +151,8 @@ export function CollaborativeEditor({
   // Set up Hocuspocus provider
   useEffect(() => {
     if (!collabToken) return
+
+    setCollaborators([]);
 
     const wsUrl = process.env.NEXT_PUBLIC_WS_URL
       ? process.env.NEXT_PUBLIC_WS_URL

@@ -2,6 +2,7 @@
 
 import { Sidebar } from "@/components/sidebar"
 import { Notifications } from "@/components/notifications"
+import { ActiveUsers } from "@/components/active-users"
 import { KeyboardShortcuts } from "@/components/keyboard-shortcuts"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { Toaster } from "sonner"
@@ -17,7 +18,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   const workspaceId = workspaceMatch?.[1]
 
   // Initialize SSE connection for real-time updates
-  useSSE(workspaceId, session?.user?.id)
+  const { activeUsers } = useSSE(workspaceId, session?.user?.id)
 
   return (
     <TooltipProvider delayDuration={0}>
@@ -26,6 +27,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* Top bar with notifications */}
           <div className="flex items-center justify-end border-b px-4 py-2 bg-background">
+            <ActiveUsers users={activeUsers} className="mr-3" />
             <Notifications />
           </div>
           <main className="flex-1 overflow-auto">{children}</main>

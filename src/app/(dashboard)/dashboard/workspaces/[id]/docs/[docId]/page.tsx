@@ -175,6 +175,7 @@ export default function DocDetailPage() {
   const [versionsOpen, setVersionsOpen] = useState(false)
   const [pendingComment, setPendingComment] = useState<PendingComment | null>(null)
   const [activeCommentMarkId, setActiveCommentMarkId] = useState<string | null>(null)
+  const [docCollaborators, setDocCollaborators] = useState<{ name: string; color: string }[]>([])
 
   useEffect(() => {
     if (data?.document) {
@@ -357,7 +358,27 @@ export default function DocDetailPage() {
               {data.document.title}
             </span>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-3">
+            {docCollaborators.length > 1 && (
+              <div className="flex -space-x-1.5">
+                {docCollaborators.slice(0, 5).map((c, i) => (
+                  <div
+                    key={`${c.name}-${i}`}
+                    className="w-6 h-6 rounded-full border-2 border-background flex items-center justify-center text-[10px] font-medium text-white"
+                    style={{ backgroundColor: c.color }}
+                    title={c.name}
+                  >
+                    {c.name.charAt(0).toUpperCase()}
+                  </div>
+                ))}
+                {docCollaborators.length > 5 && (
+                  <div className="w-6 h-6 rounded-full border-2 border-background bg-muted flex items-center justify-center text-[10px] font-medium">
+                    +{docCollaborators.length - 5}
+                  </div>
+                )}
+              </div>
+            )}
+            <div className="flex items-center gap-1">
             <Button
               variant="ghost"
               size="sm"
@@ -391,6 +412,7 @@ export default function DocDetailPage() {
             >
               <Trash2 className="h-4 w-4" />
             </Button>
+            </div>
           </div>
         </div>
 
@@ -420,6 +442,7 @@ export default function DocDetailPage() {
                 setPendingComment(data)
                 setCommentsOpen(true)
               }}
+              onCollaboratorsChange={setDocCollaborators}
               onCommentMarkClick={(markId) => {
                 setActiveCommentMarkId(markId)
                 setCommentsOpen(true)

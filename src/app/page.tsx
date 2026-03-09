@@ -4,6 +4,8 @@ import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { FlickeringGrid } from "@/components/ui/flickering-grid";
+import { BorderBeam } from "@/components/ui/border-beam";
 import { ArrowRight, Search, Menu, MessageSquare, LayoutGrid, CheckSquare, Plus, Bell, Settings, User, Command, Zap, Database, ChevronRight, Layers, FileText, CornerDownRight } from "lucide-react";
 
 if (typeof window !== "undefined") {
@@ -60,7 +62,16 @@ export default function Home() {
     <div ref={containerRef} className="min-h-screen bg-black text-zinc-50 font-sans selection:bg-white/20 overflow-x-hidden">
       
       {/* Absolute Dark Grid & Very subtle glow */}
-      <div className="fixed inset-0 z-0 bg-grid-white pointer-events-none mask-radial-gradient opacity-10" />
+      <div className="fixed inset-0 z-0 pointer-events-none">
+        <FlickeringGrid
+           className="relative inset-0 z-0 size-full [mask-image:radial-gradient(circle_at_center,white,transparent_80%)]"
+           squareSize={3}
+           gridGap={8}
+           color="#ffffff"
+           maxOpacity={0.15}
+           flickerChance={0.1}
+        />
+      </div>
       <div className="fixed top-[-10%] left-1/2 -translate-x-1/2 w-[60vw] h-[40vh] bg-indigo-500/10 blur-[120px] rounded-full pointer-events-none z-0" />
 
       {/* Modern, minimalist navbar - TweakCN style */}
@@ -76,8 +87,8 @@ export default function Home() {
           </div>
           <nav className="hidden md:flex items-center gap-6 text-[13px] font-medium text-zinc-400">
             <a href="#features" className="hover:text-white transition-colors">Features</a>
-            <a href="https://github.com/apsimbiot/taskflow" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Documentation</a>
-            <a href="https://github.com/apsimbiot/taskflow" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">GitHub</a>
+            <a href="https://github.com/Anuragtech02/taskflow" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Documentation</a>
+            <a href="https://github.com/Anuragtech02/taskflow" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">GitHub</a>
           </nav>
           <div className="flex items-center gap-4">
             <Link href="/login" className="text-[13px] font-medium text-zinc-400 hover:text-white transition-colors hidden sm:block">
@@ -108,7 +119,7 @@ export default function Home() {
                Start Building
                <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
             </Link>
-            <a href="https://github.com/apsimbiot/taskflow" target="_blank" rel="noopener noreferrer" className="hero-cta inline-flex items-center justify-center gap-2 border border-white/[0.08] bg-black/50 backdrop-blur-md hover:bg-white/[0.05] text-white px-6 py-2.5 rounded-md text-sm font-medium transition-all active:scale-[0.98]">
+            <a href="https://github.com/Anuragtech02/taskflow" target="_blank" rel="noopener noreferrer" className="hero-cta inline-flex items-center justify-center gap-2 border border-white/[0.08] bg-black/50 backdrop-blur-md hover:bg-white/[0.05] text-white px-6 py-2.5 rounded-md text-sm font-medium transition-all active:scale-[0.98]">
                Read the Docs
                <span className="text-zinc-500 text-xs ml-2 font-mono">v2.0</span>
             </a>
@@ -230,14 +241,15 @@ export default function Home() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             
             {/* Component Showcase 1: Command Palette */}
-            <div className="bento-box lg:col-span-2 relative rounded-2xl border border-white/[0.08] bg-[#050505] p-1 flex flex-col overflow-hidden group">
+            <div className="bento-box lg:col-span-2 relative rounded-2xl border border-white/[0.1] bg-[#0A0A0A] p-1 flex flex-col overflow-hidden group">
+               <BorderBeam size={250} duration={12} delay={9} colorFrom="#818cf8" colorTo="#c084fc" />
                <div className="px-8 pt-8 pb-4 relative z-10">
                  <h3 className="text-xl font-semibold text-white mb-2 tracking-tight">Omnipresent Command Palette</h3>
                  <p className="text-zinc-400 font-medium text-sm w-3/4">Navigate exactly where you need to go. Assign tasks, switch workspaces, and apply templates purely from your keyboard.</p>
                </div>
                
                {/* Coded Command Palette Mockup */}
-               <div className="flex-1 mt-4 relative bg-black/50 border-t border-white/[0.05] flex items-center justify-center p-8 overflow-hidden rounded-b-xl">
+               <div className="flex-1 mt-4 relative bg-[#0f0f11] border-t border-white/[0.08] flex items-center justify-center p-8 overflow-hidden rounded-b-xl">
                   {/* Subtle Glow */}
                   <div className="absolute top-0 right-10 w-32 h-32 bg-indigo-500/10 blur-[50px] rounded-full pointer-events-none" />
                   
@@ -263,13 +275,14 @@ export default function Home() {
             </div>
 
             {/* Component Showcase 2: Multi-player */}
-            <div className="bento-box relative rounded-2xl border border-white/[0.08] bg-[#050505] p-1 flex flex-col overflow-hidden group">
+            <div className="bento-box relative rounded-2xl border border-white/[0.1] bg-[#0A0A0A] p-1 flex flex-col overflow-hidden group">
+               <BorderBeam size={250} duration={12} delay={9} colorFrom="#34d399" colorTo="#10b981" />
                <div className="px-8 pt-8 pb-4 relative z-10">
                  <h3 className="text-xl font-semibold text-white mb-2 tracking-tight">Real-Time Collab</h3>
                  <p className="text-zinc-400 font-medium text-sm">See exactly who is editing, instantly.</p>
                </div>
                
-               <div className="flex-1 mt-4 relative bg-black/50 border-t border-white/[0.05] rounded-b-xl p-8 overflow-hidden flex items-center justify-center">
+               <div className="flex-1 mt-4 relative bg-[#0f0f11] border-t border-white/[0.08] rounded-b-xl p-8 overflow-hidden flex items-center justify-center">
                   <div className="text-sm text-zinc-500 font-medium w-full relative">
                      The server component architecture allows us to fetch |
                      
@@ -302,7 +315,7 @@ export default function Home() {
           
           <div className="flex gap-8 text-xs text-zinc-500 font-medium">
              <a href="#" className="hover:text-zinc-200 transition-colors">Twitter X</a>
-             <a href="https://github.com/apsimbiot/taskflow" target="_blank" rel="noopener noreferrer" className="hover:text-zinc-200 transition-colors">GitHub Repository</a>
+             <a href="https://github.com/Anuragtech02/taskflow" target="_blank" rel="noopener noreferrer" className="hover:text-zinc-200 transition-colors">GitHub Repository</a>
              <a href="#" className="hover:text-zinc-200 transition-colors">Terms & Privacy</a>
           </div>
         </div>

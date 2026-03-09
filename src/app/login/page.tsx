@@ -4,6 +4,8 @@ import { useState } from "react";
 import { signIn } from "next-auth/react";
 import Link from "next/link";
 import { ArrowRight, Github, Mail } from "lucide-react";
+import { FlickeringGrid } from "@/components/ui/flickering-grid";
+import { BorderBeam } from "@/components/ui/border-beam";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -35,7 +37,16 @@ export default function LoginPage() {
       {/* Left side - Branding/Hero (hidden on mobile) */}
       <div className="hidden lg:flex flex-1 flex-col justify-between p-12 bg-[#050505] border-r border-white/[0.08] relative overflow-hidden">
         {/* Structural Grid Background */}
-        <div className="absolute inset-0 z-0 bg-grid-white pointer-events-none mask-radial-gradient opacity-10" />
+        <div className="absolute inset-0 z-0 pointer-events-none">
+          <FlickeringGrid
+             className="relative inset-0 z-0 size-full [mask-image:radial-gradient(circle_at_center,white,transparent_80%)]"
+             squareSize={3}
+             gridGap={8}
+             color="#ffffff"
+             maxOpacity={0.15}
+             flickerChance={0.1}
+          />
+        </div>
 
         <div className="relative z-10">
           <Link href="/" className="inline-flex items-center gap-3 group">
@@ -71,9 +82,9 @@ export default function LoginPage() {
       </div>
 
       {/* Right side - Login Form */}
-      <div className="flex-1 flex items-center justify-center p-6 sm:p-12 relative">
-        <div className="w-full max-w-[400px] space-y-8 relative z-10">
-          
+      <div className="flex-1 flex items-center justify-center p-6 sm:p-12 relative overflow-hidden bg-black">
+        <div className="w-full max-w-[400px] border border-white/[0.08] relative p-8 rounded-2xl bg-[#030303] shadow-2xl space-y-8 z-10 group overflow-hidden">
+          <BorderBeam size={200} duration={10} delay={9} colorFrom="#818cf8" colorTo="#c084fc" />
           {/* Mobile Logo */}
           <div className="lg:hidden text-center justify-center flex mb-10">
             <Link href="/" className="inline-flex items-center gap-2">
