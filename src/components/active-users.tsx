@@ -44,13 +44,13 @@ export function ActiveUsers({ users, max = 5, className }: ActiveUsersProps) {
 
   return (
     <div className={cn("flex items-center", className)}>
-      <div className="flex -space-x-1.5">
+      <div className="flex -space-x-1.5 isolate">
         {visible.map((user, i) => {
           const color = getUserColor(i)
           return (
             <Tooltip key={user.id}>
               <TooltipTrigger asChild>
-                <Avatar className={cn("h-7 w-7 border-2 border-background ring-1", color.ring)}>
+                <Avatar className={cn("relative h-7 w-7 border-2 border-background ring-1", color.ring)} style={{ zIndex: visible.length - i }}>
                   {user.avatarUrl ? (
                     <AvatarImage src={user.avatarUrl} alt={user.name} />
                   ) : null}
