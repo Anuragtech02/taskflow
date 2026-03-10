@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { ArrowRight } from "lucide-react";
@@ -76,9 +77,7 @@ export default function RegisterPage() {
 
         <div className="relative z-10">
           <Link href="/" className="inline-flex items-center gap-3 group">
-            <div className="w-8 h-8 bg-white rounded-md flex items-center justify-center font-bold text-black text-xs tracking-tighter shadow-lg group-hover:scale-105 transition-transform duration-300">
-              TF
-            </div>
+            <Image src="/logo.png" alt="TaskFlow Logo" width={48} height={48} className="w-12 h-12 object-contain shadow-lg group-hover:scale-105 transition-transform duration-300" />
             <span className="text-white font-semibold text-lg tracking-tight">
               TaskFlow
             </span>
@@ -114,9 +113,7 @@ export default function RegisterPage() {
           {/* Mobile Logo */}
           <div className="lg:hidden text-center justify-center flex mb-10">
             <Link href="/" className="inline-flex items-center gap-2">
-              <div className="w-8 h-8 bg-white rounded-md flex items-center justify-center font-bold text-black text-xs shadow-lg">
-                TF
-              </div>
+              <Image src="/logo.png" alt="TaskFlow Logo" width={48} height={48} className="w-12 h-12 object-contain shadow-lg" />
               <span className="text-white font-semibold text-lg tracking-tight">
                 TaskFlow
               </span>

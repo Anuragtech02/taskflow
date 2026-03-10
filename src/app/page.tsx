@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { FlickeringGrid } from "@/components/ui/flickering-grid";
@@ -78,9 +79,7 @@ export default function Home() {
       <header className="nav-header fixed top-0 w-full z-50 border-b border-white/[0.05] bg-black/60 backdrop-blur-xl supports-[backdrop-filter]:bg-black/40">
         <div className="max-w-[88rem] mx-auto px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-5 h-5 bg-white rounded-sm flex items-center justify-center font-bold text-black text-[10px] tracking-tighter">
-               TF
-            </div>
+            <Image src="/logo.png" alt="TaskFlow Logo" width={32} height={32} className="w-8 h-8 object-contain" />
             <span className="text-white font-medium text-sm tracking-tight">TaskFlow</span>
             <div className="h-4 w-[1px] bg-white/[0.1] mx-1"></div>
             <span className="hidden sm:flex text-[11px] uppercase tracking-widest text-zinc-500 font-medium">Enterprise</span>
@@ -307,9 +306,7 @@ export default function Home() {
       <footer className="relative z-10 border-t border-white/[0.08] bg-black pt-12 pb-12 px-6">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
           <div className="flex items-center gap-3">
-            <div className="w-5 h-5 bg-white rounded-sm flex items-center justify-center font-bold text-black text-[9px]">
-              TF
-            </div>
+            <Image src="/logo.png" alt="TaskFlow Logo" width={28} height={28} className="w-7 h-7 object-contain" />
             <span className="text-zinc-500 font-medium text-xs tracking-tight">TaskFlow Inc. © {new Date().getFullYear()}</span>
           </div>
           
