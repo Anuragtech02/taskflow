@@ -352,6 +352,7 @@ export function useTask(taskId: string | undefined) {
       return data.task || data
     },
     enabled: !!taskId,
+    staleTime: 0,
   })
 }
 

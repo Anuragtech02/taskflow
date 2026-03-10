@@ -547,7 +547,7 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
   const prevTaskIdRef = useRef<string | undefined>(undefined)
 
   useEffect(() => {
-    const newId = currentTask?.id
+    const newId = effectiveTaskId
     const oldId = prevTaskIdRef.current
 
     // If switching to a different task, flush pending save for the old one first
@@ -562,7 +562,7 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
       isDirtyRef.current = false
     }
 
-    if (currentTask) {
+    if (newId !== oldId) {
       // Clear any remaining timeout without saving (already flushed above if needed)
       if (autoSaveTimeoutRef.current) {
         clearTimeout(autoSaveTimeoutRef.current)
@@ -572,18 +572,31 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
       pendingSaveDataRef.current = null
       prevTaskIdRef.current = newId
 
-      setTitle(currentTask.title || "")
-      setDescription(currentTask.description as Record<string, unknown> | null)
-      setStatus(currentTask.status || "todo")
-      setPriority((currentTask.priority as Priority) || "none")
-      setDueDate(currentTask.dueDate ? new Date(currentTask.dueDate) : undefined)
-      setStartDate(currentTask.startDate ? new Date(currentTask.startDate) : undefined)
-      setTimeEstimate(currentTask.timeEstimate)
-      setTimerSeconds(currentTask.timeSpent || 0)
+      // Immediately populate from whatever data we have (task prop or fetched)
+      if (currentTask) {
+        setTitle(currentTask.title || "")
+        setDescription(currentTask.description as Record<string, unknown> | null)
+        setStatus(currentTask.status || "todo")
+        setPriority((currentTask.priority as Priority) || "none")
+        setDueDate(currentTask.dueDate ? new Date(currentTask.dueDate) : undefined)
+        setStartDate(currentTask.startDate ? new Date(currentTask.startDate) : undefined)
+        setTimeEstimate(currentTask.timeEstimate)
+        setTimerSeconds(currentTask.timeSpent || 0)
+      } else {
+        // No data yet — clear state so stale data from previous task isn't shown
+        setTitle("")
+        setDescription(null)
+        setStatus("todo")
+        setPriority("none")
+        setDueDate(undefined)
+        setStartDate(undefined)
+        setTimeEstimate(null)
+        setTimerSeconds(0)
+      }
       setIsTimerRunning(false)
       setNewComment(null)
     }
-  }, [currentTask?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [effectiveTaskId, currentTask?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Re-populate local state when fetchedTask data arrives after a save-triggered refetch,
   // but only if the user isn't actively editing (isDirtyRef is false)
@@ -1958,7 +1971,7 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
                   Description
                 </label>
                 <RichTextEditor
-                  key={currentTask?.id || task?.id || "new"}
+                  key={effectiveTaskId || "new"}
                   content={description}
                   onChange={(json) => { setDescription(json); debouncedSave(); }}
                   placeholder="Add a description..."
@@ -2563,7 +2576,7 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
               </Avatar>
               <div className="flex-1 min-w-0">
                 <RichTextEditor
-                  key={`comment-${currentTask?.id || task?.id || "new"}`}
+                  key={`comment-${effectiveTaskId || "new"}`}
                   content={newComment}
                   onChange={(json) => setNewComment(json)}
                   placeholder="Write a comment... Use @ to mention someone"

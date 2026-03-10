@@ -22,7 +22,7 @@ import Superscript from "@tiptap/extension-superscript"
 import Subscript from "@tiptap/extension-subscript"
 import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight"
 import { common, createLowlight } from "lowlight"
-import { useCallback, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { Bold, Italic, Underline as UnderlineIcon, Strikethrough, Code, Quote, List, ListOrdered, Image as ImageIcon, Link as LinkIcon, Table as TableIcon, Heading1, Heading2, Heading3, Undo, Redo } from "lucide-react"
 import { cn } from "@/lib/utils"
 import suggestion from "./mention-suggestion"
@@ -266,6 +266,22 @@ export function RichTextEditor({ content, onChange, placeholder, minHeight = "15
       onChange(e.getJSON())
     },
   })
+
+  // Sync editor content when the content prop changes externally
+  // (e.g. switching tasks without remounting the editor)
+  const contentRef = useRef(content)
+  useEffect(() => {
+    if (!editor || editor.isDestroyed) return
+    // Skip if content hasn't actually changed (same reference or same JSON)
+    if (content === contentRef.current) return
+    contentRef.current = content
+
+    const currentJSON = JSON.stringify(editor.getJSON())
+    const newJSON = JSON.stringify(content || "")
+    if (currentJSON !== newJSON) {
+      editor.commands.setContent(content || "", false)
+    }
+  }, [content, editor])
 
   // Keep ref in sync
   editorRef.current = editor
