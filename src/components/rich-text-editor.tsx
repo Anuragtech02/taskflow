@@ -275,7 +275,7 @@ export function RichTextEditor({ content, onChange, placeholder, minHeight = "15
     const currentJSON = JSON.stringify(editor.getJSON())
     const newJSON = JSON.stringify(content || "")
     if (currentJSON !== newJSON) {
-      editor.commands.setContent(content || "", false)
+      editor.commands.setContent(content || "", { emitUpdate: false })
     }
   }, [content, editor])
 
