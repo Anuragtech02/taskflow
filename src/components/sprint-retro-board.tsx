@@ -51,7 +51,6 @@ const CATEGORIES = [
 
 interface SprintRetroBoardProps {
   sprintId: string
-  sprintStatus: string
 }
 
 function RetroColumn({
@@ -267,7 +266,7 @@ function SummaryCard({ summary }: { summary: RetroSummary }) {
   )
 }
 
-export function SprintRetroBoard({ sprintId, sprintStatus }: SprintRetroBoardProps) {
+export function SprintRetroBoard({ sprintId }: SprintRetroBoardProps) {
   const { data, isLoading } = useSprintRetro(sprintId)
   const { data: session } = useSession()
   const currentUserId = session?.user?.id

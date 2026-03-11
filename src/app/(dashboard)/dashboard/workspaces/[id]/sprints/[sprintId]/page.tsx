@@ -623,7 +623,7 @@ export default function SprintDetailPage() {
 
         {/* Retro View */}
         {activeTab === "retro" && (
-          <SprintRetroBoard sprintId={sprintId} sprintStatus={sprint.status} />
+          <SprintRetroBoard sprintId={sprintId} />
         )}
       </div>
 
