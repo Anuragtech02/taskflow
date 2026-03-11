@@ -267,15 +267,11 @@ export function RichTextEditor({ content, onChange, placeholder, minHeight = "15
     },
   })
 
-  // Sync editor content when the content prop changes externally
-  // (e.g. switching tasks without remounting the editor)
-  const contentRef = useRef(content)
+  // Sync editor content when the content prop changes externally or when
+  // the editor becomes available (it's created async with immediatelyRender: false).
+  // The JSON comparison prevents unnecessary editor updates and feedback loops.
   useEffect(() => {
     if (!editor || editor.isDestroyed) return
-    // Skip if content hasn't actually changed (same reference or same JSON)
-    if (content === contentRef.current) return
-    contentRef.current = content
-
     const currentJSON = JSON.stringify(editor.getJSON())
     const newJSON = JSON.stringify(content || "")
     if (currentJSON !== newJSON) {
