@@ -39,6 +39,10 @@ import {
   addTaskToSprint,
   removeTaskFromSprint,
   moveTaskBetweenSprints,
+  fetchSprintRetro,
+  createRetroItem,
+  deleteRetroItem,
+  convertRetroItemToTask,
   fetchNotifications,
   markNotificationRead,
   markAllNotificationsRead,
@@ -620,6 +624,51 @@ export function useMoveTaskBetweenSprints() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["sprints"] })
       queryClient.invalidateQueries({ queryKey: ["tasks"] })
+    },
+  })
+}
+
+// ── Sprint Retro Hooks ──────────────────────────────────────────────────
+
+export function useSprintRetro(sprintId: string | undefined) {
+  return useQuery({
+    queryKey: ["sprint-retro", sprintId],
+    queryFn: () => fetchSprintRetro(sprintId!),
+    enabled: !!sprintId,
+  })
+}
+
+export function useCreateRetroItem() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ sprintId, category, content }: { sprintId: string; category: string; content: string }) =>
+      createRetroItem(sprintId, { category, content }),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["sprint-retro", variables.sprintId] })
+    },
+  })
+}
+
+export function useDeleteRetroItem() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ sprintId, itemId }: { sprintId: string; itemId: string }) =>
+      deleteRetroItem(sprintId, itemId),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["sprint-retro", variables.sprintId] })
+    },
+  })
+}
+
+export function useConvertRetroItemToTask() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ sprintId, itemId, listId }: { sprintId: string; itemId: string; listId?: string }) =>
+      convertRetroItemToTask(sprintId, itemId, listId),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["sprint-retro", variables.sprintId] })
+      queryClient.invalidateQueries({ queryKey: ["tasks"] })
+      queryClient.invalidateQueries({ queryKey: ["sprints"] })
     },
   })
 }

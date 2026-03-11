@@ -439,6 +439,49 @@ export async function moveTaskBetweenSprints(
   })
 }
 
+// ── Sprint Retrospective ──────────────────────────────────────────────────
+export interface RetroItemResponse {
+  id: string
+  sprintId: string
+  userId: string
+  category: "went_well" | "to_improve" | "action_item"
+  content: string
+  convertedTaskId: string | null
+  createdAt: string
+  user: { id: string; name: string | null; avatarUrl: string | null }
+}
+
+export interface RetroSummary {
+  totalTasks: number
+  completedTasks: number
+  carriedOverTasks: number
+  completionRate: number
+  byAssignee: { user: { id: string; name: string | null; avatarUrl: string | null }; completed: number; total: number }[]
+}
+
+export async function fetchSprintRetro(sprintId: string): Promise<{ items: RetroItemResponse[]; summary: RetroSummary }> {
+  return fetchJSON(`/sprints/${sprintId}/retro`)
+}
+
+export async function createRetroItem(sprintId: string, data: { category: string; content: string }): Promise<RetroItemResponse> {
+  const res = await fetchJSON<{ item: RetroItemResponse }>(`/sprints/${sprintId}/retro`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  })
+  return res.item
+}
+
+export async function deleteRetroItem(sprintId: string, itemId: string): Promise<void> {
+  await fetchJSON(`/sprints/${sprintId}/retro/${itemId}`, { method: "DELETE" })
+}
+
+export async function convertRetroItemToTask(sprintId: string, itemId: string, listId?: string): Promise<{ task: TaskResponse; addedToSprintId: string | null }> {
+  return fetchJSON(`/sprints/${sprintId}/retro/${itemId}/convert-to-task`, {
+    method: "POST",
+    body: JSON.stringify(listId ? { listId } : {}),
+  })
+}
+
 // ── Notifications ─────────────────────────────────────────────────────────
 export interface NotificationResponse {
   id: string

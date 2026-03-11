@@ -14,6 +14,7 @@ import {
   X,
   ArrowRight,
   FolderKanban,
+  MessageSquare,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -50,6 +51,7 @@ import {
   useStatuses,
 } from "@/hooks/useQueries"
 import { TaskDetailPanel } from "@/components/task-detail-panel"
+import { SprintRetroBoard } from "@/components/sprint-retro-board"
 import { cn } from "@/lib/utils"
 import type { TaskResponse, SprintResponse } from "@/lib/api"
 import { format, differenceInDays, eachDayOfInterval, isAfter, isBefore, isToday } from "date-fns"
@@ -294,6 +296,9 @@ export default function SprintDetailPage() {
 
   const sprint = data?.sprint
   const tasks: TaskResponse[] = data?.tasks ?? []
+
+  // Tab state
+  const [activeTab, setActiveTab] = useState<"board" | "retro">("board")
 
   // Task detail panel state
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
@@ -571,21 +576,55 @@ export default function SprintDetailPage() {
           </Card>
         </div>
 
-        {/* Kanban Board */}
-        <div>
-          <h2 className="text-lg font-semibold mb-4">Sprint Board</h2>
-          <div className="flex gap-4 overflow-x-auto pb-4">
-            {KANBAN_COLUMNS.map((column) => (
-              <KanbanColumn
-                key={column.key}
-                column={column}
-                tasks={tasksByStatus[column.key] ?? []}
-                sprintId={sprintId}
-                onTaskClick={(taskId) => setSelectedTaskId(taskId)}
-              />
-            ))}
-          </div>
+        {/* Tab Switcher */}
+        <div className="flex items-center gap-1 border-b">
+          <button
+            className={cn(
+              "flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors",
+              activeTab === "board"
+                ? "border-primary text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            )}
+            onClick={() => setActiveTab("board")}
+          >
+            <FolderKanban className="h-4 w-4" />
+            Board
+          </button>
+          <button
+            className={cn(
+              "flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors",
+              activeTab === "retro"
+                ? "border-primary text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            )}
+            onClick={() => setActiveTab("retro")}
+          >
+            <MessageSquare className="h-4 w-4" />
+            Retrospective
+          </button>
         </div>
+
+        {/* Board View */}
+        {activeTab === "board" && (
+          <div>
+            <div className="flex gap-4 overflow-x-auto pb-4">
+              {KANBAN_COLUMNS.map((column) => (
+                <KanbanColumn
+                  key={column.key}
+                  column={column}
+                  tasks={tasksByStatus[column.key] ?? []}
+                  sprintId={sprintId}
+                  onTaskClick={(taskId) => setSelectedTaskId(taskId)}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Retro View */}
+        {activeTab === "retro" && (
+          <SprintRetroBoard sprintId={sprintId} sprintStatus={sprint.status} />
+        )}
       </div>
 
       {/* Close Sprint Dialog */}
