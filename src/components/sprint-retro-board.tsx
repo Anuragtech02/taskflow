@@ -331,7 +331,7 @@ function AIAnalysisCard({ sprintId }: { sprintId: string }) {
             <p className="text-sm">Failed to generate analysis. Please try again.</p>
           </div>
         ) : analysis?.summary ? (
-          <div className="prose prose-sm dark:prose-invert max-w-none
+          <div className="columns-1 md:columns-2 gap-6 prose prose-sm dark:prose-invert max-w-none
             [&_h3]:text-sm [&_h3]:font-semibold [&_h3]:mt-0 [&_h3]:mb-2
             [&_h2]:text-sm [&_h2]:font-semibold [&_h2]:mt-0 [&_h2]:mb-2
             [&_ul]:space-y-1.5 [&_ol]:space-y-1.5
@@ -339,8 +339,8 @@ function AIAnalysisCard({ sprintId }: { sprintId: string }) {
             [&_p]:text-[13px] [&_p]:leading-relaxed [&_p]:text-muted-foreground
             [&_strong]:text-foreground [&_strong]:font-medium
           ">
-            {analysis.summary.split(/(?=^###?\s)/m).filter(Boolean).map((section, i, arr) => (
-              <div key={i} className={cn(i > 0 && "pt-4 mt-4 border-t border-border")}>
+            {analysis.summary.split(/(?=^###?\s)/m).filter(Boolean).map((section, i) => (
+              <div key={i} className={cn("break-inside-avoid-column", i > 0 && "pt-4 mt-4 border-t border-border")}>
                 <MarkdownRenderer content={section.trim()} />
               </div>
             ))}
