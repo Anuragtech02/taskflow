@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
-import { ChevronDown, Trash2, UserPlus, Tag, Flag, Circle, ArrowRightLeft } from "lucide-react"
+import { ChevronDown, Trash2, UserPlus, Tag, Flag, Circle, ArrowRightLeft, Archive } from "lucide-react"
 import { MoveToListPicker } from "@/components/move-to-list-picker"
 
 interface BulkActionsBarProps {
@@ -21,6 +21,7 @@ interface BulkActionsBarProps {
   onAssigneeAdd: (taskIds: string[], userId: string) => void
   onLabelAdd: (taskIds: string[], labelId: string) => void
   onDelete: (taskIds: string[]) => void
+  onArchive?: (taskIds: string[]) => void
   onMoveToList?: (taskIds: string[], listId: string) => void
   workspaceId?: string
   currentListId?: string
@@ -54,6 +55,7 @@ export function BulkActionsBar({
   onAssigneeAdd,
   onLabelAdd,
   onDelete,
+  onArchive,
   onMoveToList,
   workspaceId,
   currentListId,
@@ -194,6 +196,19 @@ export function BulkActionsBar({
               </Button>
             }
           />
+        )}
+
+        {/* Archive */}
+        {onArchive && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+            onClick={() => onArchive(taskIds)}
+          >
+            <Archive className="h-4 w-4 mr-2" />
+            Archive
+          </Button>
         )}
 
         <div className="flex-1" />

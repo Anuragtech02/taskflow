@@ -238,6 +238,7 @@ export interface TaskResponse {
   parentTaskId: string | null
   createdAt: string
   updatedAt: string
+  archivedAt: string | null
   activities?: ActivityResponse[]
   // Returned inline by GET /lists/:id/tasks (JSON columns on tasks table)
   blockedBy?: string[]
@@ -246,9 +247,25 @@ export interface TaskResponse {
   assignees?: { userId: string; user: { id: string; name: string | null; email: string; avatarUrl: string | null } }[]
 }
 
-export async function fetchTasks(listId: string): Promise<TaskResponse[]> {
-  const data = await fetchJSON<{ tasks: TaskResponse[] }>(`/lists/${listId}/tasks`)
+export async function fetchTasks(listId: string, includeArchived = false): Promise<TaskResponse[]> {
+  const params = includeArchived ? '?includeArchived=true' : ''
+  const data = await fetchJSON<{ tasks: TaskResponse[] }>(`/lists/${listId}/tasks${params}`)
   return data.tasks
+}
+
+export async function archiveTask(taskId: string) {
+  const res = await api.post(`/tasks/${taskId}/archive`)
+  return res.data
+}
+
+export async function unarchiveTask(taskId: string) {
+  const res = await api.post(`/tasks/${taskId}/unarchive`)
+  return res.data
+}
+
+export async function bulkArchiveTasks(taskIds: string[]) {
+  const res = await api.post('/tasks/bulk-archive', { taskIds })
+  return res.data
 }
 
 export async function createTask(

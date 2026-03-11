@@ -23,6 +23,9 @@ import {
   createTask,
   updateTask,
   deleteTask,
+  archiveTask,
+  unarchiveTask,
+  bulkArchiveTasks,
   fetchStatuses,
   createStatus,
   updateStatus,
@@ -335,10 +338,10 @@ export function useWorkspaceLists(workspaceId: string | undefined) {
 
 // ── Task Hooks ──────────────────────────────────────────────────────────────
 
-export function useTasks(listId: string | undefined) {
+export function useTasks(listId: string | undefined, includeArchived = false) {
   return useQuery<TaskResponse[]>({
-    queryKey: ["tasks", listId],
-    queryFn: () => fetchTasks(listId!),
+    queryKey: ["tasks", listId, { includeArchived }],
+    queryFn: () => fetchTasks(listId!, includeArchived),
     enabled: !!listId,
   })
 }
@@ -353,6 +356,38 @@ export function useTask(taskId: string | undefined) {
     },
     enabled: !!taskId,
     staleTime: 0,
+  })
+}
+
+export function useArchiveTask() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (taskId: string) => archiveTask(taskId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tasks"] })
+      queryClient.invalidateQueries({ queryKey: ["task"] })
+    },
+  })
+}
+
+export function useUnarchiveTask() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (taskId: string) => unarchiveTask(taskId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tasks"] })
+      queryClient.invalidateQueries({ queryKey: ["task"] })
+    },
+  })
+}
+
+export function useBulkArchiveTasks() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (taskIds: string[]) => bulkArchiveTasks(taskIds),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tasks"] })
+    },
   })
 }
 
