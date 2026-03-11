@@ -572,27 +572,22 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
       pendingSaveDataRef.current = null
       prevTaskIdRef.current = newId
 
-      // Immediately populate from whatever data we have (task prop or fetched)
-      if (currentTask) {
-        setTitle(currentTask.title || "")
-        setDescription(currentTask.description as Record<string, unknown> | null)
-        setStatus(currentTask.status || "todo")
-        setPriority((currentTask.priority as Priority) || "none")
-        setDueDate(currentTask.dueDate ? new Date(currentTask.dueDate) : undefined)
-        setStartDate(currentTask.startDate ? new Date(currentTask.startDate) : undefined)
-        setTimeEstimate(currentTask.timeEstimate)
-        setTimerSeconds(currentTask.timeSpent || 0)
-      } else {
-        // No data yet — clear state so stale data from previous task isn't shown
-        setTitle("")
-        setDescription(null)
-        setStatus("todo")
-        setPriority("none")
-        setDueDate(undefined)
-        setStartDate(undefined)
-        setTimeEstimate(null)
-        setTimerSeconds(0)
-      }
+      // Always clear state on task switch — only fetchedTask (validated by ID)
+      // should populate description, never the stale task prop from list cache.
+      // Title/status/priority are safe from the task prop (lightweight fields),
+      // but description must come from the full fetch to avoid cross-task bleed.
+      setTitle(currentTask?.title || "")
+      setDescription(
+        fetchedTask && fetchedTask.id === newId
+          ? (fetchedTask.description as Record<string, unknown> | null)
+          : null
+      )
+      setStatus(currentTask?.status || "todo")
+      setPriority((currentTask?.priority as Priority) || "none")
+      setDueDate(currentTask?.dueDate ? new Date(currentTask.dueDate) : undefined)
+      setStartDate(currentTask?.startDate ? new Date(currentTask.startDate) : undefined)
+      setTimeEstimate(currentTask?.timeEstimate ?? null)
+      setTimerSeconds(currentTask?.timeSpent || 0)
       setIsTimerRunning(false)
       setNewComment(null)
     }
