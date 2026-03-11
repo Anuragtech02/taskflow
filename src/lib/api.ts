@@ -482,6 +482,20 @@ export async function convertRetroItemToTask(sprintId: string, itemId: string, l
   })
 }
 
+// ── Sprint AI Analysis ────────────────────────────────────────────────────
+export interface SprintAnalysisResponse {
+  summary: string | null
+  generatedAt: string | null
+}
+
+export async function fetchSprintAnalysis(sprintId: string): Promise<SprintAnalysisResponse> {
+  return fetchJSON(`/sprints/${sprintId}/analyze`)
+}
+
+export async function generateSprintAnalysis(sprintId: string): Promise<SprintAnalysisResponse> {
+  return fetchJSON(`/sprints/${sprintId}/analyze`, { method: "POST" })
+}
+
 // ── Notifications ─────────────────────────────────────────────────────────
 export interface NotificationResponse {
   id: string

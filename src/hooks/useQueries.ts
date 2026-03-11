@@ -43,6 +43,8 @@ import {
   createRetroItem,
   deleteRetroItem,
   convertRetroItemToTask,
+  fetchSprintAnalysis,
+  generateSprintAnalysis,
   fetchNotifications,
   markNotificationRead,
   markAllNotificationsRead,
@@ -669,6 +671,26 @@ export function useConvertRetroItemToTask() {
       queryClient.invalidateQueries({ queryKey: ["sprint-retro", variables.sprintId] })
       queryClient.invalidateQueries({ queryKey: ["tasks"] })
       queryClient.invalidateQueries({ queryKey: ["sprints"] })
+    },
+  })
+}
+
+// ── Sprint AI Analysis Hooks ─────────────────────────────────────────────
+
+export function useSprintAnalysis(sprintId: string | undefined) {
+  return useQuery({
+    queryKey: ["sprint-analysis", sprintId],
+    queryFn: () => fetchSprintAnalysis(sprintId!),
+    enabled: !!sprintId,
+  })
+}
+
+export function useGenerateSprintAnalysis() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (sprintId: string) => generateSprintAnalysis(sprintId),
+    onSuccess: (_data, sprintId) => {
+      queryClient.invalidateQueries({ queryKey: ["sprint-analysis", sprintId] })
     },
   })
 }

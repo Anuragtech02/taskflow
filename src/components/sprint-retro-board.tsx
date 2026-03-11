@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Plus, Trash2, ArrowRight, CheckCircle2, ThumbsUp, AlertTriangle, Lightbulb, User } from "lucide-react"
+import { Plus, Trash2, ArrowRight, CheckCircle2, ThumbsUp, AlertTriangle, Lightbulb, User, Sparkles, RefreshCw, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
@@ -14,7 +14,10 @@ import {
   useCreateRetroItem,
   useDeleteRetroItem,
   useConvertRetroItemToTask,
+  useSprintAnalysis,
+  useGenerateSprintAnalysis,
 } from "@/hooks/useQueries"
+import { MarkdownRenderer } from "./markdown-renderer"
 import type { RetroItemResponse, RetroSummary } from "@/lib/api"
 import { toast } from "sonner"
 import { useSession } from "next-auth/react"
@@ -266,6 +269,70 @@ function SummaryCard({ summary }: { summary: RetroSummary }) {
   )
 }
 
+function AIAnalysisCard({ sprintId }: { sprintId: string }) {
+  const { data: analysis, isLoading } = useSprintAnalysis(sprintId)
+  const generateMutation = useGenerateSprintAnalysis()
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-sm font-medium flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-purple-500" />
+            AI Sprint Analysis
+          </CardTitle>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => generateMutation.mutate(sprintId, {
+              onSuccess: () => toast.success("Analysis generated"),
+              onError: () => toast.error("Failed to generate analysis"),
+            })}
+            disabled={generateMutation.isPending}
+          >
+            {generateMutation.isPending ? (
+              <>
+                <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" />
+                Analyzing...
+              </>
+            ) : analysis?.summary ? (
+              <>
+                <RefreshCw className="h-3.5 w-3.5 mr-2" />
+                Regenerate
+              </>
+            ) : (
+              <>
+                <Sparkles className="h-3.5 w-3.5 mr-2" />
+                Generate Analysis
+              </>
+            )}
+          </Button>
+        </div>
+        {analysis?.generatedAt && (
+          <p className="text-xs text-muted-foreground">
+            Generated {new Date(analysis.generatedAt).toLocaleString()}
+          </p>
+        )}
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="h-24 bg-muted animate-pulse rounded" />
+        ) : analysis?.summary ? (
+          <div className="prose prose-sm dark:prose-invert max-w-none">
+            <MarkdownRenderer content={analysis.summary} />
+          </div>
+        ) : (
+          <div className="text-center py-8 text-muted-foreground">
+            <Sparkles className="h-8 w-8 mx-auto mb-3 opacity-40" />
+            <p className="text-sm">Click &ldquo;Generate Analysis&rdquo; to get AI-powered insights about this sprint.</p>
+            <p className="text-xs mt-1">Analyzes cycle times, rework patterns, bottlenecks, and team workload.</p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
 export function SprintRetroBoard({ sprintId }: SprintRetroBoardProps) {
   const { data, isLoading } = useSprintRetro(sprintId)
   const { data: session } = useSession()
@@ -290,6 +357,8 @@ export function SprintRetroBoard({ sprintId }: SprintRetroBoardProps) {
   return (
     <div className="space-y-6">
       {summary && <SummaryCard summary={summary} />}
+
+      <AIAnalysisCard sprintId={sprintId} />
 
       <div className="flex flex-col md:flex-row gap-4">
         {CATEGORIES.map((cat) => (
