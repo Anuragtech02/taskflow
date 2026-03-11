@@ -1965,14 +1965,18 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
                 <label className="text-sm font-medium text-muted-foreground mb-2 block">
                   Description
                 </label>
-                <RichTextEditor
-                  key={effectiveTaskId || "new"}
-                  content={description}
-                  onChange={(json) => { setDescription(json); debouncedSave(); }}
-                  placeholder="Add a description..."
-                  minHeight="120px"
-                  onImageClick={setPreviewImage}
-                />
+                {fetchedTask && fetchedTask.id === effectiveTaskId ? (
+                  <RichTextEditor
+                    key={effectiveTaskId || "new"}
+                    content={description}
+                    onChange={(json) => { setDescription(json); debouncedSave(); }}
+                    placeholder="Add a description..."
+                    minHeight="120px"
+                    onImageClick={setPreviewImage}
+                  />
+                ) : (
+                  <div className="border rounded-md p-3 text-sm text-muted-foreground animate-pulse" style={{ minHeight: "120px" }} />
+                )}
               </div>
 
               <Separator />
