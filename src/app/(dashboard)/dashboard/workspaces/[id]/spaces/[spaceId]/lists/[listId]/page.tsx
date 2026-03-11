@@ -496,7 +496,7 @@ export default function ListPage({
 
   // Archived tasks
   const [showArchived, setShowArchived] = useState(false)
-  const { data: allTasksIncludingArchived } = useTasks(showArchived ? listId : undefined, true)
+  const { data: allTasksIncludingArchived } = useTasks(listId, true)
   const archivedTasks = useMemo(
     () => (allTasksIncludingArchived || []).filter(t => t.archivedAt != null),
     [allTasksIncludingArchived]
