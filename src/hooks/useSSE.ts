@@ -28,6 +28,7 @@ export function useSSE(workspaceId?: string, currentUserId?: string) {
   const eventSourceRef = useRef<EventSource | null>(null)
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const reconnectAttemptsRef = useRef(0)
+  const stableTimerRef = useRef<NodeJS.Timeout | null>(null)
   const [isConnected, setIsConnected] = useState(false)
   const [activeUsers, setActiveUsers] = useState<{ id: string; name: string; avatarUrl?: string | null }[]>([])
 
@@ -54,7 +55,11 @@ export function useSSE(workspaceId?: string, currentUserId?: string) {
       eventSource.onopen = () => {
         console.log("SSE connected")
         setIsConnected(true)
-        reconnectAttemptsRef.current = 0
+        // Only reset reconnect attempts after connection is stable for 5s
+        // (prevents infinite reconnect loops from QUIC/HTTP3 transport errors)
+        stableTimerRef.current = setTimeout(() => {
+          reconnectAttemptsRef.current = 0
+        }, 5000)
       }
 
       eventSource.onmessage = (event) => {
@@ -144,6 +149,10 @@ export function useSSE(workspaceId?: string, currentUserId?: string) {
       eventSource.onerror = () => {
         eventSource.close()
         setIsConnected(false)
+        if (stableTimerRef.current) {
+          clearTimeout(stableTimerRef.current)
+          stableTimerRef.current = null
+        }
 
         if (!reconnectTimeoutRef.current) {
           const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current), 30000)
@@ -190,6 +199,10 @@ export function useSSE(workspaceId?: string, currentUserId?: string) {
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current)
         reconnectTimeoutRef.current = null
+      }
+      if (stableTimerRef.current) {
+        clearTimeout(stableTimerRef.current)
+        stableTimerRef.current = null
       }
     }
   }, [connect, workspaceId])
