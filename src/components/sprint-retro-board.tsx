@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Plus, Trash2, ArrowRight, CheckCircle2, ThumbsUp, AlertTriangle, Lightbulb, User, Sparkles, RefreshCw, Loader2, Clock, RotateCcw, Target, Users, Zap } from "lucide-react"
+import { Plus, Trash2, ArrowRight, CheckCircle2, ThumbsUp, AlertTriangle, Lightbulb, User, Sparkles, RefreshCw, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
@@ -269,157 +269,91 @@ function SummaryCard({ summary }: { summary: RetroSummary }) {
   )
 }
 
-const ANALYSIS_SECTIONS = [
-  { icon: Zap, label: "Sprint Overview", color: "text-purple-500", bg: "bg-purple-50 dark:bg-purple-950/30", border: "border-purple-200 dark:border-purple-800" },
-  { icon: Clock, label: "Cycle Time Analysis", color: "text-orange-500", bg: "bg-orange-50 dark:bg-orange-950/30", border: "border-orange-200 dark:border-orange-800" },
-  { icon: RotateCcw, label: "Rework & Quality Issues", color: "text-red-500", bg: "bg-red-50 dark:bg-red-950/30", border: "border-red-200 dark:border-red-800" },
-  { icon: Target, label: "Impact & Priority Analysis", color: "text-blue-500", bg: "bg-blue-50 dark:bg-blue-950/30", border: "border-blue-200 dark:border-blue-800" },
-  { icon: Users, label: "Team Workload", color: "text-teal-500", bg: "bg-teal-50 dark:bg-teal-950/30", border: "border-teal-200 dark:border-teal-800" },
-  { icon: Lightbulb, label: "Recommendations", color: "text-amber-500", bg: "bg-amber-50 dark:bg-amber-950/30", border: "border-amber-200 dark:border-amber-800" },
-]
-
-function parseAnalysisSections(markdown: string): { title: string; content: string }[] {
-  // Split by ### headings (the main section headers from the AI)
-  const lines = markdown.split("\n")
-  const sections: { title: string; content: string }[] = []
-  let currentTitle = ""
-  let currentLines: string[] = []
-
-  for (const line of lines) {
-    const headingMatch = line.match(/^###?\s+(.+)/)
-    if (headingMatch) {
-      if (currentTitle || currentLines.length > 0) {
-        sections.push({ title: currentTitle, content: currentLines.join("\n").trim() })
-      }
-      currentTitle = headingMatch[1].replace(/^[^\w]*/, "").trim() // strip leading emoji
-      currentLines = []
-    } else {
-      currentLines.push(line)
-    }
-  }
-  if (currentTitle || currentLines.length > 0) {
-    sections.push({ title: currentTitle, content: currentLines.join("\n").trim() })
-  }
-
-  return sections.filter(s => s.content.length > 0)
-}
-
-function AnalysisSectionCard({ section, index }: { section: { title: string; content: string }; index: number }) {
-  const style = ANALYSIS_SECTIONS[index] || ANALYSIS_SECTIONS[0]
-  const Icon = style.icon
-
-  return (
-    <div className={cn("rounded-lg border p-4", style.bg, style.border)}>
-      <div className="flex items-center gap-2 mb-3">
-        <div className={cn("rounded-md p-1.5", style.bg)}>
-          <Icon className={cn("h-4 w-4", style.color)} />
-        </div>
-        <h4 className="font-semibold text-sm">{section.title}</h4>
-      </div>
-      <div className="prose prose-sm dark:prose-invert max-w-none [&_ul]:space-y-2 [&_ol]:space-y-2 [&_li]:leading-relaxed [&_p]:leading-relaxed [&_strong]:text-foreground">
-        <MarkdownRenderer content={section.content} />
-      </div>
-    </div>
-  )
-}
-
 function AIAnalysisCard({ sprintId }: { sprintId: string }) {
   const { data: analysis, isLoading } = useSprintAnalysis(sprintId)
   const generateMutation = useGenerateSprintAnalysis()
 
-  const sections = analysis?.summary ? parseAnalysisSections(analysis.summary) : []
-
   return (
-    <div className="space-y-4">
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-purple-500" />
-              AI Sprint Analysis
-            </CardTitle>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => generateMutation.mutate(sprintId, {
-                onSuccess: () => toast.success("Analysis generated"),
-                onError: () => toast.error("Failed to generate analysis"),
-              })}
-              disabled={generateMutation.isPending}
-            >
-              {generateMutation.isPending ? (
-                <>
-                  <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" />
-                  Analyzing...
-                </>
-              ) : analysis?.summary ? (
-                <>
-                  <RefreshCw className="h-3.5 w-3.5 mr-2" />
-                  Regenerate
-                </>
-              ) : (
-                <>
-                  <Sparkles className="h-3.5 w-3.5 mr-2" />
-                  Generate Analysis
-                </>
-              )}
-            </Button>
-          </div>
-          {analysis?.generatedAt && (
-            <p className="text-xs text-muted-foreground">
-              Generated {new Date(analysis.generatedAt).toLocaleString()}
-            </p>
-          )}
-        </CardHeader>
-        {(isLoading || generateMutation.isPending || generateMutation.isError || !analysis?.summary) && (
-          <CardContent>
-            {isLoading || generateMutation.isPending ? (
-              <div className="space-y-3">
-                <div className="h-20 bg-muted animate-pulse rounded-lg" />
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div className="h-32 bg-muted animate-pulse rounded-lg" />
-                  <div className="h-32 bg-muted animate-pulse rounded-lg" />
-                </div>
-              </div>
-            ) : generateMutation.isError ? (
-              <div className="text-center py-8 text-destructive">
-                <AlertTriangle className="h-8 w-8 mx-auto mb-3 opacity-60" />
-                <p className="text-sm">Failed to generate analysis. Please try again.</p>
-              </div>
+    <Card>
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-sm font-medium flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-purple-500" />
+            AI Sprint Analysis
+          </CardTitle>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => generateMutation.mutate(sprintId, {
+              onSuccess: () => toast.success("Analysis generated"),
+              onError: () => toast.error("Failed to generate analysis"),
+            })}
+            disabled={generateMutation.isPending}
+          >
+            {generateMutation.isPending ? (
+              <>
+                <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" />
+                Analyzing...
+              </>
+            ) : analysis?.summary ? (
+              <>
+                <RefreshCw className="h-3.5 w-3.5 mr-2" />
+                Regenerate
+              </>
             ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                <Sparkles className="h-8 w-8 mx-auto mb-3 opacity-40" />
-                <p className="text-sm">Click &ldquo;Generate Analysis&rdquo; to get AI-powered insights about this sprint.</p>
-                <p className="text-xs mt-1">Analyzes cycle times, rework patterns, bottlenecks, and team workload.</p>
-              </div>
+              <>
+                <Sparkles className="h-3.5 w-3.5 mr-2" />
+                Generate Analysis
+              </>
             )}
-          </CardContent>
+          </Button>
+        </div>
+        {analysis?.generatedAt && (
+          <p className="text-xs text-muted-foreground">
+            Generated {new Date(analysis.generatedAt).toLocaleString()}
+          </p>
         )}
-      </Card>
-
-      {sections.length > 0 && (
-        <>
-          {/* Overview section - full width */}
-          {sections[0] && (
-            <AnalysisSectionCard section={sections[0]} index={0} />
-          )}
-
-          {/* Middle sections - 2-column grid */}
-          {sections.length > 1 && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {sections.slice(1, -1).map((section, i) => (
-                <AnalysisSectionCard key={i} section={section} index={i + 1} />
-              ))}
-            </div>
-          )}
-
-          {/* Recommendations - full width at the bottom */}
-          {sections.length > 2 && (
-            <AnalysisSectionCard section={sections[sections.length - 1]} index={5} />
-          )}
-        </>
-      )}
-    </div>
+      </CardHeader>
+      <CardContent>
+        {isLoading || generateMutation.isPending ? (
+          <div className="space-y-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="space-y-2">
+                <div className="h-4 w-40 bg-muted animate-pulse rounded" />
+                <div className="h-3 w-full bg-muted animate-pulse rounded" />
+                <div className="h-3 w-3/4 bg-muted animate-pulse rounded" />
+              </div>
+            ))}
+          </div>
+        ) : generateMutation.isError ? (
+          <div className="text-center py-8 text-destructive">
+            <AlertTriangle className="h-8 w-8 mx-auto mb-3 opacity-60" />
+            <p className="text-sm">Failed to generate analysis. Please try again.</p>
+          </div>
+        ) : analysis?.summary ? (
+          <div className="prose prose-sm dark:prose-invert max-w-none
+            [&_h3]:text-sm [&_h3]:font-semibold [&_h3]:mt-0 [&_h3]:mb-2
+            [&_h2]:text-sm [&_h2]:font-semibold [&_h2]:mt-0 [&_h2]:mb-2
+            [&_ul]:space-y-1.5 [&_ol]:space-y-1.5
+            [&_li]:text-[13px] [&_li]:leading-relaxed [&_li]:text-muted-foreground
+            [&_p]:text-[13px] [&_p]:leading-relaxed [&_p]:text-muted-foreground
+            [&_strong]:text-foreground [&_strong]:font-medium
+          ">
+            {analysis.summary.split(/(?=^###?\s)/m).filter(Boolean).map((section, i, arr) => (
+              <div key={i} className={cn(i > 0 && "pt-4 mt-4 border-t border-border")}>
+                <MarkdownRenderer content={section.trim()} />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-8 text-muted-foreground">
+            <Sparkles className="h-8 w-8 mx-auto mb-3 opacity-40" />
+            <p className="text-sm">Click &ldquo;Generate Analysis&rdquo; to get AI-powered insights about this sprint.</p>
+            <p className="text-xs mt-1">Analyzes cycle times, rework patterns, bottlenecks, and team workload.</p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   )
 }
 
