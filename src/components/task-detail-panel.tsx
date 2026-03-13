@@ -693,15 +693,18 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
     }
   })
 
+  // Refs for latest title/taskId so flush callbacks always have current values
+  const titleRef = useRef(title)
+  titleRef.current = title
+  const taskIdRef = useRef(currentTask?.id || task?.id)
+  taskIdRef.current = currentTask?.id || task?.id
+
   // Flush pending saves on panel close
   useEffect(() => {
     if (!open) {
       // Flush unsaved title
-      if (titleDirtyRef.current) {
-        const effectiveId = currentTask?.id || task?.id
-        if (effectiveId) {
-          updateTaskMutation.mutate({ taskId: effectiveId, title })
-        }
+      if (titleDirtyRef.current && taskIdRef.current) {
+        updateTaskMutation.mutate({ taskId: taskIdRef.current, title: titleRef.current })
         titleDirtyRef.current = false
       }
       // Flush pending description debounce
@@ -713,12 +716,6 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
       }
     }
   }, [open, handleSave]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Flush pending saves on page unload / navigation
-  const titleRef = useRef(title)
-  titleRef.current = title
-  const taskIdRef = useRef(currentTask?.id || task?.id)
-  taskIdRef.current = currentTask?.id || task?.id
 
   useEffect(() => {
     const flush = () => {
