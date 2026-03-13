@@ -1038,9 +1038,8 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
                 onBlur={() => {
                   if (!titleDirtyRef.current) return
                   titleDirtyRef.current = false
-                  const effectiveId = currentTask?.id || task?.id
-                  if (effectiveId) {
-                    updateTaskMutation.mutate({ taskId: effectiveId, title })
+                  if (taskIdRef.current) {
+                    updateTaskMutation.mutate({ taskId: taskIdRef.current, title: titleRef.current })
                   }
                 }}
                 ref={(el) => {
