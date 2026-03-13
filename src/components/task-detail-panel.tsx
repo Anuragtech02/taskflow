@@ -534,17 +534,14 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
     }
   }
 
+  // Track whether the title has unsaved changes (saved on blur, not on debounce)
+  const titleDirtyRef = useRef(false)
+
   // Snapshot of the pending save data so we can flush it even after the task changes.
   // Updated every time debouncedSave is called (i.e. user makes an edit).
   const pendingSaveDataRef = useRef<{
     taskId: string
-    title: string
     description: Record<string, unknown> | undefined
-    status: string
-    priority: string
-    dueDate: string | undefined
-    startDate: string | undefined
-    timeEstimate: number | undefined
   } | null>(null)
 
   // Flush pending save for the OLD task before switching, then populate new task data
@@ -554,16 +551,23 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
     const newId = effectiveTaskId
     const oldId = prevTaskIdRef.current
 
-    // If switching to a different task, flush pending save for the old one first
-    if (oldId && newId !== oldId && isDirtyRef.current && autoSaveTimeoutRef.current) {
-      clearTimeout(autoSaveTimeoutRef.current)
-      autoSaveTimeoutRef.current = null
-      // Use the snapshot — it has the correct task ID and form values from before the switch
-      if (pendingSaveDataRef.current) {
-        updateTaskMutation.mutate(pendingSaveDataRef.current)
-        pendingSaveDataRef.current = null
+    // If switching to a different task, flush pending saves for the old one first
+    if (oldId && newId !== oldId) {
+      // Flush unsaved title
+      if (titleDirtyRef.current) {
+        updateTaskMutation.mutate({ taskId: oldId, title })
+        titleDirtyRef.current = false
       }
-      isDirtyRef.current = false
+      // Flush pending description debounce
+      if (isDirtyRef.current && autoSaveTimeoutRef.current) {
+        clearTimeout(autoSaveTimeoutRef.current)
+        autoSaveTimeoutRef.current = null
+        if (pendingSaveDataRef.current) {
+          updateTaskMutation.mutate(pendingSaveDataRef.current)
+          pendingSaveDataRef.current = null
+        }
+        isDirtyRef.current = false
+      }
     }
 
     if (newId !== oldId) {
@@ -573,6 +577,7 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
         autoSaveTimeoutRef.current = null
       }
       isDirtyRef.current = false
+      titleDirtyRef.current = false
       pendingSaveDataRef.current = null
       prevTaskIdRef.current = newId
 
@@ -643,15 +648,9 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
     if (!effectiveId) return
     updateTaskMutation.mutate({
       taskId: effectiveId,
-      title,
       description: (description ?? undefined) as string | Record<string, unknown> | undefined,
-      status,
-      priority,
-      dueDate: dueDate ? dueDate.toISOString() : undefined,
-      startDate: startDate ? startDate.toISOString() : undefined,
-      timeEstimate: timeEstimate ?? undefined,
     })
-  }, [currentTask, task, title, description, status, priority, dueDate, startDate, timeEstimate, updateTaskMutation])
+  }, [currentTask, task, description, updateTaskMutation])
 
   // Keep a ref to the latest handleSave so debounce timeouts never use a stale closure
   const handleSaveRef = useRef(handleSave)
@@ -660,18 +659,12 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
   // Debounced auto-save — only fires if user actually made changes
   const debouncedSave = useCallback(() => {
     isDirtyRef.current = true
-    // Snapshot current form data so flush-on-switch can use it even after task changes
+    // Snapshot current description so flush-on-switch can use it even after task changes
     const effectiveId = currentTask?.id || task?.id
     if (effectiveId) {
       pendingSaveDataRef.current = {
         taskId: effectiveId,
-        title,
         description: (description ?? undefined) as Record<string, unknown> | undefined,
-        status,
-        priority,
-        dueDate: dueDate ? dueDate.toISOString() : undefined,
-        startDate: startDate ? startDate.toISOString() : undefined,
-        timeEstimate: timeEstimate ?? undefined,
       }
     }
     if (autoSaveTimeoutRef.current) {
@@ -684,41 +677,57 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
         pendingSaveDataRef.current = null
       }
     }, 300)
-  }, [currentTask, task, title, description, status, priority, dueDate, startDate, timeEstimate])
+  }, [currentTask, task, description])
 
   // Keep pendingSaveDataRef in sync after each render so flush-on-switch
-  // never uses a stale snapshot (setTitle is async, closure captures old value)
+  // never uses a stale snapshot (setDescription is async, closure captures old value)
   useEffect(() => {
     if (isDirtyRef.current) {
       const effectiveId = currentTask?.id || task?.id
       if (effectiveId) {
         pendingSaveDataRef.current = {
           taskId: effectiveId,
-          title,
           description: (description ?? undefined) as Record<string, unknown> | undefined,
-          status,
-          priority,
-          dueDate: dueDate ? dueDate.toISOString() : undefined,
-          startDate: startDate ? startDate.toISOString() : undefined,
-          timeEstimate: timeEstimate ?? undefined,
         }
       }
     }
   })
 
-  // Flush pending save on panel close
+  // Flush pending saves on panel close
   useEffect(() => {
-    if (!open && isDirtyRef.current && autoSaveTimeoutRef.current) {
-      clearTimeout(autoSaveTimeoutRef.current)
-      autoSaveTimeoutRef.current = null
-      handleSave()
-      isDirtyRef.current = false
+    if (!open) {
+      // Flush unsaved title
+      if (titleDirtyRef.current) {
+        const effectiveId = currentTask?.id || task?.id
+        if (effectiveId) {
+          updateTaskMutation.mutate({ taskId: effectiveId, title })
+        }
+        titleDirtyRef.current = false
+      }
+      // Flush pending description debounce
+      if (isDirtyRef.current && autoSaveTimeoutRef.current) {
+        clearTimeout(autoSaveTimeoutRef.current)
+        autoSaveTimeoutRef.current = null
+        handleSave()
+        isDirtyRef.current = false
+      }
     }
-  }, [open, handleSave])
+  }, [open, handleSave]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Flush pending save on page unload / navigation
+  // Flush pending saves on page unload / navigation
+  const titleRef = useRef(title)
+  titleRef.current = title
+  const taskIdRef = useRef(currentTask?.id || task?.id)
+  taskIdRef.current = currentTask?.id || task?.id
+
   useEffect(() => {
     const flush = () => {
+      // Flush unsaved title
+      if (titleDirtyRef.current && taskIdRef.current) {
+        updateTaskMutation.mutate({ taskId: taskIdRef.current, title: titleRef.current })
+        titleDirtyRef.current = false
+      }
+      // Flush pending description debounce
       if (isDirtyRef.current) {
         if (autoSaveTimeoutRef.current) clearTimeout(autoSaveTimeoutRef.current)
         autoSaveTimeoutRef.current = null
@@ -1025,17 +1034,16 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
                 value={title}
                 onChange={(e) => {
                   setTitle(e.target.value);
-                  debouncedSave();
-                  // Auto-resize
+                  titleDirtyRef.current = true
                   e.target.style.height = "auto";
                   e.target.style.height = e.target.scrollHeight + "px";
                 }}
                 onBlur={() => {
-                  if (isDirtyRef.current) {
-                    if (autoSaveTimeoutRef.current) clearTimeout(autoSaveTimeoutRef.current)
-                    autoSaveTimeoutRef.current = null
-                    handleSave()
-                    isDirtyRef.current = false
+                  if (!titleDirtyRef.current) return
+                  titleDirtyRef.current = false
+                  const effectiveId = currentTask?.id || task?.id
+                  if (effectiveId) {
+                    updateTaskMutation.mutate({ taskId: effectiveId, title })
                   }
                 }}
                 ref={(el) => {
