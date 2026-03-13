@@ -553,9 +553,9 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
 
     // If switching to a different task, flush pending saves for the old one first
     if (oldId && newId !== oldId) {
-      // Flush unsaved title
+      // Flush unsaved title (use ref for latest value)
       if (titleDirtyRef.current) {
-        updateTaskMutation.mutate({ taskId: oldId, title })
+        updateTaskMutation.mutate({ taskId: oldId, title: titleRef.current })
         titleDirtyRef.current = false
       }
       // Flush pending description debounce
