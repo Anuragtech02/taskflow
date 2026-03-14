@@ -30,6 +30,8 @@ export default auth((req) => {
     pathname === "/" ||
     pathname === "/login" ||
     pathname === "/register" ||
+    pathname === "/forgot-password" ||
+    pathname === "/reset-password" ||
     pathname.startsWith("/api/auth") ||
     pathname.startsWith("/forms/") ||
     pathname.startsWith("/share/");
