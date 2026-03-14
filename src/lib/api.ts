@@ -247,25 +247,10 @@ export interface TaskResponse {
   assignees?: { userId: string; user: { id: string; name: string | null; email: string; avatarUrl: string | null } }[]
 }
 
-export async function fetchTasks(listId: string, includeArchived = false): Promise<TaskResponse[]> {
-  const params = includeArchived ? '?includeArchived=true' : ''
-  const data = await fetchJSON<{ tasks: TaskResponse[] }>(`/lists/${listId}/tasks${params}`)
-  return data.tasks
-}
-
-export async function archiveTask(taskId: string) {
-  const res = await api.post(`/tasks/${taskId}/archive`)
-  return res.data
-}
-
-export async function unarchiveTask(taskId: string) {
-  const res = await api.post(`/tasks/${taskId}/unarchive`)
-  return res.data
-}
-
-export async function bulkArchiveTasks(taskIds: string[]) {
-  const res = await api.post('/tasks/bulk-archive', { taskIds })
-  return res.data
+export async function fetchTasks(listId: string, includeClosed = false): Promise<{ tasks: TaskResponse[]; closedCount: number }> {
+  const params = includeClosed ? '?includeClosed=true' : ''
+  const data = await fetchJSON<{ tasks: TaskResponse[]; closedCount: number }>(`/lists/${listId}/tasks${params}`)
+  return data
 }
 
 export async function createTask(
@@ -369,6 +354,7 @@ export async function reorderStatuses(
 export interface SprintResponse {
   id: string
   workspaceId: string
+  spaceId: string
   name: string
   startDate: string
   endDate: string
@@ -382,8 +368,8 @@ export interface SprintDetailResponse {
   tasks: TaskResponse[]
 }
 
-export async function fetchSprints(workspaceId: string): Promise<SprintResponse[]> {
-  const data = await fetchJSON<{ sprints: SprintResponse[] }>(`/workspaces/${workspaceId}/sprints`)
+export async function fetchSprints(spaceId: string): Promise<SprintResponse[]> {
+  const data = await fetchJSON<{ sprints: SprintResponse[] }>(`/spaces/${spaceId}/sprints`)
   return data.sprints
 }
 
@@ -392,10 +378,10 @@ export async function fetchSprint(sprintId: string): Promise<SprintDetailRespons
 }
 
 export async function createSprint(
-  workspaceId: string,
+  spaceId: string,
   data: { name: string; startDate: string; endDate: string; goal?: string }
 ): Promise<{ sprint: SprintResponse }> {
-  return fetchJSON(`/workspaces/${workspaceId}/sprints`, {
+  return fetchJSON(`/spaces/${spaceId}/sprints`, {
     method: "POST",
     body: JSON.stringify(data),
   })

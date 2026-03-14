@@ -2,7 +2,7 @@
 
 import api from "@/lib/axios"
 import { useState, useEffect, useCallback, useMemo, useRef } from "react"
-import { X, Calendar, Clock, CheckSquare, MessageSquare, Play, Pause, Square, Trash2, Plus, Check, Search, Link2, ChevronRight, Tag, Paperclip, AlertCircle, ArrowUpRight, MoreHorizontal, CircleCheckBig, Flag, Users, Timer, Gauge, ChevronDown, FolderKanban, FileText, Film, Edit3, Lock, ExternalLink, List as ListIcon, Maximize, Minimize, Download, Archive, ArchiveRestore } from "lucide-react"
+import { X, Calendar, Clock, CheckSquare, MessageSquare, Play, Pause, Square, Trash2, Plus, Check, Search, Link2, ChevronRight, Tag, Paperclip, AlertCircle, ArrowUpRight, MoreHorizontal, CircleCheckBig, Flag, Users, Timer, Gauge, ChevronDown, FolderKanban, FileText, Film, Edit3, Lock, ExternalLink, List as ListIcon, Maximize, Minimize, Download } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -89,8 +89,6 @@ import {
   useCreateTaskReminder,
   useDeleteTaskReminder,
   useList,
-  useArchiveTask,
-  useUnarchiveTask,
 } from "@/hooks/useQueries"
 import { useQueryClient } from "@tanstack/react-query"
 import { useSession } from "next-auth/react"
@@ -302,8 +300,6 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
 
   const updateTaskMutation = useUpdateTask()
   const deleteTaskMutation = useDeleteTask()
-  const archiveTaskMutation = useArchiveTask()
-  const unarchiveTaskMutation = useUnarchiveTask()
 
   const queryClient = useQueryClient()
 
@@ -951,32 +947,6 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
               ))}
             </div>
             <div className="flex items-center gap-1 flex-shrink-0">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="text-muted-foreground hover:text-amber-600 h-8 w-8"
-                    onClick={() => {
-                      if (currentTask?.archivedAt) {
-                        unarchiveTaskMutation.mutate(effectiveTaskId!, {
-                          onSuccess: () => toast.success("Task unarchived"),
-                        })
-                      } else {
-                        archiveTaskMutation.mutate(effectiveTaskId!, {
-                          onSuccess: () => {
-                            toast.success("Task archived")
-                            onClose?.()
-                          },
-                        })
-                      }
-                    }}
-                  >
-                    {currentTask?.archivedAt ? <ArchiveRestore className="h-4 w-4" /> : <Archive className="h-4 w-4" />}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>{currentTask?.archivedAt ? "Unarchive" : "Archive"}</TooltipContent>
-              </Tooltip>
               <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
                 <AlertDialogTrigger asChild>
                   <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive h-8 w-8">
@@ -1006,22 +976,6 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
               </Button>
             </div>
           </div>
-
-          {/* Archived Banner */}
-          {currentTask?.archivedAt && (
-            <div className="flex items-center gap-2 px-5 py-2 bg-amber-50 dark:bg-amber-950/30 border-b border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400 text-sm">
-              <Archive className="h-4 w-4 flex-shrink-0" />
-              <span>This task is archived.</span>
-              <button
-                className="underline hover:no-underline font-medium"
-                onClick={() => unarchiveTaskMutation.mutate(effectiveTaskId!, {
-                  onSuccess: () => toast.success("Task unarchived"),
-                })}
-              >
-                Unarchive
-              </button>
-            </div>
-          )}
 
           {/* Scrollable Content */}
           <div className="flex-1 overflow-y-auto">

@@ -17,7 +17,8 @@ import {
   Pencil,
   Palette,
   User,
-  Archive,
+  CheckCircle2,
+  RotateCcw,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -27,7 +28,7 @@ import { Breadcrumb } from "@/components/breadcrumb"
 import { KanbanBoard } from "@/components/kanban-board"
 import { TaskDetailPanel } from "@/components/task-detail-panel"
 import { useTaskPanel } from "@/store/useTaskPanel"
-import { useTasks, useCreateTask, useUpdateTask, useDeleteTask, useBulkArchiveTasks, useUnarchiveTask, useStatuses, useCreateStatus, useUpdateStatus, useDeleteStatus, useWorkspaceMembers, useAddTaskAssignee, useRemoveTaskAssignee, useAddTaskLabel, useRemoveTaskLabel, useList, useLabels, useAllTaskAssignees, useAllTaskLabels, useWorkspaceLists } from "@/hooks/useQueries"
+import { useTasks, useCreateTask, useUpdateTask, useDeleteTask, useStatuses, useCreateStatus, useUpdateStatus, useDeleteStatus, useWorkspaceMembers, useAddTaskAssignee, useRemoveTaskAssignee, useAddTaskLabel, useRemoveTaskLabel, useList, useLabels, useAllTaskAssignees, useAllTaskLabels, useWorkspaceLists } from "@/hooks/useQueries"
 import { cn } from "@/lib/utils"
 import type { TaskResponse } from "@/lib/api"
 import { buildTaskTree, flattenTree, type TaskTreeNode } from "@/lib/task-tree"
@@ -471,14 +472,22 @@ export default function ListPage({
 }) {
   const { id: workspaceId, spaceId, listId } = use(params)
   const { data: list, isLoading: isListLoading } = useList(listId)
-  const { data: tasks, isLoading } = useTasks(listId)
+  const { data: allTasksData, isLoading } = useTasks(listId, true)
+  const tasks = useMemo(() => {
+    if (!allTasksData) return undefined
+    const closedStatuses = ["done", "closed", "complete"]
+    return allTasksData.tasks.filter(t => !closedStatuses.includes(t.status || ""))
+  }, [allTasksData])
+  const closedTasks = useMemo(() => {
+    if (!allTasksData) return []
+    const closedStatuses = ["done", "closed", "complete"]
+    return allTasksData.tasks.filter(t => closedStatuses.includes(t.status || ""))
+  }, [allTasksData])
   const { data: statuses } = useStatuses(listId)
   const { data: labels } = useLabels(workspaceId)
   const createTaskMutation = useCreateTask()
   const updateTaskMutation = useUpdateTask()
   const deleteTaskMutation = useDeleteTask()
-  const bulkArchiveMutation = useBulkArchiveTasks()
-  const unarchiveTaskMutation = useUnarchiveTask()
   const { data: workspaceMembers } = useWorkspaceMembers(workspaceId)
   const { data: workspaceLists } = useWorkspaceLists(workspaceId)
   const addTaskAssigneeMutation = useAddTaskAssignee()
@@ -494,13 +503,8 @@ export default function ListPage({
   // "My Tasks" toggle
   const [showMyTasks, setShowMyTasks] = useState(false)
 
-  // Archived tasks
-  const [showArchived, setShowArchived] = useState(false)
-  const { data: allTasksIncludingArchived } = useTasks(listId, true)
-  const archivedTasks = useMemo(
-    () => (allTasksIncludingArchived || []).filter(t => t.archivedAt != null),
-    [allTasksIncludingArchived]
-  )
+  // Closed tasks section
+  const [showClosed, setShowClosed] = useState(false)
 
   // Fetch all task assignees and labels for filtering/grouping
   const taskIds = useMemo(() => (tasks || []).map((t) => t.id), [tasks])
@@ -953,16 +957,6 @@ export default function ListPage({
       setSelectedTasks(new Set())
     },
     [deleteTaskMutation]
-  )
-
-  const handleBulkArchive = useCallback(
-    (taskIds: string[]) => {
-      bulkArchiveMutation.mutate(taskIds, {
-        onSuccess: () => toast.success(`${taskIds.length} task(s) archived`),
-      })
-      setSelectedTasks(new Set())
-    },
-    [bulkArchiveMutation]
   )
 
   const handleMoveToList = useCallback(
@@ -1716,50 +1710,49 @@ export default function ListPage({
         ) : null}
       </div>
 
-      {/* Archived Tasks Section */}
-      <div className="px-4 pb-4">
-        <button
-          className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors py-2"
-          onClick={() => setShowArchived(!showArchived)}
-        >
-          <Archive className="h-4 w-4" />
-          {showArchived ? "Hide archived tasks" : `Show archived tasks${archivedTasks.length > 0 ? ` (${archivedTasks.length})` : ""}`}
-          {showArchived ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-        </button>
-        {showArchived && archivedTasks.length > 0 && (
-          <div className="mt-2 space-y-1 opacity-60">
-            {archivedTasks.map(task => (
-              <div
-                key={task.id}
-                className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-muted/50 cursor-pointer group"
-                onClick={() => setSelectedTask(task.id)}
-              >
-                <Archive className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-                <span className="text-sm line-through flex-1 truncate">{task.title}</span>
-                <span className="text-xs text-muted-foreground">
-                  {task.archivedAt ? new Date(task.archivedAt).toLocaleDateString() : ""}
-                </span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 px-2 text-xs opacity-0 group-hover:opacity-100 transition-opacity"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    unarchiveTaskMutation.mutate(task.id, {
-                      onSuccess: () => toast.success("Task unarchived"),
-                    })
-                  }}
+      {/* Closed Tasks Section */}
+      {closedTasks.length > 0 && (
+        <div className="px-4 pb-4">
+          <button
+            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors py-2"
+            onClick={() => setShowClosed(!showClosed)}
+          >
+            <CheckCircle2 className="h-4 w-4" />
+            {showClosed ? "Hide closed tasks" : `${closedTasks.length} closed task${closedTasks.length !== 1 ? "s" : ""}`}
+            {showClosed ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+          </button>
+          {showClosed && (
+            <div className="mt-2 space-y-1 opacity-60">
+              {closedTasks.map(task => (
+                <div
+                  key={task.id}
+                  className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-muted/50 cursor-pointer group"
+                  onClick={() => setSelectedTask(task.id)}
                 >
-                  Unarchive
-                </Button>
-              </div>
-            ))}
-          </div>
-        )}
-        {showArchived && archivedTasks.length === 0 && (
-          <p className="text-sm text-muted-foreground py-2 pl-6">No archived tasks in this list.</p>
-        )}
-      </div>
+                  <CheckCircle2 className="h-3.5 w-3.5 text-green-500 flex-shrink-0" />
+                  <span className="text-sm line-through flex-1 truncate">{task.title}</span>
+                  <span className="text-xs text-muted-foreground capitalize">{task.status}</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-2 text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      updateTaskMutation.mutate(
+                        { taskId: task.id, status: "todo" },
+                        { onSuccess: () => toast.success("Task reopened") }
+                      )
+                    }}
+                  >
+                    <RotateCcw className="h-3 w-3 mr-1" />
+                    Reopen
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Bulk Actions Bar */}
       <BulkActionsBar
@@ -1771,7 +1764,6 @@ export default function ListPage({
         onAssigneeAdd={() => {}}
         onLabelAdd={() => {}}
         onDelete={handleBulkDelete}
-        onArchive={handleBulkArchive}
         onMoveToList={handleBulkMoveToList}
         workspaceId={workspaceId}
         currentListId={listId}

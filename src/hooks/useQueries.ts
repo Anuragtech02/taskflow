@@ -23,9 +23,6 @@ import {
   createTask,
   updateTask,
   deleteTask,
-  archiveTask,
-  unarchiveTask,
-  bulkArchiveTasks,
   fetchStatuses,
   createStatus,
   updateStatus,
@@ -344,10 +341,10 @@ export function useWorkspaceLists(workspaceId: string | undefined) {
 
 // ── Task Hooks ──────────────────────────────────────────────────────────────
 
-export function useTasks(listId: string | undefined, includeArchived = false) {
-  return useQuery<TaskResponse[]>({
-    queryKey: ["tasks", listId, { includeArchived }],
-    queryFn: () => fetchTasks(listId!, includeArchived),
+export function useTasks(listId: string | undefined, includeClosed = false) {
+  return useQuery<{ tasks: TaskResponse[]; closedCount: number }>({
+    queryKey: ["tasks", listId, { includeClosed }],
+    queryFn: () => fetchTasks(listId!, includeClosed),
     enabled: !!listId,
   })
 }
@@ -362,38 +359,6 @@ export function useTask(taskId: string | undefined) {
     },
     enabled: !!taskId,
     staleTime: 0,
-  })
-}
-
-export function useArchiveTask() {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: (taskId: string) => archiveTask(taskId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["tasks"] })
-      queryClient.invalidateQueries({ queryKey: ["task"] })
-    },
-  })
-}
-
-export function useUnarchiveTask() {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: (taskId: string) => unarchiveTask(taskId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["tasks"] })
-      queryClient.invalidateQueries({ queryKey: ["task"] })
-    },
-  })
-}
-
-export function useBulkArchiveTasks() {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: (taskIds: string[]) => bulkArchiveTasks(taskIds),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["tasks"] })
-    },
   })
 }
 
@@ -528,11 +493,11 @@ export function useReorderStatuses() {
 
 // ── Sprint Hooks ──────────────────────────────────────────────────────────
 
-export function useSprints(workspaceId: string | undefined) {
+export function useSprints(spaceId: string | undefined) {
   return useQuery<SprintResponse[]>({
-    queryKey: ["sprints", workspaceId],
-    queryFn: () => fetchSprints(workspaceId!),
-    enabled: !!workspaceId,
+    queryKey: ["sprints", spaceId],
+    queryFn: () => fetchSprints(spaceId!),
+    enabled: !!spaceId,
   })
 }
 
@@ -548,17 +513,17 @@ export function useCreateSprint() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: ({
-      workspaceId,
+      spaceId,
       ...data
     }: {
-      workspaceId: string
+      spaceId: string
       name: string
       startDate: string
       endDate: string
       goal?: string
-    }) => createSprint(workspaceId, data),
+    }) => createSprint(spaceId, data),
     onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["sprints", variables.workspaceId] })
+      queryClient.invalidateQueries({ queryKey: ["sprints", variables.spaceId] })
     },
   })
 }

@@ -67,13 +67,13 @@ function isAncestorOf(doc: DocumentResponse & { children: DocumentResponse[] }, 
 
 function DocTreeItem({
   doc,
-  workspaceId,
+  docsBasePath,
   currentDocId,
   depth = 0,
   onDelete,
 }: {
   doc: DocumentResponse & { children: DocumentResponse[] }
-  workspaceId: string
+  docsBasePath: string
   currentDocId: string
   depth?: number
   onDelete: (id: string) => void
@@ -113,7 +113,7 @@ function DocTreeItem({
         <button
           className="flex items-center gap-2 flex-1 text-left min-w-0"
           onClick={() =>
-            router.push(`/dashboard/workspaces/${workspaceId}/docs/${doc.id}`)
+            router.push(`${docsBasePath}/${doc.id}`)
           }
         >
           {hasChildren ? (
@@ -141,7 +141,7 @@ function DocTreeItem({
             <DocTreeItem
               key={child.id}
               doc={child}
-              workspaceId={workspaceId}
+              docsBasePath={docsBasePath}
               currentDocId={currentDocId}
               depth={depth + 1}
               onDelete={onDelete}
@@ -159,9 +159,15 @@ export default function DocDetailPage() {
   const { data: session } = useSession()
   const workspaceId = params.id as string
   const docId = params.docId as string
+  const spaceIdFromParams = params.spaceId as string | undefined
 
   const { data, isLoading, refetch } = useDocument(docId)
-  const { data: allDocuments } = useDocuments(workspaceId)
+  const spaceId = spaceIdFromParams || data?.document?.spaceId || undefined
+  const { data: allDocuments } = useDocuments(spaceId ?? undefined)
+
+  const docsBasePath = spaceId
+    ? `/dashboard/workspaces/${workspaceId}/spaces/${spaceId}/docs`
+    : `/dashboard/workspaces/${workspaceId}/docs`
   const updateMutation = useUpdateDocument()
   const deleteMutation = useDeleteDocument()
   const createMutation = useCreateDocument()
@@ -196,7 +202,7 @@ export default function DocDetailPage() {
     if (confirm("Delete this document?")) {
       deleteMutation.mutate(docId, {
         onSuccess: () => {
-          router.push(`/dashboard/workspaces/${workspaceId}/docs`)
+          router.push(docsBasePath)
         },
       })
     }
@@ -205,7 +211,7 @@ export default function DocDetailPage() {
   const handleCreateDoc = () => {
     if (!newDocTitle.trim()) return
     createMutation.mutate({
-      workspaceId,
+      spaceId: spaceId!,
       data: {
         title: newDocTitle.trim(),
         parentDocumentId: docId,
@@ -214,7 +220,7 @@ export default function DocDetailPage() {
       onSuccess: (data) => {
         setCreateOpen(false)
         setNewDocTitle("")
-        router.push(`/dashboard/workspaces/${workspaceId}/docs/${data.document.id}`)
+        router.push(`${docsBasePath}/${data.document.id}`)
       }
     })
   }
@@ -269,7 +275,7 @@ export default function DocDetailPage() {
             variant="ghost"
             size="sm"
             className="gap-1.5"
-            onClick={() => router.push(`/dashboard/workspaces/${workspaceId}/docs`)}
+            onClick={() => router.push(docsBasePath)}
           >
             <ArrowLeft className="h-4 w-4" />
             Docs
@@ -322,7 +328,7 @@ export default function DocDetailPage() {
               <DocTreeItem
                 key={doc.id}
                 doc={doc}
-                workspaceId={workspaceId}
+                docsBasePath={docsBasePath}
                 currentDocId={docId}
                 onDelete={handleSidebarDelete}
               />

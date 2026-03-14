@@ -289,12 +289,17 @@ export default function SprintDetailPage() {
   const router = useRouter()
   const workspaceId = params.id as string
   const sprintId = params.sprintId as string
+  const spaceIdFromParams = params.spaceId as string | undefined
 
   const { data, isLoading } = useSprint(sprintId)
   const updateSprintMutation = useUpdateSprint()
   const deleteSprintMutation = useDeleteSprint()
 
   const sprint = data?.sprint
+  const spaceId = spaceIdFromParams || sprint?.spaceId
+  const sprintsPath = spaceId
+    ? `/dashboard/workspaces/${workspaceId}/spaces/${spaceId}/sprints`
+    : `/dashboard/workspaces/${workspaceId}/sprints`
   const tasks: TaskResponse[] = data?.tasks ?? []
 
   // Tab state
@@ -400,7 +405,7 @@ export default function SprintDetailPage() {
   const handleDeleteSprint = () => {
     deleteSprintMutation.mutate(sprintId, {
       onSuccess: () => {
-        router.push(`/dashboard/workspaces/${workspaceId}/sprints`)
+        router.push(sprintsPath)
       },
     })
   }
@@ -425,7 +430,7 @@ export default function SprintDetailPage() {
         <h2 className="text-lg font-semibold">Sprint not found</h2>
         <Button
           variant="link"
-          onClick={() => router.push(`/dashboard/workspaces/${workspaceId}/sprints`)}
+          onClick={() => router.push(sprintsPath)}
         >
           Back to sprints
         </Button>
@@ -442,7 +447,7 @@ export default function SprintDetailPage() {
             variant="ghost"
             size="icon"
             className="h-8 w-8"
-            onClick={() => router.push(`/dashboard/workspaces/${workspaceId}/sprints`)}
+            onClick={() => router.push(sprintsPath)}
           >
             <ArrowLeft className="h-4 w-4" />
           </Button>

@@ -4,7 +4,7 @@ import api from "../axios"
 export interface DocumentResponse {
   id: string
   workspaceId: string
-  spaceId: string | null
+  spaceId: string
   title: string
   content: Record<string, unknown> | null
   icon: string | null
@@ -15,8 +15,8 @@ export interface DocumentResponse {
   updatedAt: string
 }
 
-export async function fetchDocuments(workspaceId: string): Promise<DocumentResponse[]> {
-  const res = await api.get(`/workspaces/${workspaceId}/documents`)
+export async function fetchDocuments(spaceId: string): Promise<DocumentResponse[]> {
+  const res = await api.get(`/spaces/${spaceId}/documents`)
   return res.data.documents || []
 }
 
@@ -26,15 +26,14 @@ export async function fetchDocument(documentId: string): Promise<{ document: Doc
 }
 
 export async function createDocument(
-  workspaceId: string,
+  spaceId: string,
   data: {
     title: string
-    spaceId?: string
     parentDocumentId?: string
     icon?: string
   }
 ): Promise<{ document: DocumentResponse }> {
-  const res = await api.post(`/workspaces/${workspaceId}/documents`, data)
+  const res = await api.post(`/spaces/${spaceId}/documents`, data)
   return res.data
 }
 

@@ -484,6 +484,30 @@ function SidebarSpaceItem({
         </ContextMenu>
         <CollapsibleContent>
           <div className="ml-4 mt-0.5 space-y-0.5">
+            <button
+              onClick={() =>
+                router.push(`/dashboard/workspaces/${workspaceId}/spaces/${space.id}/sprints`)
+              }
+              className={cn(
+                "flex items-center gap-2 w-full min-w-0 px-2 py-1 rounded-md text-sm transition-colors hover:bg-accent/50 text-left",
+                pathname?.includes(`/spaces/${space.id}/sprints`) && "bg-accent text-accent-foreground"
+              )}
+            >
+              <Zap className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+              <span className="truncate">Sprints</span>
+            </button>
+            <button
+              onClick={() =>
+                router.push(`/dashboard/workspaces/${workspaceId}/spaces/${space.id}/docs`)
+              }
+              className={cn(
+                "flex items-center gap-2 w-full min-w-0 px-2 py-1 rounded-md text-sm transition-colors hover:bg-accent/50 text-left",
+                pathname?.includes(`/spaces/${space.id}/docs`) && "bg-accent text-accent-foreground"
+              )}
+            >
+              <FileText className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+              <span className="truncate">Docs</span>
+            </button>
             {folders?.map((folder) => (
               <SidebarFolderItem
                 key={folder.id}
@@ -610,34 +634,6 @@ export function Sidebar() {
 
           {selectedWorkspaceId && (
             <>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8"
-                    onClick={() => router.push(`/dashboard/workspaces/${selectedWorkspaceId}/sprints`)}
-                  >
-                    <Zap className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="right">Sprints</TooltipContent>
-              </Tooltip>
-
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8"
-                    onClick={() => router.push(`/dashboard/workspaces/${selectedWorkspaceId}/docs`)}
-                  >
-                    <FileText className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="right">Docs</TooltipContent>
-              </Tooltip>
-
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
@@ -787,24 +783,6 @@ export function Sidebar() {
           <SearchCommand />
           {selectedWorkspaceId && (
             <>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="w-full justify-start gap-2 h-8"
-                onClick={() => router.push(`/dashboard/workspaces/${selectedWorkspaceId}/sprints`)}
-              >
-                <Zap className="h-4 w-4" />
-                <span className="text-sm">Sprints</span>
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="w-full justify-start gap-2 h-8"
-                onClick={() => router.push(`/dashboard/workspaces/${selectedWorkspaceId}/docs`)}
-              >
-                <FileText className="h-4 w-4" />
-                <span className="text-sm">Docs</span>
-              </Button>
               <Button
                 variant="ghost"
                 size="sm"

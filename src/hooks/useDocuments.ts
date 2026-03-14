@@ -8,11 +8,11 @@ import {
   type DocumentResponse,
 } from "@/lib/api/documents"
 
-export function useDocuments(workspaceId: string | undefined) {
+export function useDocuments(spaceId: string | undefined) {
   return useQuery<DocumentResponse[]>({
-    queryKey: ["documents", workspaceId],
-    queryFn: () => fetchDocuments(workspaceId!),
-    enabled: !!workspaceId,
+    queryKey: ["documents", spaceId],
+    queryFn: () => fetchDocuments(spaceId!),
+    enabled: !!spaceId,
   })
 }
 
@@ -28,19 +28,18 @@ export function useCreateDocument() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: ({
-      workspaceId,
+      spaceId,
       data,
     }: {
-      workspaceId: string
+      spaceId: string
       data: {
         title: string
-        spaceId?: string
         parentDocumentId?: string
         icon?: string
       }
-    }) => createDocument(workspaceId, data),
+    }) => createDocument(spaceId, data),
     onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["documents", variables.workspaceId] })
+      queryClient.invalidateQueries({ queryKey: ["documents", variables.spaceId] })
     },
   })
 }
