@@ -377,7 +377,7 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
   const { data: currentList } = useList(currentTask?.listId)
 
   // Sprint hooks
-  const { data: sprints = [] } = useSprints(workspaceId)
+  const { data: sprints = [] } = useSprints(currentList?.spaceId)
   const { data: currentSprint, isLoading: sprintLoading } = useTaskSprint(currentTask?.id)
   const assignToSprintMutation = useAssignTaskToSprint()
   const removeFromSprintMutation = useRemoveTaskFromAllSprints()
