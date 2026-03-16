@@ -221,6 +221,12 @@ function getActivityActionText(activity: ActivityResponse): string {
         const fieldName = humanizeField(field)
         // Skip showing order/position changes — too noisy
         if (field === "order") return `reordered this task`
+        // Parent task changes — don't show raw UUID
+        if (field === "parentTaskId" || field === "parent_task_id") {
+          if (!newValue || newValue === "empty") return "detached from parent task"
+          if (!oldValue || oldValue === "empty") return "moved under a parent task"
+          return "changed parent task"
+        }
         const from = humanize(oldValue)
         const to = humanize(newValue)
         if (!oldValue || oldValue === "empty") {
