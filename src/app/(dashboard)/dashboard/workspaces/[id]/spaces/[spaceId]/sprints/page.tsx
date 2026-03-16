@@ -214,12 +214,21 @@ function SprintCard({ sprint, workspaceId, spaceId }: { sprint: { id: string; na
           {sprint.status === "active" && (
             <div className="space-y-1">
               <div className="flex justify-between text-xs">
-                <span className="text-muted-foreground">Progress</span>
-                <span className="font-medium">{daysRemaining > 0 ? `${daysRemaining} days left` : "Ended"}</span>
+                <span className="text-muted-foreground">Timeline</span>
+                <span className="font-medium">
+                  {daysRemaining > 0
+                    ? `${daysRemaining} day${daysRemaining === 1 ? "" : "s"} left`
+                    : daysRemaining === 0
+                    ? "Last day"
+                    : `${Math.abs(daysRemaining)} day${Math.abs(daysRemaining) === 1 ? "" : "s"} overdue`}
+                </span>
               </div>
               <div className="h-2 bg-secondary rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-primary transition-all"
+                  className={cn(
+                    "h-full transition-all",
+                    daysRemaining < 0 ? "bg-destructive" : daysRemaining <= 1 ? "bg-orange-500" : "bg-primary"
+                  )}
                   style={{ width: `${progress}%` }}
                 />
               </div>
