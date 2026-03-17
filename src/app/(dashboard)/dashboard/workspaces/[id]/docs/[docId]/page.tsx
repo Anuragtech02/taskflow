@@ -16,6 +16,7 @@ import {
   Clock,
 } from "lucide-react"
 import { useDocument, useDocuments, useUpdateDocument, useDeleteDocument, useCreateDocument } from "@/hooks/useDocuments"
+import { SortableDocTree } from "@/components/documents/sortable-doc-tree"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { CollaborativeEditor } from "@/components/collaborative-editor"
@@ -35,7 +36,6 @@ import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
 import type { DocumentResponse } from "@/lib/api/documents"
 
-// Build document tree from flat list
 function buildDocTree(docs: DocumentResponse[]): (DocumentResponse & { children: DocumentResponse[] })[] {
   const map = new Map<string, DocumentResponse & { children: DocumentResponse[] }>()
   const roots: (DocumentResponse & { children: DocumentResponse[] })[] = []
@@ -319,20 +319,23 @@ export default function DocDetailPage() {
         </div>
 
         <div className="flex-1 overflow-auto p-2">
-          {tree.length === 0 ? (
+          {!allDocuments || allDocuments.length === 0 ? (
             <div className="text-sm text-muted-foreground p-3 text-center">
               No documents yet
             </div>
           ) : (
-            tree.map((doc) => (
-              <DocTreeItem
-                key={doc.id}
-                doc={doc}
-                docsBasePath={docsBasePath}
-                currentDocId={docId}
-                onDelete={handleSidebarDelete}
-              />
-            ))
+            <SortableDocTree
+              documents={allDocuments}
+              onNavigate={(id) => router.push(`${docsBasePath}/${id}`)}
+              onDelete={handleSidebarDelete}
+              onReparent={(docIdToMove, newParentId) => {
+                updateMutation.mutate({
+                  documentId: docIdToMove,
+                  data: { parentDocumentId: newParentId },
+                })
+              }}
+              activeDocId={docId}
+            />
           )}
         </div>
       </div>

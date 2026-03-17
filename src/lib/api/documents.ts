@@ -44,7 +44,7 @@ export async function updateDocument(
     content: Record<string, unknown>
     icon: string
     coverUrl: string
-    parentDocumentId: string
+    parentDocumentId: string | null
   }>
 ): Promise<{ document: DocumentResponse }> {
   const res = await api.patch(`/documents/${documentId}`, data)

@@ -57,7 +57,7 @@ export function useUpdateDocument() {
         content: Record<string, unknown>
         icon: string
         coverUrl: string
-        parentDocumentId: string
+        parentDocumentId: string | null
       }>
     }) => updateDocument(documentId, data),
     onSuccess: (_data, variables) => {

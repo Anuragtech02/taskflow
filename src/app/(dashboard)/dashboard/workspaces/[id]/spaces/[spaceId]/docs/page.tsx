@@ -5,12 +5,9 @@ import { useParams, useRouter } from "next/navigation"
 import {
   FileText,
   Plus,
-  ChevronRight,
-  Trash2,
   File,
-  FolderOpen,
 } from "lucide-react"
-import { useDocuments, useCreateDocument, useDeleteDocument } from "@/hooks/useDocuments"
+import { useDocuments, useCreateDocument, useDeleteDocument, useUpdateDocument } from "@/hooks/useDocuments"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import {
@@ -31,131 +28,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { cn } from "@/lib/utils"
-import type { DocumentResponse } from "@/lib/api/documents"
-
-function buildDocTree(docs: DocumentResponse[]): (DocumentResponse & { children: DocumentResponse[] })[] {
-  const map = new Map<string, DocumentResponse & { children: DocumentResponse[] }>()
-  const roots: (DocumentResponse & { children: DocumentResponse[] })[] = []
-
-  docs.forEach((doc) => {
-    map.set(doc.id, { ...doc, children: [] })
-  })
-
-  docs.forEach((doc) => {
-    const node = map.get(doc.id)!
-    if (doc.parentDocumentId && map.has(doc.parentDocumentId)) {
-      map.get(doc.parentDocumentId)!.children.push(node)
-    } else {
-      roots.push(node)
-    }
-  })
-
-  return roots
-}
-
-function DocTreeItem({
-  doc,
-  workspaceId,
-  spaceId,
-  depth = 0,
-  onDelete,
-}: {
-  doc: DocumentResponse & { children: DocumentResponse[] }
-  workspaceId: string
-  spaceId: string
-  depth?: number
-  onDelete: (id: string) => void
-}) {
-  const router = useRouter()
-  const hasChildren = doc.children && doc.children.length > 0
-  const [expanded, setExpanded] = useState(hasChildren)
-
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr)
-    const now = new Date()
-    const diff = now.getTime() - date.getTime()
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24))
-    if (days === 0) return "Today"
-    if (days === 1) return "Yesterday"
-    if (days < 7) return `${days} days ago`
-    return date.toLocaleDateString("en-US", { month: "short", day: "numeric" })
-  }
-
-  return (
-    <div>
-      <div
-        className={cn(
-          "group flex items-center gap-2 px-3 py-2 rounded-md hover:bg-accent/50 cursor-pointer transition-colors",
-        )}
-        style={{ paddingLeft: `${12 + depth * 20}px` }}
-      >
-        {hasChildren ? (
-          <button
-            onClick={(e) => {
-              e.stopPropagation()
-              setExpanded(!expanded)
-            }}
-            className="p-0.5"
-          >
-            <ChevronRight
-              className={cn(
-                "h-4 w-4 text-muted-foreground transition-transform",
-                expanded && "rotate-90"
-              )}
-            />
-          </button>
-        ) : (
-          <span className="w-5" />
-        )}
-        <button
-          className="flex items-center gap-2 flex-1 text-left min-w-0"
-          onClick={() =>
-            router.push(`/dashboard/workspaces/${workspaceId}/spaces/${spaceId}/docs/${doc.id}`)
-          }
-        >
-          {hasChildren ? (
-            <FolderOpen className="h-4 w-4 text-muted-foreground" />
-          ) : (
-            <FileText className="h-4 w-4 text-muted-foreground" />
-          )}
-          <span className="text-sm truncate">{doc.title}</span>
-          <span className="text-xs text-muted-foreground ml-auto mr-2 shrink-0">
-            {formatDate(doc.updatedAt)}
-          </span>
-        </button>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
-          onClick={(e) => {
-            e.stopPropagation()
-            onDelete(doc.id)
-          }}
-        >
-          <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
-        </Button>
-      </div>
-      {expanded && hasChildren && (
-        <div>
-          {doc.children.map((child: any) => (
-            <DocTreeItem
-              key={child.id}
-              doc={child}
-              workspaceId={workspaceId}
-              spaceId={spaceId}
-              depth={depth + 1}
-              onDelete={onDelete}
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
+import { SortableDocTree } from "@/components/documents/sortable-doc-tree"
 
 export default function SpaceDocsPage() {
   const params = useParams()
+  const router = useRouter()
   const workspaceId = params.id as string
   const spaceId = params.spaceId as string
   const [createOpen, setCreateOpen] = useState(false)
@@ -165,8 +42,7 @@ export default function SpaceDocsPage() {
   const { data: documents, isLoading } = useDocuments(spaceId)
   const createMutation = useCreateDocument()
   const deleteMutation = useDeleteDocument()
-
-  const router = useRouter()
+  const updateDocMutation = useUpdateDocument()
 
   const handleCreate = () => {
     if (!title.trim()) return
@@ -192,7 +68,16 @@ export default function SpaceDocsPage() {
     }
   }
 
-  const tree = documents ? buildDocTree(documents) : []
+  const handleReparent = (docId: string, newParentId: string | null) => {
+    updateDocMutation.mutate({
+      documentId: docId,
+      data: { parentDocumentId: newParentId },
+    })
+  }
+
+  const handleNavigate = (docId: string) => {
+    router.push(`/dashboard/workspaces/${workspaceId}/spaces/${spaceId}/docs/${docId}`)
+  }
 
   if (isLoading) {
     return (
@@ -279,7 +164,7 @@ export default function SpaceDocsPage() {
         </Dialog>
       </div>
 
-      {tree.length === 0 ? (
+      {!documents || documents.length === 0 ? (
         <Card className="border-dashed">
           <CardContent className="flex flex-col items-center justify-center py-12">
             <File className="h-12 w-12 text-muted-foreground mb-4" />
@@ -296,15 +181,13 @@ export default function SpaceDocsPage() {
       ) : (
         <Card>
           <CardContent className="p-2">
-            {tree.map((doc) => (
-              <DocTreeItem
-                key={doc.id}
-                doc={doc}
-                workspaceId={workspaceId}
-                spaceId={spaceId}
-                onDelete={handleDelete}
-              />
-            ))}
+            <SortableDocTree
+              documents={documents}
+              onNavigate={handleNavigate}
+              onDelete={handleDelete}
+              onReparent={handleReparent}
+              showDates
+            />
           </CardContent>
         </Card>
       )}
