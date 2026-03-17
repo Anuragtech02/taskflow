@@ -424,8 +424,10 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
       for (const file of Array.from(files)) {
         await uploadAttachmentMutation.mutateAsync({ taskId: effectiveId, file })
       }
+      toast.success("File uploaded")
     } catch (error) {
       console.error("Upload failed:", error)
+      toast.error("Upload failed")
     } finally {
       setIsUploading(false)
     }
@@ -480,8 +482,10 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
     if (!effectiveId) return
     try {
       await deleteAttachmentMutation.mutateAsync({ taskId: effectiveId, attachmentId })
+      toast.success("Attachment deleted")
     } catch (error) {
       console.error("Delete failed:", error)
+      toast.error("Failed to delete attachment")
     }
   }
 
@@ -517,8 +521,10 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
     if (!effectiveId) return
     try {
       await addDependencyMutation.mutateAsync({ taskId: effectiveId, blockedTaskId: blockingTaskId })
+      toast.success("Dependency added")
     } catch (error) {
       console.error("Add dependency failed:", error)
+      toast.error("Failed to add dependency")
     }
     setDepSearchOpen(false)
     setDepSearchQuery("")
@@ -531,8 +537,10 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
     if (!effectiveId) return
     try {
       await removeDependencyMutation.mutateAsync({ taskId: effectiveId, blockedTaskId: blockingTaskId })
+      toast.success("Dependency removed")
     } catch (error) {
       console.error("Remove dependency failed:", error)
+      toast.error("Failed to remove dependency")
     }
   }
 
@@ -744,7 +752,9 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
   const handleDelete = useCallback(() => {
     const effectiveId = currentTask?.id || task?.id
     if (!effectiveId) return
-    deleteTaskMutation.mutate(effectiveId)
+    deleteTaskMutation.mutate(effectiveId, {
+      onSuccess: () => toast.success("Task deleted"),
+    })
     setIsDeleteDialogOpen(false)
     onClose()
   }, [currentTask, task, deleteTaskMutation, onClose])
@@ -803,6 +813,8 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
     createSubtaskMutation.mutate({
       taskId: effectiveId,
       title: newSubtask.trim(),
+    }, {
+      onSuccess: () => toast.success("Subtask added"),
     })
     setNewSubtask("")
   }
@@ -823,6 +835,8 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
     deleteSubtaskMutation.mutate({
       taskId: effectiveId,
       subtaskId,
+    }, {
+      onSuccess: () => toast.success("Subtask deleted"),
     })
   }
 
@@ -851,6 +865,8 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
     createCommentMutation.mutate({
       taskId: effectiveId,
       content: JSON.stringify(newComment),
+    }, {
+      onSuccess: () => toast.success("Comment added"),
     })
     setNewComment(null)
   }
@@ -862,6 +878,8 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
     addAssigneeMutation.mutate({
       taskId: effectiveId,
       userId: member.id,
+    }, {
+      onSuccess: () => toast.success("Assignee added"),
     })
     setAssigneeSearch("")
   }
@@ -872,6 +890,8 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
     removeAssigneeMutation.mutate({
       taskId: effectiveId,
       userId,
+    }, {
+      onSuccess: () => toast.success("Assignee removed"),
     })
   }
 
@@ -971,8 +991,9 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
                     <AlertDialogAction
                       onClick={handleDelete}
                       className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      disabled={deleteTaskMutation.isPending}
                     >
-                      Delete
+                      {deleteTaskMutation.isPending ? "Deleting..." : "Delete"}
                     </AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
@@ -1030,6 +1051,8 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
                         updateTaskMutation.mutate({
                           taskId: effectiveId,
                           status: value,
+                        }, {
+                          onSuccess: () => toast.success("Status updated"),
                         })
                       }
                     }}
@@ -1079,6 +1102,8 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
                         updateTaskMutation.mutate({
                           taskId: effectiveId,
                           priority: newPriority,
+                        }, {
+                          onSuccess: () => toast.success("Priority updated"),
                         })
                       }
                     }}
@@ -1142,6 +1167,8 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
                               updateTaskMutation.mutate({
                                 taskId: effectiveId,
                                 startDate: date ? date.toISOString() : null,
+                              }, {
+                                onSuccess: () => toast.success("Start date updated"),
                               })
                             }
                           }}
@@ -1175,6 +1202,8 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
                               updateTaskMutation.mutate({
                                 taskId: effectiveId,
                                 dueDate: date ? date.toISOString() : null,
+                              }, {
+                                onSuccess: () => toast.success("Due date updated"),
                               })
                             }
                           }}
@@ -1313,10 +1342,13 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
                           onClick={() => {
                             const effectiveId = currentTask?.id || task?.id
                             if (effectiveId) {
-                              removeTaskLabelMutation.mutate({ taskId: effectiveId, labelId: label.id })
+                              removeTaskLabelMutation.mutate({ taskId: effectiveId, labelId: label.id }, {
+                                onSuccess: () => toast.success("Label removed"),
+                              })
                             }
                           }}
                           className="ml-1 hover:text-destructive"
+                          disabled={removeTaskLabelMutation.isPending}
                         >
                           <X className="h-3 w-3" />
                         </button>
@@ -1345,9 +1377,13 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
                                           const effectiveId = currentTask?.id || task?.id
                                           if (!effectiveId) return
                                           if (isOnTask) {
-                                            removeTaskLabelMutation.mutate({ taskId: effectiveId, labelId: label.id })
+                                            removeTaskLabelMutation.mutate({ taskId: effectiveId, labelId: label.id }, {
+                                              onSuccess: () => toast.success("Label removed"),
+                                            })
                                           } else {
-                                            addTaskLabelMutation.mutate({ taskId: effectiveId, labelId: label.id })
+                                            addTaskLabelMutation.mutate({ taskId: effectiveId, labelId: label.id }, {
+                                              onSuccess: () => toast.success("Label added"),
+                                            })
                                           }
                                         }}
                                         className="flex-1 px-2 py-1 text-xs rounded-full border transition-colors hover:opacity-80 text-left"
@@ -1367,7 +1403,7 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
                                             onClick={() => {
                                               const newName = window.prompt("Rename label:", label.name)
                                               if (newName && newName.trim() && newName.trim() !== label.name && workspaceId) {
-                                                updateLabelMutation.mutate({ workspaceId, labelId: label.id, name: newName.trim() })
+                                                updateLabelMutation.mutate({ workspaceId, labelId: label.id, name: newName.trim() }, { onSuccess: () => toast.success("Label renamed") })
                                               }
                                             }}
                                           >
@@ -1378,7 +1414,7 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
                                             className="text-destructive focus:text-destructive"
                                             onClick={() => {
                                               if (workspaceId) {
-                                                deleteLabelMutation.mutate({ workspaceId, labelId: label.id })
+                                                deleteLabelMutation.mutate({ workspaceId, labelId: label.id }, { onSuccess: () => toast.success("Label deleted") })
                                               }
                                             }}
                                           >
@@ -1499,9 +1535,13 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
                       const effectiveId = currentTask?.id || task?.id
                       if (!effectiveId) return
                       if (value === "none") {
-                        removeFromSprintMutation.mutate({ taskId: effectiveId })
+                        removeFromSprintMutation.mutate({ taskId: effectiveId }, {
+                          onSuccess: () => toast.success("Removed from sprint"),
+                        })
                       } else {
-                        assignToSprintMutation.mutate({ taskId: effectiveId, sprintId: value })
+                        assignToSprintMutation.mutate({ taskId: effectiveId, sprintId: value }, {
+                          onSuccess: () => toast.success("Sprint updated"),
+                        })
                       }
                     }}
                   >
@@ -1582,6 +1622,8 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
                                     deleteCustomFieldMutation.mutate({
                                       listId,
                                       fieldId: field.id,
+                                    }, {
+                                      onSuccess: () => toast.success("Custom field deleted"),
                                     })
                                   }
                                 }}
@@ -1950,6 +1992,8 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
                                   name: newFieldName.trim(),
                                   type: newFieldType,
                                   options,
+                                }, {
+                                  onSuccess: () => toast.success("Custom field created"),
                                 })
                                 setNewFieldName("")
                                 setNewFieldType("text")
@@ -1957,9 +2001,9 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
                                 setIsCustomFieldDialogOpen(false)
                               }
                             }}
-                            disabled={!newFieldName.trim()}
+                            disabled={!newFieldName.trim() || createCustomFieldMutation.isPending}
                           >
-                            Add Field
+                            {createCustomFieldMutation.isPending ? "Adding..." : "Add Field"}
                           </Button>
                         </DialogFooter>
                       </DialogContent>
@@ -2090,7 +2134,7 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
                             <DependencyChip
                               key={depId}
                               taskId={depId}
-                              onRemove={() => removeDependencyMutation.mutate({ taskId: depId, blockedTaskId: currentTask?.id || task?.id || "" })}
+                              onRemove={() => removeDependencyMutation.mutate({ taskId: depId, blockedTaskId: currentTask?.id || task?.id || "" }, { onSuccess: () => toast.success("Dependency removed") })}
                               onClick={() => onTaskSelect?.(depId)}
                               variant="blocks"
                             />
@@ -2463,7 +2507,7 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
                               onClick={() => {
                                 const effectiveId = currentTask?.id || task?.id
                                 if (effectiveId) {
-                                  deleteCommentMutation.mutate({ taskId: effectiveId, commentId: comment.id })
+                                  deleteCommentMutation.mutate({ taskId: effectiveId, commentId: comment.id }, { onSuccess: () => toast.success("Comment deleted") })
                                 }
                               }}
                               className="ml-auto opacity-0 group-hover/comment:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
@@ -2522,7 +2566,7 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
                               onClick={() => {
                                 const effectiveId = currentTask?.id || task?.id
                                 if (effectiveId) {
-                                  deleteCommentMutation.mutate({ taskId: effectiveId, commentId: comment.id })
+                                  deleteCommentMutation.mutate({ taskId: effectiveId, commentId: comment.id }, { onSuccess: () => toast.success("Comment deleted") })
                                 }
                               }}
                               className="ml-auto opacity-0 group-hover/comment:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
@@ -2592,10 +2636,10 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
                   <Button
                     size="sm"
                     onClick={handleAddComment}
-                    disabled={!newComment}
+                    disabled={!newComment || createCommentMutation.isPending}
                     className="h-7"
                   >
-                    Send
+                    {createCommentMutation.isPending ? "Sending..." : "Send"}
                   </Button>
                 </div>
               </div>

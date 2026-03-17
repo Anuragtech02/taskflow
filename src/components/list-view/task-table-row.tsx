@@ -129,6 +129,8 @@ export function TaskTableRow({
   const [assigneeSearch, setAssigneeSearch] = React.useState("")
   const [pendingAssignees, setPendingAssignees] = React.useState<Set<string>>(new Set())
   const [pendingLabels, setPendingLabels] = React.useState<Set<string>>(new Set())
+  const [pendingStatus, setPendingStatus] = React.useState(false)
+  const [pendingPriority, setPendingPriority] = React.useState(false)
   const [labelSearch, setLabelSearch] = React.useState("")
   const [isEditing, setIsEditing] = React.useState(false)
   const [editTitle, setEditTitle] = React.useState(task.title)
@@ -143,17 +145,29 @@ export function TaskTableRow({
     ? (availableStatuses.find(s => s.value === status) ?? null)
     : null
 
+  const handleStatusChange = (newStatus: string) => {
+    setPendingStatus(true)
+    onStatusChange(task.id, newStatus)
+    setTimeout(() => setPendingStatus(false), 1500)
+  }
+
   const cycleStatus = () => {
     if (hasCustomStatuses) {
       const values = availableStatuses.map(s => s.value)
       const currentIndex = values.indexOf(status)
       const nextStatus = values[(currentIndex + 1) % values.length]
-      onStatusChange(task.id, nextStatus)
+      handleStatusChange(nextStatus)
     } else {
       const currentIndex = STATUS_ORDER.indexOf(status)
       const nextStatus = STATUS_ORDER[(currentIndex + 1) % STATUS_ORDER.length]
-      onStatusChange(task.id, nextStatus)
+      handleStatusChange(nextStatus)
     }
+  }
+
+  const handlePriorityChange = (newPriority: string) => {
+    setPendingPriority(true)
+    onPriorityChange?.(task.id, newPriority)
+    setTimeout(() => setPendingPriority(false), 1500)
   }
 
   const formatDate = (dateStr: string | null) => {
@@ -250,15 +264,19 @@ export function TaskTableRow({
         className="flex-shrink-0 hover:scale-110 transition-transform"
         title={`Status: ${status}`}
       >
-        <div
-          className="w-4 h-4 rounded-full border-2"
-          style={{
-            borderColor: matchedStatus?.color || STATUS_COLORS[status] || STATUS_COLORS.todo,
-            backgroundColor: (status === "done" || status === "closed" || status === "completed")
-              ? (matchedStatus?.color || STATUS_COLORS.done)
-              : "transparent",
-          }}
-        />
+        {pendingStatus ? (
+          <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+        ) : (
+          <div
+            className="w-4 h-4 rounded-full border-2"
+            style={{
+              borderColor: matchedStatus?.color || STATUS_COLORS[status] || STATUS_COLORS.todo,
+              backgroundColor: (status === "done" || status === "closed" || status === "completed")
+                ? (matchedStatus?.color || STATUS_COLORS.done)
+                : "transparent",
+            }}
+          />
+        )}
       </button>
 
       {/* Name */}
@@ -368,7 +386,11 @@ export function TaskTableRow({
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button className="w-full flex items-center justify-start cursor-pointer hover:bg-accent/50 rounded px-1 py-0.5">
-                {matchedStatus ? (
+                {pendingStatus ? (
+                  <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2 py-0.5">
+                    <div className="h-3 w-3 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                  </span>
+                ) : matchedStatus ? (
                   <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded-md border" style={{
                     backgroundColor: `${matchedStatus.color}20`,
                     borderColor: `${matchedStatus.color}30`,
@@ -388,7 +410,7 @@ export function TaskTableRow({
                 { value: "review", label: "Review", color: STATUS_COLORS.review },
                 { value: "done", label: "Done", color: STATUS_COLORS.done },
               ]).map((s) => (
-                <DropdownMenuItem key={s.value} onClick={() => onStatusChange(task.id, s.value)}>
+                <DropdownMenuItem key={s.value} onClick={() => handleStatusChange(s.value)}>
                   <div className="w-2 h-2 rounded-full mr-2" style={{ backgroundColor: s.color }} />
                   {s.label}
                 </DropdownMenuItem>
@@ -416,31 +438,34 @@ export function TaskTableRow({
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button className="w-full flex items-center justify-start cursor-pointer hover:bg-accent/50 rounded px-1 py-0.5">
-                {priority !== "none" && (
+                {pendingPriority ? (
+                  <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2 py-0.5">
+                    <div className="h-3 w-3 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                  </span>
+                ) : priority !== "none" ? (
                   <StatusBadge
                     variant="priority"
                     priority={priority as "low" | "medium" | "high" | "urgent"}
                   />
-                )}
-                {priority === "none" && (
+                ) : (
                   <span className="text-xs text-muted-foreground">Set</span>
                 )}
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start">
-              <DropdownMenuItem onClick={() => onPriorityChange(task.id, "urgent")}>
+              <DropdownMenuItem onClick={() => handlePriorityChange("urgent")}>
                 🔴 Urgent
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onPriorityChange(task.id, "high")}>
+              <DropdownMenuItem onClick={() => handlePriorityChange("high")}>
                 🟠 High
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onPriorityChange(task.id, "medium")}>
+              <DropdownMenuItem onClick={() => handlePriorityChange("medium")}>
                 🔵 Medium
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onPriorityChange(task.id, "low")}>
+              <DropdownMenuItem onClick={() => handlePriorityChange("low")}>
                 ⚪ Low
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onPriorityChange(task.id, "none")}>
+              <DropdownMenuItem onClick={() => handlePriorityChange("none")}>
                 None
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -730,7 +755,7 @@ export function TaskTableRow({
           </ContextMenuSubTrigger>
           <ContextMenuSubContent className="w-48">
             {contextStatuses.map((s) => (
-              <ContextMenuItem key={s.value} onClick={() => onStatusChange(task.id, s.value)}>
+              <ContextMenuItem key={s.value} onClick={() => handleStatusChange(s.value)}>
                 <div className="w-2.5 h-2.5 rounded-full mr-2" style={{ backgroundColor: s.color }} />
                 {s.label}
                 {s.value === status && <Check className="h-4 w-4 ml-auto" />}
@@ -754,7 +779,7 @@ export function TaskTableRow({
                 { value: "low", label: "Low" },
                 { value: "none", label: "None" },
               ].map((p) => (
-                <ContextMenuItem key={p.value} onClick={() => onPriorityChange(task.id, p.value)}>
+                <ContextMenuItem key={p.value} onClick={() => handlePriorityChange(p.value)}>
                   {p.label}
                   {p.value === priority && <Check className="h-4 w-4 ml-auto" />}
                 </ContextMenuItem>
