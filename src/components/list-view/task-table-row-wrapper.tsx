@@ -69,5 +69,5 @@ export function TaskTableRowWrapper({ bulkAssignees, bulkLabels, ...props }: Tas
     color: l.color,
   }))
 
-  return <TaskTableRow {...props} assignees={assignees} tags={tags} />
+  return <TaskTableRow {...props} assignees={assignees} taskAssignees={taskAssignees} tags={tags} />
 }
