@@ -127,6 +127,8 @@ export function TaskTableRow({
   const priority = task.priority || "none"
   const canHaveChildren = (depth || 0) < MAX_NESTING_DEPTH
   const [assigneeSearch, setAssigneeSearch] = React.useState("")
+  const [pendingAssignees, setPendingAssignees] = React.useState<Set<string>>(new Set())
+  const [pendingLabels, setPendingLabels] = React.useState<Set<string>>(new Set())
   const [labelSearch, setLabelSearch] = React.useState("")
   const [isEditing, setIsEditing] = React.useState(false)
   const [editTitle, setEditTitle] = React.useState(task.title)
@@ -544,7 +546,13 @@ export function TaskTableRow({
                       <CommandItem
                         key={member.id}
                         value={member.name || member.email}
+                        disabled={pendingAssignees.has(member.id)}
                         onSelect={() => {
+                          if (pendingAssignees.has(member.id)) return
+                          setPendingAssignees(prev => new Set([...prev, member.id]))
+                          const done = () => setPendingAssignees(prev => { const n = new Set(prev); n.delete(member.id); return n })
+                          // Clear pending after a short delay (mutation callback isn't available here)
+                          setTimeout(done, 1500)
                           if (isAssigned) {
                             onAssigneeRemove(task.id, member.id)
                           } else {
@@ -562,9 +570,11 @@ export function TaskTableRow({
                         <span className="flex-1 truncate">
                           {member.name || member.email}
                         </span>
-                        {isAssigned && (
+                        {pendingAssignees.has(member.id) ? (
+                          <div className="h-4 w-4 border-2 border-primary border-t-transparent rounded-full animate-spin shrink-0" />
+                        ) : isAssigned ? (
                           <Check className="h-4 w-4 text-primary shrink-0" />
-                        )}
+                        ) : null}
                       </CommandItem>
                     )
                   })}

@@ -156,8 +156,8 @@ export default function SpaceDocsPage() {
               <Button variant="outline" onClick={() => setCreateOpen(false)}>
                 Cancel
               </Button>
-              <Button onClick={handleCreate} disabled={!title.trim()}>
-                Create
+              <Button onClick={handleCreate} disabled={!title.trim() || createMutation.isPending}>
+                {createMutation.isPending ? "Creating..." : "Create"}
               </Button>
             </DialogFooter>
           </DialogContent>

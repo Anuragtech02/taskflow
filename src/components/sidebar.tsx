@@ -578,7 +578,7 @@ export function Sidebar() {
     }
   }, [workspaces, selectedWorkspaceId, pathname])
 
-  const { data: spaces } = useSpaces(selectedWorkspaceId ?? undefined)
+  const { data: spaces, isLoading: spacesLoading } = useSpaces(selectedWorkspaceId ?? undefined)
 
   const createWorkspaceMutation = useCreateWorkspace()
   const createSpaceMutation = useCreateSpace()
@@ -859,7 +859,7 @@ export function Sidebar() {
             </Button>
           </div>
 
-          {workspacesLoading ? (
+          {workspacesLoading || spacesLoading ? (
             <div className="space-y-2 px-2">
               {Array.from({ length: 3 }).map((_, i) => (
                 <div key={i} className="h-7 bg-muted rounded-md animate-pulse" />
