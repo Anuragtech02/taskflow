@@ -551,7 +551,7 @@ export function TaskTableRow({
                             onAssigneeAdd(task.id, member.id)
                           }
                         }}
-                        className="flex items-center gap-2"
+                        className={cn("flex items-center gap-2", isAssigned && "bg-accent")}
                       >
                         <Avatar className="h-6 w-6">
                           <AvatarImage src={member.avatarUrl || undefined} />
@@ -563,7 +563,7 @@ export function TaskTableRow({
                           {member.name || member.email}
                         </span>
                         {isAssigned && (
-                          <span className="text-green-500">✓</span>
+                          <Check className="h-4 w-4 text-primary shrink-0" />
                         )}
                       </CommandItem>
                     )
