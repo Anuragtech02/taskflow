@@ -166,6 +166,8 @@ export default function SpaceDocsPage() {
   const createMutation = useCreateDocument()
   const deleteMutation = useDeleteDocument()
 
+  const router = useRouter()
+
   const handleCreate = () => {
     if (!title.trim()) return
     createMutation.mutate({
@@ -174,10 +176,14 @@ export default function SpaceDocsPage() {
         title: title.trim(),
         parentDocumentId: parentId,
       },
+    }, {
+      onSuccess: (data) => {
+        setCreateOpen(false)
+        setTitle("")
+        setParentId(undefined)
+        router.push(`/dashboard/workspaces/${workspaceId}/spaces/${spaceId}/docs/${data.document.id}`)
+      },
     })
-    setCreateOpen(false)
-    setTitle("")
-    setParentId(undefined)
   }
 
   const handleDelete = (docId: string) => {
