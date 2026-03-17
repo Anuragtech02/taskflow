@@ -284,6 +284,7 @@ export async function updateTask(
     order: number
     customFields: Record<string, unknown>
     listId: string
+    parentTaskId: string | null
   }>
 ): Promise<{ task: TaskResponse }> {
   return fetchJSON(`/tasks/${taskId}`, {

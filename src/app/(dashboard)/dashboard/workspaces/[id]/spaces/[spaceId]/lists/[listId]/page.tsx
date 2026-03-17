@@ -38,7 +38,21 @@ import { GroupByDropdown } from "@/components/list-view/group-by-dropdown"
 import { SortDropdown, PRIORITY_ORDER } from "@/components/list-view/sort-dropdown"
 import { FilterPopover, type FilterState } from "@/components/list-view/filter-popover"
 import { TaskTableRowWrapper } from "@/components/list-view/task-table-row-wrapper"
+import { SortableTaskRow } from "@/components/list-view/sortable-task-row"
 import { BulkActionsBar } from "@/components/list-view/bulk-actions-bar"
+import {
+  DndContext,
+  DragOverlay,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragStartEvent,
+} from "@dnd-kit/core"
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable"
 import { AIGenerateModal } from "@/components/ai/aigenerate-modal"
 import { TimelineView } from "@/components/timeline-view/TimelineView"
 import { CalendarView } from "@/components/calendar-view"
@@ -542,6 +556,52 @@ export default function ListPage({
   const [editingStatusName, setEditingStatusName] = useState("")
   const [colorPickerForId, setColorPickerForId] = useState<string | null>(null)
   const { selectedTaskId, setSelectedTask, isOpen: isTaskPanelOpen, close: closeTaskPanel } = useTaskPanel()
+
+  // Drag-and-drop for reparenting tasks
+  const [activeDragId, setActiveDragId] = useState<string | null>(null)
+  const dragSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
+  )
+
+  const handleDragStart = useCallback((event: DragStartEvent) => {
+    setActiveDragId(event.active.id as string)
+  }, [])
+
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event
+    setActiveDragId(null)
+
+    if (!over || active.id === over.id) return
+
+    const draggedTaskId = active.id as string
+    const targetTaskId = over.id as string
+
+    // Find both tasks
+    const allTasks = tasks || []
+    const draggedTask = allTasks.find(t => t.id === draggedTaskId)
+    const targetTask = allTasks.find(t => t.id === targetTaskId)
+
+    if (!draggedTask || !targetTask) return
+
+    // Prevent dropping a parent onto its own child
+    const isDescendant = (parentId: string, childId: string): boolean => {
+      const child = allTasks.find(t => t.id === childId)
+      if (!child?.parentTaskId) return false
+      if (child.parentTaskId === parentId) return true
+      return isDescendant(parentId, child.parentTaskId)
+    }
+    if (isDescendant(draggedTaskId, targetTaskId)) return
+
+    if (draggedTask.parentTaskId === targetTaskId) {
+      // Already a child of target — detach to root
+      updateTaskMutation.mutate({ taskId: draggedTaskId, parentTaskId: null })
+    } else {
+      // Make dragged task a child of target
+      updateTaskMutation.mutate({ taskId: draggedTaskId, parentTaskId: targetTaskId })
+      // Auto-expand target so the dropped task is visible
+      setExpandedTasks(prev => new Set([...prev, targetTaskId]))
+    }
+  }, [tasks, updateTaskMutation])
 
   // Column widths for resizable columns (in px, persisted via sessionStorage)
   const defaultColumnWidths = { status: 112, priority: 96, dueDate: 96, assignee: 96, list: 96, tags: 96, created: 80, updated: 80 }
@@ -1561,55 +1621,78 @@ export default function ListPage({
                     </div>
                   ))
                 ) : (
-                  // Flat view
+                  // Flat view with drag-and-drop for reparenting
                   (
-                    <>
-                      {flatTasks.map((task) => (
-                        <React.Fragment key={task.id}>
-                          <TaskTableRowWrapper
-                            task={task}
-                            depth={task.depth}
-                            hasChildren={task.children.length > 0}
-                            childCount={task.children.length}
-                            isExpanded={expandedTasks.has(task.id)}
-                            onToggleExpand={toggleExpand}
-                            isSelected={selectedTasks.has(task.id)}
-                            onSelect={handleTaskSelect}
-                            onStatusChange={handleStatusChange}
-                            onClick={(taskId) => setSelectedTask(taskId)}
-                            workspaceId={workspaceId}
-                            workspaceMembers={workspaceMembers || []}
-                            onPriorityChange={handlePriorityChange}
-                            onDueDateChange={handleDueDateChange}
-                            onAssigneeAdd={handleAssigneeAdd}
-                            onAssigneeRemove={handleAssigneeRemove}
-                            onLabelAdd={handleLabelAdd}
-                            onLabelRemove={handleLabelRemove}
-                            availableLabels={availableLabelsForRows}
-                            onRename={handleRename}
-                            onAddSubtask={handleAddSubtask}
-                            onMoveToList={handleMoveToList}
-                            onDelete={handleDeleteTask}
-                            columnWidths={columnWidths}
-                            availableStatuses={availableStatuses}
-                          />
-                          {addingSubtaskFor === task.id && (
-                            <InlineSubtaskInput
-                              depth={(task.depth || 0) + 1}
-                              onSubmit={(title) => handleCreateSubtask(task.id, title)}
-                              onCancel={() => setAddingSubtaskFor(null)}
-                            />
-                          )}
-                        </React.Fragment>
-                      ))}
-                      {/* Inline new task row for flat view */}
-                      <InlineNewTaskRow
-                        listId={listId}
-                        defaultStatus="todo"
-                        onCreateTask={handleInlineCreateTask}
-                      />
-                    </>
+                    <DndContext
+                      sensors={dragSensors}
+                      onDragStart={handleDragStart}
+                      onDragEnd={handleDragEnd}
+                    >
+                      <SortableContext
+                        items={flatTasks.map(t => t.id)}
+                        strategy={verticalListSortingStrategy}
+                      >
+                        {flatTasks.map((task) => (
+                          <React.Fragment key={task.id}>
+                            <SortableTaskRow id={task.id}>
+                              <TaskTableRowWrapper
+                                task={task}
+                                depth={task.depth}
+                                hasChildren={task.children.length > 0}
+                                childCount={task.children.length}
+                                isExpanded={expandedTasks.has(task.id)}
+                                onToggleExpand={toggleExpand}
+                                isSelected={selectedTasks.has(task.id)}
+                                onSelect={handleTaskSelect}
+                                onStatusChange={handleStatusChange}
+                                onClick={(taskId) => setSelectedTask(taskId)}
+                                workspaceId={workspaceId}
+                                workspaceMembers={workspaceMembers || []}
+                                onPriorityChange={handlePriorityChange}
+                                onDueDateChange={handleDueDateChange}
+                                onAssigneeAdd={handleAssigneeAdd}
+                                onAssigneeRemove={handleAssigneeRemove}
+                                onLabelAdd={handleLabelAdd}
+                                onLabelRemove={handleLabelRemove}
+                                availableLabels={availableLabelsForRows}
+                                onRename={handleRename}
+                                onAddSubtask={handleAddSubtask}
+                                onMoveToList={handleMoveToList}
+                                onDelete={handleDeleteTask}
+                                columnWidths={columnWidths}
+                                availableStatuses={availableStatuses}
+                              />
+                            </SortableTaskRow>
+                            {addingSubtaskFor === task.id && (
+                              <InlineSubtaskInput
+                                depth={(task.depth || 0) + 1}
+                                onSubmit={(title) => handleCreateSubtask(task.id, title)}
+                                onCancel={() => setAddingSubtaskFor(null)}
+                              />
+                            )}
+                          </React.Fragment>
+                        ))}
+                      </SortableContext>
+                      <DragOverlay>
+                        {activeDragId && (() => {
+                          const draggedTask = flatTasks.find(t => t.id === activeDragId)
+                          return draggedTask ? (
+                            <div className="bg-background border rounded-md shadow-lg px-4 py-2 text-sm opacity-90">
+                              {draggedTask.title}
+                            </div>
+                          ) : null
+                        })()}
+                      </DragOverlay>
+                    </DndContext>
                   )
+                )}
+                {/* Inline new task row for flat view (outside DndContext) */}
+                {!groupBy && (
+                  <InlineNewTaskRow
+                    listId={listId}
+                    defaultStatus="todo"
+                    onCreateTask={handleInlineCreateTask}
+                  />
                 )}
               </div>
             ) : tasks && tasks.length > 0 ? (

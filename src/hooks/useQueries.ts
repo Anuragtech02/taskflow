@@ -402,6 +402,7 @@ export function useUpdateTask() {
       order?: number
       customFields?: Record<string, unknown>
       listId?: string
+      parentTaskId?: string | null
     }) => updateTask(taskId, data),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["tasks"] })
