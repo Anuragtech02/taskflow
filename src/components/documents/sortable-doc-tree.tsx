@@ -123,18 +123,18 @@ function SortableDocItem({
           isDragging && "opacity-40",
           isOver && !isDragging && "ring-2 ring-primary/50 ring-inset bg-primary/5"
         )}
-        style={{ paddingLeft: `${12 + depth * 20}px` }}
+        style={{ paddingLeft: `${6 + depth * 16}px` }}
         onClick={() => onNavigate(doc.id)}
       >
         <div
-          className="absolute left-1 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing p-0.5"
+          className="absolute left-0.5 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing p-0.5"
           {...attributes}
           {...listeners}
         >
-          <GripVertical className="h-3.5 w-3.5 text-muted-foreground" />
+          <GripVertical className="h-3 w-3 text-muted-foreground" />
         </div>
 
-        {hasChildren ? (
+        {hasChildren && (
           <button
             onClick={(e) => {
               e.stopPropagation()
@@ -144,13 +144,11 @@ function SortableDocItem({
           >
             <ChevronRight
               className={cn(
-                "h-4 w-4 text-muted-foreground transition-transform",
+                "h-3.5 w-3.5 text-muted-foreground transition-transform",
                 isExpanded && "rotate-90"
               )}
             />
           </button>
-        ) : (
-          <span className="w-5 flex-shrink-0" />
         )}
 
         <div className="flex items-center gap-2 flex-1 min-w-0">
