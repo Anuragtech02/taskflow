@@ -360,7 +360,7 @@ export default function SprintDetailPage() {
   const [closeOption, setCloseOption] = useState<"move" | "backlog">("backlog")
   const [targetSprintId, setTargetSprintId] = useState<string>("")
 
-  const { data: allSprints } = useSprints(workspaceId)
+  const { data: allSprints } = useSprints(spaceId)
   
   // Get other sprints (not current one) that are not completed
   const availableTargetSprints = useMemo(() => {
