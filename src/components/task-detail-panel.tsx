@@ -89,6 +89,7 @@ import {
   useCreateTaskReminder,
   useDeleteTaskReminder,
   useList,
+  useWorkspaceLists,
 } from "@/hooks/useQueries"
 import { useQueryClient } from "@tanstack/react-query"
 import { useSession } from "next-auth/react"
@@ -211,7 +212,7 @@ function humanizeField(field: string): string {
   return fieldNames[field] || field.replace(/_/g, " ").replace(/([A-Z])/g, " $1").toLowerCase().trim()
 }
 
-function getActivityActionText(activity: ActivityResponse): string {
+function getActivityActionText(activity: ActivityResponse, listNameMap?: Map<string, string>): string {
   const { action, field, oldValue, newValue } = activity
   switch (action) {
     case "created":
@@ -226,6 +227,14 @@ function getActivityActionText(activity: ActivityResponse): string {
           if (!newValue || newValue === "empty") return "detached from parent task"
           if (!oldValue || oldValue === "empty") return "moved under a parent task"
           return "changed parent task"
+        }
+        // List changes — resolve names from lookup
+        if (field === "listId" || field === "list_id") {
+          const fromName = oldValue && listNameMap?.get(oldValue)
+          const toName = newValue && listNameMap?.get(newValue)
+          if (fromName && toName) return `moved from "${fromName}" to "${toName}"`
+          if (toName) return `moved to "${toName}"`
+          return "moved to another list"
         }
         const from = humanize(oldValue)
         const to = humanize(newValue)
@@ -381,6 +390,20 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
 
   // List hook (for displaying current list name)
   const { data: currentList } = useList(currentTask?.listId)
+
+  // All lists in workspace (for activity log list name resolution)
+  const { data: workspaceListsData } = useWorkspaceLists(workspaceId)
+  const listNameMap = useMemo(() => {
+    const map = new Map<string, string>()
+    if (workspaceListsData) {
+      for (const space of workspaceListsData) {
+        for (const list of space.lists) {
+          map.set(list.id, list.name)
+        }
+      }
+    }
+    return map
+  }, [workspaceListsData])
 
   // Sprint hooks
   const { data: sprints = [] } = useSprints(currentList?.spaceId)
@@ -2466,7 +2489,7 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
                 return items.map((item) => {
                   if (item.type === "activity") {
                     const activity = item.data as ActivityResponse
-                    const actionText = getActivityActionText(activity)
+                    const actionText = getActivityActionText(activity, listNameMap)
                     return (
                       <ActivityItem
                         key={`activity-${activity.id}`}
@@ -2599,7 +2622,7 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
             ) : activityTab === "history" ? (
               currentTask?.activities && currentTask.activities.length > 0 ? (
                 [...currentTask.activities].map((activity) => {
-                  const actionText = getActivityActionText(activity)
+                  const actionText = getActivityActionText(activity, listNameMap)
                   return (
                     <ActivityItem
                       key={activity.id}
