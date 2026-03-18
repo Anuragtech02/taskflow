@@ -147,7 +147,7 @@ export function TaskTableRow({
 
   const handleStatusChange = (newStatus: string) => {
     setPendingStatus(true)
-    onStatusChange(task.id, newStatus)
+    onStatusChange?.(task.id, newStatus)
     setTimeout(() => setPendingStatus(false), 1500)
   }
 
