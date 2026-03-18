@@ -29,7 +29,7 @@ export interface TaskTableRowProps {
   task: TaskResponse
   isSelected: boolean
   onSelect: (taskId: string, selected: boolean) => void
-  onStatusChange: (taskId: string, status: string) => void
+  onStatusChange?: (taskId: string, status: string) => void
   onClick?: (taskId: string) => void
   assignees?: { userId: string; user: { name: string; avatarUrl?: string } }[]
   listName?: string
