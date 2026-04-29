@@ -135,6 +135,13 @@ export interface ListResponse {
   name: string
   description: string | null
   order: number | null
+  // Model B (0018): every sprint owns a list. `kind` distinguishes general
+  // workflow lists from sprint-backed lists. `sprintId` is set when this list
+  // represents a sprint (1:1). `archivedAt` is set when the sprint completes
+  // (or the list is otherwise closed).
+  kind?: "general" | "sprint" | "backlog" | null
+  sprintId?: string | null
+  archivedAt?: string | null
   createdAt: string
 }
 
