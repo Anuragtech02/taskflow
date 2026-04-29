@@ -47,7 +47,7 @@ export interface KanbanBoardProps {
   tasks: TaskResponse[]
   statuses: StatusResponse[]
   listId: string
-  workspaceId?: string
+  workspaceId: string
 }
 
 /**
@@ -301,7 +301,7 @@ export function KanbanBoard({ tasks, statuses, listId, workspaceId }: KanbanBoar
       // Only call API for real (non-default) statuses
       const realStatusIds = newOrder.filter((s) => !s.id.startsWith("default-")).map((s) => s.id)
       if (realStatusIds.length > 0) {
-        reorderStatusesMutation.mutate({ listId, statusIds: realStatusIds }, {
+        reorderStatusesMutation.mutate({ workspaceId, statusIds: realStatusIds }, {
           onSuccess: () => {
             columnReorderPendingRef.current = false
             toast.success("Columns reordered")
@@ -436,7 +436,7 @@ export function KanbanBoard({ tasks, statuses, listId, workspaceId }: KanbanBoar
     if (!newColumnName.trim()) return
     
     createStatusMutation.mutate({
-      listId,
+      workspaceId,
       name: newColumnName.trim(),
       color: newColumnColor,
     }, {
@@ -459,7 +459,7 @@ export function KanbanBoard({ tasks, statuses, listId, workspaceId }: KanbanBoar
       return
     }
     updateStatusMutation.mutate({
-      listId,
+      workspaceId,
       statusId,
       name: newName,
     }, {
@@ -478,7 +478,7 @@ export function KanbanBoard({ tasks, statuses, listId, workspaceId }: KanbanBoar
       return
     }
     updateStatusMutation.mutate({
-      listId,
+      workspaceId,
       statusId,
       color,
     }, {
@@ -497,7 +497,7 @@ export function KanbanBoard({ tasks, statuses, listId, workspaceId }: KanbanBoar
       return
     }
     deleteStatusMutation.mutate({
-      listId,
+      workspaceId,
       statusId,
     }, {
       onSuccess: () => {
@@ -529,7 +529,7 @@ export function KanbanBoard({ tasks, statuses, listId, workspaceId }: KanbanBoar
     const realStatusIds = newOrder.filter((s) => !s.id.startsWith("default-")).map((s) => s.id)
     if (realStatusIds.length > 0) {
       reorderStatusesMutation.mutate({
-        listId,
+        workspaceId,
         statusIds: realStatusIds,
       }, {
         onSuccess: () => {

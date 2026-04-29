@@ -300,52 +300,53 @@ export async function deleteTask(taskId: string): Promise<void> {
 }
 
 // ── Statuses ─────────────────────────────────────────────────────────────────
+// Workspace-scoped (was list-scoped pre-0016).
 export interface StatusResponse {
   id: string
-  listId: string
+  workspaceId: string
   name: string
   color: string | null
   order: number | null
   isDefault: boolean | null
 }
 
-export async function fetchStatuses(listId: string): Promise<StatusResponse[]> {
-  const data = await fetchJSON<{ statuses: StatusResponse[] }>(`/lists/${listId}/statuses`)
+export async function fetchStatuses(workspaceId: string): Promise<StatusResponse[]> {
+  const data = await fetchJSON<{ statuses: StatusResponse[] }>(`/workspaces/${workspaceId}/statuses`)
   return data.statuses
 }
 
 export async function createStatus(
-  listId: string,
+  workspaceId: string,
   data: { name: string; color?: string; order?: number }
 ): Promise<{ status: StatusResponse }> {
-  return fetchJSON(`/lists/${listId}/statuses`, {
+  return fetchJSON(`/workspaces/${workspaceId}/statuses`, {
     method: "POST",
     body: JSON.stringify(data),
   })
 }
 
 export async function updateStatus(
-  listId: string,
+  workspaceId: string,
   statusId: string,
   data: { name?: string; color?: string; order?: number }
 ): Promise<{ status: StatusResponse }> {
-  return fetchJSON(`/lists/${listId}/statuses/${statusId}`, {
-    method: "PUT",
+  return fetchJSON(`/workspaces/${workspaceId}/statuses/${statusId}`, {
+    method: "PATCH",
     body: JSON.stringify(data),
   })
 }
 
-export async function deleteStatus(listId: string, statusId: string): Promise<void> {
-  return fetchJSON(`/lists/${listId}/statuses/${statusId}`, {
+export async function deleteStatus(workspaceId: string, statusId: string): Promise<void> {
+  return fetchJSON(`/workspaces/${workspaceId}/statuses/${statusId}`, {
     method: "DELETE",
   })
 }
 
 export async function reorderStatuses(
-  listId: string,
+  workspaceId: string,
   statusIds: string[]
 ): Promise<{ statuses: StatusResponse[] }> {
-  return fetchJSON(`/lists/${listId}/statuses/reorder`, {
+  return fetchJSON(`/workspaces/${workspaceId}/statuses/reorder`, {
     method: "PUT",
     body: JSON.stringify({ statusIds }),
   })

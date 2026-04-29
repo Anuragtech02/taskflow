@@ -308,7 +308,7 @@ export default function SprintDetailPage() {
   // Task detail panel state
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
   const selectedTask = tasks.find((t) => t.id === selectedTaskId) || null
-  const { data: statuses = [] } = useStatuses(selectedTask?.listId)
+  const { data: statuses = [] } = useStatuses(workspaceId)
 
   const startDate = sprint ? new Date(sprint.startDate) : new Date()
   const endDate = sprint ? new Date(sprint.endDate) : new Date()

@@ -940,10 +940,10 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
 
   // Merge default statuses with any custom ones (custom overrides defaults with same normalized name)
   const DEFAULT_DISPLAY_STATUSES: StatusResponse[] = [
-    { id: "default-todo", name: "To Do", color: "#94a3b8", listId: "", order: 0, isDefault: true },
-    { id: "default-ip", name: "In Progress", color: "#3b82f6", listId: "", order: 1, isDefault: false },
-    { id: "default-review", name: "In Review", color: "#f59e0b", listId: "", order: 2, isDefault: false },
-    { id: "default-done", name: "Done", color: "#10b981", listId: "", order: 3, isDefault: false },
+    { id: "default-todo", name: "To Do", color: "#94a3b8", workspaceId: workspaceId ?? "", order: 0, isDefault: true },
+    { id: "default-ip", name: "In Progress", color: "#3b82f6", workspaceId: workspaceId ?? "", order: 1, isDefault: false },
+    { id: "default-review", name: "In Review", color: "#f59e0b", workspaceId: workspaceId ?? "", order: 2, isDefault: false },
+    { id: "default-done", name: "Done", color: "#10b981", workspaceId: workspaceId ?? "", order: 3, isDefault: false },
   ]
   const displayStatuses = (() => {
     if (statuses.length === 0) return DEFAULT_DISPLAY_STATUSES

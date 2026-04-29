@@ -12,7 +12,7 @@ import { ChevronLeft } from "lucide-react"
 export default function TaskPage({ params }: { params: Promise<{ id: string; taskId: string }> }) {
   const { id: workspaceId, taskId } = use(params)
   const { data: task, isLoading } = useTask(taskId)
-  const { data: statuses = [] } = useStatuses(task?.listId)
+  const { data: statuses = [] } = useStatuses(workspaceId)
   const { data: list } = useList(task?.listId)
   const router = useRouter()
 

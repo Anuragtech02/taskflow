@@ -422,12 +422,13 @@ export function useDeleteTask() {
 }
 
 // ── Status Hooks ───────────────────────────────────────────────────────────
+// Statuses are workspace-scoped (was list-scoped pre-0016).
 
-export function useStatuses(listId: string | undefined) {
+export function useStatuses(workspaceId: string | undefined) {
   return useQuery<StatusResponse[]>({
-    queryKey: ["statuses", listId],
-    queryFn: () => fetchStatuses(listId!),
-    enabled: !!listId,
+    queryKey: ["statuses", workspaceId],
+    queryFn: () => fetchStatuses(workspaceId!),
+    enabled: !!workspaceId,
   })
 }
 
@@ -435,16 +436,16 @@ export function useCreateStatus() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: ({
-      listId,
+      workspaceId,
       ...data
     }: {
-      listId: string
+      workspaceId: string
       name: string
       color?: string
       order?: number
-    }) => createStatus(listId, data),
+    }) => createStatus(workspaceId, data),
     onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["statuses", variables.listId] })
+      queryClient.invalidateQueries({ queryKey: ["statuses", variables.workspaceId] })
     },
   })
 }
@@ -453,18 +454,20 @@ export function useUpdateStatus() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: ({
-      listId,
+      workspaceId,
       statusId,
       ...data
     }: {
-      listId: string
+      workspaceId: string
       statusId: string
       name?: string
       color?: string
       order?: number
-    }) => updateStatus(listId, statusId, data),
+    }) => updateStatus(workspaceId, statusId, data),
     onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["statuses", variables.listId] })
+      queryClient.invalidateQueries({ queryKey: ["statuses", variables.workspaceId] })
+      // Status name/slug rewrites also touch task rows — invalidate task queries.
+      queryClient.invalidateQueries({ queryKey: ["tasks"] })
     },
   })
 }
@@ -472,11 +475,11 @@ export function useUpdateStatus() {
 export function useDeleteStatus() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ listId, statusId }: { listId: string; statusId: string }) =>
-      deleteStatus(listId, statusId),
+    mutationFn: ({ workspaceId, statusId }: { workspaceId: string; statusId: string }) =>
+      deleteStatus(workspaceId, statusId),
     onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["statuses", variables.listId] })
-      queryClient.invalidateQueries({ queryKey: ["tasks", variables.listId] })
+      queryClient.invalidateQueries({ queryKey: ["statuses", variables.workspaceId] })
+      queryClient.invalidateQueries({ queryKey: ["tasks"] })
     },
   })
 }
@@ -484,10 +487,10 @@ export function useDeleteStatus() {
 export function useReorderStatuses() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ listId, statusIds }: { listId: string; statusIds: string[] }) =>
-      reorderStatuses(listId, statusIds),
+    mutationFn: ({ workspaceId, statusIds }: { workspaceId: string; statusIds: string[] }) =>
+      reorderStatuses(workspaceId, statusIds),
     onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["statuses", variables.listId] })
+      queryClient.invalidateQueries({ queryKey: ["statuses", variables.workspaceId] })
     },
   })
 }
