@@ -956,12 +956,13 @@ export function useSearchWorkspaceTasks() {
 }
 
 // ── Custom Fields Hooks ─────────────────────────────────────────────────
+// Custom fields are workspace-scoped (was list-scoped pre-0017).
 
-export function useCustomFields(listId: string | undefined) {
+export function useCustomFields(workspaceId: string | undefined) {
   return useQuery<CustomFieldDefinitionResponse[]>({
-    queryKey: ["custom-fields", listId],
-    queryFn: () => fetchCustomFields(listId!),
-    enabled: !!listId,
+    queryKey: ["custom-fields", workspaceId],
+    queryFn: () => fetchCustomFields(workspaceId!),
+    enabled: !!workspaceId,
   })
 }
 
@@ -969,16 +970,16 @@ export function useCreateCustomField() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: ({
-      listId,
+      workspaceId,
       ...data
     }: {
-      listId: string
+      workspaceId: string
       name: string
       type: string
       options?: Record<string, unknown>
-    }) => createCustomField(listId, data),
+    }) => createCustomField(workspaceId, data),
     onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["custom-fields", variables.listId] })
+      queryClient.invalidateQueries({ queryKey: ["custom-fields", variables.workspaceId] })
     },
   })
 }
@@ -987,19 +988,19 @@ export function useUpdateCustomField() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: ({
-      listId,
+      workspaceId,
       fieldId,
       ...data
     }: {
-      listId: string
+      workspaceId: string
       fieldId: string
       name?: string
       type?: string
       options?: Record<string, unknown>
       order?: number
-    }) => updateCustomField(listId, fieldId, data),
+    }) => updateCustomField(workspaceId, fieldId, data),
     onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["custom-fields", variables.listId] })
+      queryClient.invalidateQueries({ queryKey: ["custom-fields", variables.workspaceId] })
     },
   })
 }
@@ -1007,10 +1008,10 @@ export function useUpdateCustomField() {
 export function useDeleteCustomField() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ listId, fieldId }: { listId: string; fieldId: string }) =>
-      deleteCustomField(listId, fieldId),
+    mutationFn: ({ workspaceId, fieldId }: { workspaceId: string; fieldId: string }) =>
+      deleteCustomField(workspaceId, fieldId),
     onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["custom-fields", variables.listId] })
+      queryClient.invalidateQueries({ queryKey: ["custom-fields", variables.workspaceId] })
     },
   })
 }

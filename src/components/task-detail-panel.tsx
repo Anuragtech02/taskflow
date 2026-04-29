@@ -387,7 +387,7 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
   const [newFieldOptions, setNewFieldOptions] = useState<string>("")
 
   // Custom fields
-  const { data: customFields = [], isLoading: customFieldsLoading } = useCustomFields(currentTask?.listId)
+  const { data: customFields = [], isLoading: customFieldsLoading } = useCustomFields(workspaceId)
   const createCustomFieldMutation = useCreateCustomField()
   const deleteCustomFieldMutation = useDeleteCustomField()
 
@@ -1630,10 +1630,9 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
                               <span className="text-sm font-medium truncate">{field.name}</span>
                               <button
                                 onClick={() => {
-                                  const listId = (currentTask || task)?.listId
-                                  if (listId) {
+                                  if (workspaceId) {
                                     deleteCustomFieldMutation.mutate({
-                                      listId,
+                                      workspaceId,
                                       fieldId: field.id,
                                     }, {
                                       onSuccess: () => toast.success("Custom field deleted"),
@@ -1994,14 +1993,13 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
                           </Button>
                           <Button
                             onClick={() => {
-                              const listId = (currentTask || task)?.listId
-                              if (listId && newFieldName.trim()) {
+                              if (workspaceId && newFieldName.trim()) {
                                 const options: Record<string, unknown> = {}
                                 if ((newFieldType === "select" || newFieldType === "multiSelect") && newFieldOptions.trim()) {
                                   options.choices = newFieldOptions.split("\n").map(o => o.trim()).filter(Boolean)
                                 }
                                 createCustomFieldMutation.mutate({
-                                  listId,
+                                  workspaceId,
                                   name: newFieldName.trim(),
                                   type: newFieldType,
                                   options,

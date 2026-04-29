@@ -749,9 +749,10 @@ export async function searchWorkspaceTasks(query: string, workspaceId: string): 
 }
 
 // ── Custom Fields ─────────────────────────────────────────────────────────
+// Workspace-scoped (was list-scoped pre-0017).
 export interface CustomFieldDefinitionResponse {
   id: string
-  listId: string
+  workspaceId: string
   name: string
   type: CustomFieldType
   options: Record<string, unknown>
@@ -794,34 +795,34 @@ export const CUSTOM_FIELD_TYPES: { value: CustomFieldType; label: string; descri
   { value: "user", label: "User", description: "Assign to workspace member" },
 ]
 
-export async function fetchCustomFields(listId: string): Promise<CustomFieldDefinitionResponse[]> {
-  const data = await fetchJSON<{ fields: CustomFieldDefinitionResponse[] }>(`/lists/${listId}/custom-fields`)
+export async function fetchCustomFields(workspaceId: string): Promise<CustomFieldDefinitionResponse[]> {
+  const data = await fetchJSON<{ fields: CustomFieldDefinitionResponse[] }>(`/workspaces/${workspaceId}/custom-fields`)
   return data.fields
 }
 
 export async function createCustomField(
-  listId: string,
+  workspaceId: string,
   data: { name: string; type: string; options?: Record<string, unknown> }
 ): Promise<{ field: CustomFieldDefinitionResponse }> {
-  return fetchJSON(`/lists/${listId}/custom-fields`, {
+  return fetchJSON(`/workspaces/${workspaceId}/custom-fields`, {
     method: "POST",
     body: JSON.stringify(data),
   })
 }
 
 export async function updateCustomField(
-  listId: string,
+  workspaceId: string,
   fieldId: string,
   data: Partial<{ name: string; type: string; options: Record<string, unknown>; order: number }>
 ): Promise<{ field: CustomFieldDefinitionResponse }> {
-  return fetchJSON(`/lists/${listId}/custom-fields/${fieldId}`, {
-    method: "PUT",
+  return fetchJSON(`/workspaces/${workspaceId}/custom-fields/${fieldId}`, {
+    method: "PATCH",
     body: JSON.stringify(data),
   })
 }
 
-export async function deleteCustomField(listId: string, fieldId: string): Promise<void> {
-  await fetchJSON(`/lists/${listId}/custom-fields/${fieldId}`, {
+export async function deleteCustomField(workspaceId: string, fieldId: string): Promise<void> {
+  await fetchJSON(`/workspaces/${workspaceId}/custom-fields/${fieldId}`, {
     method: "DELETE",
   })
 }
