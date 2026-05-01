@@ -79,6 +79,64 @@ import type { SpaceResponse, FolderResponse, ListResponse } from "@/lib/api"
 
 // ── Sub-components ──────────────────────────────────────────────────────────
 
+/**
+ * Splits a folder's lists into:
+ *  - active   — anything not in an archived sprint state (general lists,
+ *               backlog lists, the active sprint's list)
+ *  - archived — sprint-kind lists with an archivedAt timestamp (one per
+ *               completed sprint), sorted most-recent first
+ */
+function partitionListsForSidebar(lists: ListResponse[] | undefined) {
+  if (!lists) return { active: [] as ListResponse[], archivedSprints: [] as ListResponse[] }
+  const active: ListResponse[] = []
+  const archivedSprints: ListResponse[] = []
+  for (const l of lists) {
+    if (l.kind === "sprint" && l.archivedAt) archivedSprints.push(l)
+    else active.push(l)
+  }
+  // Sort archived sprints by archivedAt desc — most-recent first.
+  archivedSprints.sort((a, b) => {
+    const ta = a.archivedAt ? new Date(a.archivedAt).getTime() : 0
+    const tb = b.archivedAt ? new Date(b.archivedAt).getTime() : 0
+    return tb - ta
+  })
+  return { active, archivedSprints }
+}
+
+function PastSprintsGroup({
+  lists,
+  workspaceId,
+  spaceId,
+}: {
+  lists: ListResponse[]
+  workspaceId: string
+  spaceId: string
+}) {
+  const [expanded, setExpanded] = useState(false)
+  if (lists.length === 0) return null
+  return (
+    <div>
+      <button
+        onClick={() => setExpanded((e) => !e)}
+        className="flex items-center gap-1 w-full min-w-0 px-2 py-1 rounded-md text-xs text-muted-foreground hover:bg-accent/50 transition-colors"
+      >
+        <ChevronRight
+          className={cn("h-3 w-3 transition-transform duration-200", expanded && "rotate-90")}
+        />
+        <span className="uppercase tracking-wide">Past Sprints</span>
+        <span className="ml-auto opacity-70">{lists.length}</span>
+      </button>
+      {expanded && (
+        <div className="ml-4 mt-0.5 space-y-0.5 opacity-80">
+          {lists.map((list) => (
+            <SidebarListItem key={list.id} list={list} workspaceId={workspaceId} spaceId={spaceId} />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function SidebarListItem({
   list,
   workspaceId,
@@ -318,14 +376,26 @@ function SidebarFolderItem({
         </ContextMenu>
         <CollapsibleContent>
           <div className="ml-6 mt-0.5 space-y-0.5">
-            {lists?.map((list) => (
-              <SidebarListItem
-                key={list.id}
-                list={list}
-                workspaceId={workspaceId}
-                spaceId={spaceId}
-              />
-            ))}
+            {(() => {
+              const { active, archivedSprints } = partitionListsForSidebar(lists)
+              return (
+                <>
+                  {active.map((list) => (
+                    <SidebarListItem
+                      key={list.id}
+                      list={list}
+                      workspaceId={workspaceId}
+                      spaceId={spaceId}
+                    />
+                  ))}
+                  <PastSprintsGroup
+                    lists={archivedSprints}
+                    workspaceId={workspaceId}
+                    spaceId={spaceId}
+                  />
+                </>
+              )
+            })()}
           </div>
         </CollapsibleContent>
       </Collapsible>
