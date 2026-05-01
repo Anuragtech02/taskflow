@@ -254,9 +254,16 @@ export interface TaskResponse {
   assignees?: { userId: string; user: { id: string; name: string | null; email: string; avatarUrl: string | null } }[]
 }
 
-export async function fetchTasks(listId: string, includeClosed = false): Promise<{ tasks: TaskResponse[]; closedCount: number }> {
+export interface FetchTasksResponse {
+  tasks: TaskResponse[]
+  closedCount: number
+  total?: number
+  hasMore?: boolean
+}
+
+export async function fetchTasks(listId: string, includeClosed = false): Promise<FetchTasksResponse> {
   const params = includeClosed ? '?includeClosed=true' : ''
-  const data = await fetchJSON<{ tasks: TaskResponse[]; closedCount: number }>(`/lists/${listId}/tasks${params}`)
+  const data = await fetchJSON<FetchTasksResponse>(`/lists/${listId}/tasks${params}`)
   return data
 }
 

@@ -1205,6 +1205,11 @@ export default function ListPage({
                   {" "}(filtered from {tasks?.length || 0})
                 </span>
               )}
+              {allTasksData?.hasMore && (
+                <span className="ml-2 inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-amber-500/10 text-amber-600 dark:text-amber-400" title={`This list has ${allTasksData.total} tasks but the current page is capped at ${allTasksData.tasks.length}. Some tasks aren't shown.`}>
+                  ⚠ {allTasksData.total} total, showing {allTasksData.tasks.length}
+                </span>
+              )}
             </p>
           </div>
           <div className="flex items-center gap-2">

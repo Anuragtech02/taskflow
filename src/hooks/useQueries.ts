@@ -342,7 +342,7 @@ export function useWorkspaceLists(workspaceId: string | undefined) {
 // ── Task Hooks ──────────────────────────────────────────────────────────────
 
 export function useTasks(listId: string | undefined, includeClosed = false) {
-  return useQuery<{ tasks: TaskResponse[]; closedCount: number }>({
+  return useQuery<{ tasks: TaskResponse[]; closedCount: number; total?: number; hasMore?: boolean }>({
     queryKey: ["tasks", listId, { includeClosed }],
     queryFn: () => fetchTasks(listId!, includeClosed),
     enabled: !!listId,
