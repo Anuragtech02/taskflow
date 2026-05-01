@@ -395,7 +395,15 @@ export async function fetchSprint(sprintId: string): Promise<SprintDetailRespons
 
 export async function createSprint(
   spaceId: string,
-  data: { name: string; startDate: string; endDate: string; goal?: string }
+  data: {
+    name: string
+    startDate: string
+    endDate: string
+    goal?: string
+    // Optional folder override for the sprint's 1:1 list. `undefined` →
+    // backend inherits previous sprint's folder. `null` → space root.
+    folderId?: string | null
+  }
 ): Promise<{ sprint: SprintResponse }> {
   return fetchJSON(`/spaces/${spaceId}/sprints`, {
     method: "POST",

@@ -28,9 +28,16 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Calendar } from "@/components/ui/calendar"
-import { useSprints, useCreateSprint } from "@/hooks/useQueries"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { useSprints, useCreateSprint, useFolders } from "@/hooks/useQueries"
 import { cn } from "@/lib/utils"
 import { format, differenceInDays } from "date-fns"
+
+// Sentinel sentinel values for the Folder dropdown — the underlying API
+// distinguishes "inherit from previous sprint" (undefined) from "force space
+// root" (null) from a chosen folder UUID.
+const FOLDER_INHERIT = "__inherit__"
+const FOLDER_ROOT = "__root__"
 
 function CreateSprintDialog({ spaceId }: { spaceId: string }) {
   const [open, setOpen] = useState(false)
@@ -38,12 +45,23 @@ function CreateSprintDialog({ spaceId }: { spaceId: string }) {
   const [startDate, setStartDate] = useState<Date | undefined>(undefined)
   const [endDate, setEndDate] = useState<Date | undefined>(undefined)
   const [goal, setGoal] = useState("")
+  const [folderChoice, setFolderChoice] = useState<string>(FOLDER_INHERIT)
 
+  const { data: folders } = useFolders(spaceId)
   const createSprintMutation = useCreateSprint()
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!name || !startDate || !endDate) return
+
+    // Map sentinel back to API contract:
+    //   FOLDER_INHERIT  → omit folderId (server inherits from previous sprint)
+    //   FOLDER_ROOT     → folderId: null (force space root)
+    //   uuid            → folderId: uuid
+    const folderId =
+      folderChoice === FOLDER_INHERIT ? undefined :
+      folderChoice === FOLDER_ROOT ? null :
+      folderChoice
 
     createSprintMutation.mutate({
       spaceId,
@@ -51,6 +69,7 @@ function CreateSprintDialog({ spaceId }: { spaceId: string }) {
       startDate: startDate.toISOString(),
       endDate: endDate.toISOString(),
       goal: goal || undefined,
+      folderId,
     }, {
       onSuccess: () => {
         setOpen(false)
@@ -58,6 +77,7 @@ function CreateSprintDialog({ spaceId }: { spaceId: string }) {
         setStartDate(undefined)
         setEndDate(undefined)
         setGoal("")
+        setFolderChoice(FOLDER_INHERIT)
       }
     })
   }
@@ -150,6 +170,30 @@ function CreateSprintDialog({ spaceId }: { spaceId: string }) {
                 onChange={(e) => setGoal(e.target.value)}
                 rows={3}
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="folder">Folder</Label>
+              <Select value={folderChoice} onValueChange={setFolderChoice}>
+                <SelectTrigger id="folder">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={FOLDER_INHERIT}>
+                    Same as previous sprint
+                  </SelectItem>
+                  <SelectItem value={FOLDER_ROOT}>
+                    No folder (space root)
+                  </SelectItem>
+                  {(folders ?? []).map((f) => (
+                    <SelectItem key={f.id} value={f.id}>
+                      {f.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Where the sprint&apos;s list lives in the sidebar. Default inherits the previous sprint&apos;s folder.
+              </p>
             </div>
           </div>
           <DialogFooter>

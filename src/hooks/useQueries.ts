@@ -525,9 +525,13 @@ export function useCreateSprint() {
       startDate: string
       endDate: string
       goal?: string
+      folderId?: string | null
     }) => createSprint(spaceId, data),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["sprints", variables.spaceId] })
+      // The sprint's list lands in the sidebar — invalidate folder list caches.
+      queryClient.invalidateQueries({ queryKey: ["lists"] })
+      queryClient.invalidateQueries({ queryKey: ["folder-lists"] })
     },
   })
 }
