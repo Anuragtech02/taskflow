@@ -656,13 +656,13 @@ export default function SprintDetailPage() {
                     className="h-4 w-4"
                   />
                   <div>
-                    <div className="font-medium text-sm">Keep in backlog</div>
+                    <div className="font-medium text-sm">Move to Backlog</div>
                     <div className="text-xs text-muted-foreground">
-                      Tasks will be removed from this sprint but remain in their original lists
+                      Incomplete tasks move out of this sprint into the space&apos;s Backlog list. Done tasks stay here as a frozen record.
                     </div>
                   </div>
                 </label>
-                
+
                 <label className="flex items-center gap-3 cursor-pointer">
                   <input
                     type="radio"
@@ -672,9 +672,9 @@ export default function SprintDetailPage() {
                     className="h-4 w-4"
                   />
                   <div className="flex-1">
-                    <div className="font-medium text-sm">Move to another sprint</div>
+                    <div className="font-medium text-sm">Roll over to another sprint</div>
                     <div className="text-xs text-muted-foreground">
-                      Transfer incomplete tasks to a different sprint
+                      Incomplete tasks move into the chosen sprint&apos;s list and join its scope.
                     </div>
                   </div>
                 </label>
