@@ -96,6 +96,7 @@ import { CUSTOM_FIELD_TYPES, type CustomFieldType } from "@/lib/api"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import { extractTextFromTiptap } from "@/lib/tiptap"
+import { compressImage } from "@/lib/image-compression"
 import type { TaskResponse, StatusResponse, WorkspaceMemberResponse, SubtaskResponse, CommentResponse, ActivityResponse } from "@/lib/api"
 
 interface TaskDetailPanelProps {
@@ -435,7 +436,10 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
     setIsUploading(true)
     try {
       for (const file of Array.from(files)) {
-        await uploadAttachmentMutation.mutateAsync({ taskId: effectiveId, file })
+        // Image attachments are compressed to <~1MB / capped resolution;
+        // non-images (PDF, video, etc.) pass through untouched.
+        const toUpload = await compressImage(file)
+        await uploadAttachmentMutation.mutateAsync({ taskId: effectiveId, file: toUpload })
       }
       toast.success("File uploaded")
     } catch (error) {

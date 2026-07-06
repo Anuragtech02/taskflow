@@ -27,6 +27,7 @@ import { Bold, Italic, Underline as UnderlineIcon, Strikethrough, Code, Quote, L
 import { cn } from "@/lib/utils"
 import suggestion from "./mention-suggestion"
 import api from "@/lib/axios"
+import { compressImage } from "@/lib/image-compression"
 import { CommentMark } from "@/lib/editor/comment-mark"
 import { InternalEmbedNode } from "@/lib/editor/internal-embed-node"
 import { parseInternalUrl } from "@/lib/editor/internal-link-utils"
@@ -51,8 +52,10 @@ interface RichTextEditorProps {
 }
 
 async function uploadImage(file: File): Promise<string | null> {
+  // Shrink to <~1MB / capped resolution client-side before it leaves the browser.
+  const compressed = await compressImage(file)
   const formData = new FormData()
-  formData.append("file", file)
+  formData.append("file", compressed)
   try {
     const res = await api.post("/upload", formData)
     const url = res.data.url as string
