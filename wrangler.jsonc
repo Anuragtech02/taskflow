@@ -12,5 +12,15 @@
   // near the user. This app's SSR + route handlers make server-side calls to
   // api-taskflow.anuragtech.com, so origin-proximity cuts round-trip latency.
   "placement": { "mode": "smart" },
+  // SSR worker entry + static assets. `wrangler deploy` (CF Workers Builds'
+  // default command) needs these; @vinext/cloudflare's own deploy doesn't
+  // emit them in beta.0. Requests matching a static file are served from
+  // dist/client; everything else falls through to the worker for SSR.
+  // Route-wired SSR entry provided by vinext (correct for no-image-optimization
+  // apps — per vinext's own worker template). This is the handler that carries
+  // the app's route table; pointing main at the raw dist/server/index.js RSC
+  // module instead gives a worker that renders but 404s every route.
+  "main": "./worker/index.ts",
+  "assets": { "directory": "dist/client", "binding": "ASSETS", "not_found_handling": "none" },
   "cache": { "enabled": true }
 }
