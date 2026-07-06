@@ -2,6 +2,12 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  // We don't run image optimization (no Cloudflare Images; compression is
+  // done app-side on upload). unoptimized makes next/image render a direct
+  // relative <img src="/logo.png">, skipping the /_next/image endpoint —
+  // which otherwise resolved the source to an http:// origin on Workers and
+  // got blocked as mixed content on the HTTPS page.
+  images: { unoptimized: true },
   experimental: {
     serverActions: {
       bodySizeLimit: "10mb",
