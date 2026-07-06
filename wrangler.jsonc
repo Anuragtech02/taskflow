@@ -1,0 +1,16 @@
+{
+  // Cloudflare Worker for the TaskFlow frontend (vinext).
+  // Backend stays on Coolify at api-taskflow.anuragtech.com.
+  "name": "taskflow-web",
+  // Pinned to the apal895@gmail.com account (this login has 4 accounts).
+  "account_id": "ec6721b8cf1cc6b9d72f33f164169b4a",
+  "compatibility_date": "2026-07-01",
+  // Required: NextAuth (node:crypto), bcryptjs, and other Node built-ins.
+  "compatibility_flags": ["nodejs_compat"]
+,
+  // Smart Placement: run the worker near the Coolify origin API rather than
+  // near the user. This app's SSR + route handlers make server-side calls to
+  // api-taskflow.anuragtech.com, so origin-proximity cuts round-trip latency.
+  "placement": { "mode": "smart" },
+  "cache": { "enabled": true }
+}

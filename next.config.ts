@@ -1,5 +1,4 @@
 import type { NextConfig } from "next";
-import path from "path";
 
 const nextConfig: NextConfig = {
   output: "standalone",
@@ -18,10 +17,13 @@ const nextConfig: NextConfig = {
       "y-prosemirror": "@tiptap/y-tiptap",
     },
   },
+  // Note: under vinext (Vite) this webpack block is ignored — the same alias
+  // lives in vite.config.ts. Kept only so a `next build` fallback still works.
+  // Bare-package alias avoids __dirname (unavailable under "type": "module").
   webpack: (config) => {
     config.resolve.alias = {
       ...config.resolve.alias,
-      "y-prosemirror": path.resolve(__dirname, "node_modules/@tiptap/y-tiptap"),
+      "y-prosemirror": "@tiptap/y-tiptap",
     };
     return config;
   },

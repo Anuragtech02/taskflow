@@ -12,7 +12,11 @@
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
-    "db:seed": "npx tsx src/db/seed.ts"
+    "db:seed": "npx tsx src/db/seed.ts",
+    "dev:vinext": "vinext dev --port 3001",
+    "build:vinext": "vinext build",
+    "start:vinext": "wrangler dev --config dist/server/wrangler.json",
+    "deploy:vinext": "vinext-cloudflare deploy --config dist/server/wrangler.json"
   },
   "dependencies": {
     "@auth/core": "^0.41.0",
@@ -23,6 +27,7 @@
     "@google/generative-ai": "^0.24.1",
     "@gsap/react": "^2.1.2",
     "@hocuspocus/provider": "^3.4.4",
+    "@mdx-js/rollup": "3.1.1",
     "@radix-ui/react-accordion": "^1.2.12",
     "@radix-ui/react-alert-dialog": "^1.1.15",
     "@radix-ui/react-avatar": "^1.1.11",
@@ -70,6 +75,8 @@
     "@tiptap/starter-kit": "^3.20.1",
     "@tiptap/suggestion": "^3.20.1",
     "@tiptap/y-tiptap": "^3.0.2",
+    "@vitejs/plugin-react": "6.0.1",
+    "@vitejs/plugin-rsc": "0.5.26",
     "axios": "^1.13.6",
     "bcryptjs": "^3.0.3",
     "class-variance-authority": "^0.7.1",
@@ -88,10 +95,11 @@
     "next-auth": "^5.0.0-beta.30",
     "pdf2json": "^4.0.2",
     "postgres": "^3.4.8",
-    "react": "19.2.3",
+    "react": "19.2.6",
     "react-day-picker": "^9.13.2",
-    "react-dom": "19.2.3",
+    "react-dom": "19.2.6",
     "react-markdown": "^10.1.0",
+    "react-server-dom-webpack": "19.2.6",
     "recharts": "^3.7.0",
     "remark-gfm": "^4.0.1",
     "resend": "^6.9.3",
@@ -105,15 +113,22 @@
     "zustand": "^5.0.11"
   },
   "devDependencies": {
+    "@cloudflare/vite-plugin": "^1.43.0",
     "@tailwindcss/postcss": "^4",
+    "@tailwindcss/vite": "4.2.0",
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@vinext/cloudflare": "^1.0.0-beta.0",
     "drizzle-kit": "^0.31.9",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "tailwindcss": "^4",
-    "typescript": "^5"
-  }
+    "typescript": "^5",
+    "vinext": "^1.0.0-beta.0",
+    "vite": "^8.1.3",
+    "wrangler": "^4.107.0"
+  },
+  "type": "module"
 }
