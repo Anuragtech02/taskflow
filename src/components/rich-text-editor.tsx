@@ -133,6 +133,10 @@ export function RichTextEditor({ content, onChange, placeholder, minHeight = "15
     StarterKit.configure({
       heading: false,
       codeBlock: false,
+      // v3 StarterKit bundles link + underline — disable so our configured
+      // standalone copies below don't trigger duplicate-extension warnings.
+      link: false,
+      underline: false,
     }),
     HeadingWithAnchor,
     Placeholder.configure({ placeholder: placeholder || "Type something..." }),
@@ -272,10 +276,28 @@ export function RichTextEditor({ content, onChange, placeholder, minHeight = "15
   // The JSON comparison prevents unnecessary editor updates and feedback loops.
   useEffect(() => {
     if (!editor || editor.isDestroyed) return
+    // The server default for an empty description is `{}`, which is not a
+    // valid TipTap document (setContent({}) throws "Unknown node type").
+    // Treat any object without a `type` as empty.
+    const isValidDoc =
+      content != null &&
+      (typeof content === "string" ||
+        (typeof content === "object" && (content as { type?: string }).type))
+    // Never clobber a focused editor with a non-empty doc. While the user is
+    // typing, any external content change is an echo of their own debounced
+    // save round-tripping through the server — and Postgres jsonb reorders
+    // object keys, so the stringify comparison below can't recognize the echo
+    // as identical. setContent() on a focused editor resets the cursor to the
+    // end of the doc (and can drop keystrokes typed since the save fired).
+    // An external clear (null / {} / "") is an intentional reset — e.g. the
+    // comment box clearing after submit — and must go through even when
+    // focused (Safari doesn't move focus to buttons on click).
+    if (editor.isFocused && isValidDoc) return
+    const next = isValidDoc ? content : ""
     const currentJSON = JSON.stringify(editor.getJSON())
-    const newJSON = JSON.stringify(content || "")
+    const newJSON = JSON.stringify(next || "")
     if (currentJSON !== newJSON) {
-      editor.commands.setContent(content || "", { emitUpdate: false })
+      editor.commands.setContent(next || "", { emitUpdate: false })
     }
   }, [content, editor])
 
