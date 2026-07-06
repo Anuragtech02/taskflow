@@ -979,31 +979,50 @@ export default function ListPage({
     [createTaskMutation, listId]
   )
 
+  // Bulk mutations must use `mutateAsync` + `Promise.all` on a shared
+  // useMutation instance. Calling `.mutate()` in a forEach loop is
+  // fire-and-forget on the same observer and produces flaky results in
+  // TanStack Query v5 — only some of the calls actually round-trip.
   const handleBulkStatusChange = useCallback(
-    (taskIds: string[], status: string) => {
-      taskIds.forEach((taskId) => {
-        updateTaskMutation.mutate({ taskId, status })
-      })
+    async (taskIds: string[], status: string) => {
+      try {
+        await Promise.all(
+          taskIds.map((taskId) => updateTaskMutation.mutateAsync({ taskId, status }))
+        )
+        toast.success(`Status updated on ${taskIds.length} task${taskIds.length !== 1 ? "s" : ""}`)
+      } catch {
+        toast.error("Failed to update some tasks")
+      }
       setSelectedTasks(new Set())
     },
     [updateTaskMutation]
   )
 
   const handleBulkPriorityChange = useCallback(
-    (taskIds: string[], priority: string) => {
-      taskIds.forEach((taskId) => {
-        updateTaskMutation.mutate({ taskId, priority })
-      })
+    async (taskIds: string[], priority: string) => {
+      try {
+        await Promise.all(
+          taskIds.map((taskId) => updateTaskMutation.mutateAsync({ taskId, priority }))
+        )
+        toast.success(`Priority updated on ${taskIds.length} task${taskIds.length !== 1 ? "s" : ""}`)
+      } catch {
+        toast.error("Failed to update some tasks")
+      }
       setSelectedTasks(new Set())
     },
     [updateTaskMutation]
   )
 
   const handleBulkDelete = useCallback(
-    (taskIds: string[]) => {
-      taskIds.forEach((taskId) => {
-        deleteTaskMutation.mutate(taskId)
-      })
+    async (taskIds: string[]) => {
+      try {
+        await Promise.all(
+          taskIds.map((taskId) => deleteTaskMutation.mutateAsync(taskId))
+        )
+        toast.success(`Deleted ${taskIds.length} task${taskIds.length !== 1 ? "s" : ""}`)
+      } catch {
+        toast.error("Failed to delete some tasks")
+      }
       setSelectedTasks(new Set())
     },
     [deleteTaskMutation]
