@@ -73,5 +73,10 @@ export default auth((req) => {
 });
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|public/).*)"],
+  // /api/auth is excluded: the auth()-wrapped middleware runs Auth.js itself,
+  // so letting it match Auth.js's own endpoints executes Auth.js TWICE per
+  // request (middleware + route handler). Each execution minted a different
+  // CSRF token/cookie; the browser kept one, the page used the other →
+  // MissingCSRF on every login/signout. /api/auth was already public here.
+  matcher: ["/((?!api/auth|_next/static|_next/image|favicon.ico|public/).*)"],
 };

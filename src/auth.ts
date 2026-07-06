@@ -8,6 +8,16 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 const INTERNAL_API_SECRET = process.env.INTERNAL_API_SECRET || "";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
+  // On Cloudflare Workers (vinext), request scheme detection is inconsistent —
+  // some requests are perceived as http://, others https://. Auth.js derives
+  // its cookie mode (secure "__Host-" prefixed vs plain) from that scheme, so
+  // it flip-flopped between modes across requests: /api/auth/csrf could issue
+  // a token for one cookie variant while the credentials callback validated
+  // against the other → MissingCSRF → every login/signout silently failed.
+  // Pinning both options makes cookie mode & host handling deterministic.
+  // We only ever serve over HTTPS in production, so secure cookies are correct.
+  trustHost: true,
+  useSecureCookies: true,
   providers: [
     Credentials({
       name: "credentials",
@@ -39,7 +49,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             email: data.user.email,
             image: data.user.avatarUrl,
           };
-        } catch {
+        } catch (e) {
+          // Non-sensitive ops logging: distinguishes "backend unreachable" from
+          // "wrong credentials" in Workers Logs (both surface identically to users).
+          console.error(`[auth] login fetch to backend failed: ${e instanceof Error ? e.message : String(e)}`);
           return null;
         }
       },

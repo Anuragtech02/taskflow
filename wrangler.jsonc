@@ -22,5 +22,9 @@
   // module instead gives a worker that renders but 404s every route.
   "main": "./worker/index.ts",
   "assets": { "directory": "dist/client", "binding": "ASSETS", "not_found_handling": "none" },
-  "cache": { "enabled": true }
+  "cache": { "enabled": true },
+  // Workers Logs (observability): persists console.log/error + request metadata,
+  // queryable in the Cloudflare dashboard (Workers & Pages → taskflow-web → Logs).
+  // head_sampling_rate 1 = capture 100% of requests.
+  "observability": { "enabled": true, "head_sampling_rate": 1 }
 }
