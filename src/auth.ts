@@ -3,7 +3,17 @@ import Credentials from "next-auth/providers/credentials";
 import Google from "next-auth/providers/google";
 import GitHub from "next-auth/providers/github";
 
-const MAIN_DOMAIN = process.env.NEXT_PUBLIC_MAIN_DOMAIN || "72.62.227.33.sslip.io";
+// NOTE: NEXT_PUBLIC_* are inlined at BUILD time. If NEXT_PUBLIC_MAIN_DOMAIN is
+// missing from the build env (e.g. a CI build config that forgot it), we must
+// NOT invent a parent domain for the session cookie: a wrong `Domain=` makes
+// the browser silently drop the cookie, so /api/auth/session reads null and
+// every protected route redirects to /login. Instead, leave it undefined so
+// the cookie is host-only — which still works on the main host (tenant
+// subdomains just won't share the session until the var is set correctly).
+const MAIN_DOMAIN = process.env.NEXT_PUBLIC_MAIN_DOMAIN; // may be undefined
+const COOKIE_DOMAIN =
+  process.env.COOKIE_DOMAIN ||
+  (MAIN_DOMAIN && process.env.NODE_ENV === "production" ? `.${MAIN_DOMAIN}` : undefined);
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 const INTERNAL_API_SECRET = process.env.INTERNAL_API_SECRET || "";
 
@@ -125,7 +135,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         sameSite: "none",
         path: "/",
         secure: true,
-        domain: process.env.COOKIE_DOMAIN || (process.env.NODE_ENV === "production" ? `.${MAIN_DOMAIN}` : undefined),
+        domain: COOKIE_DOMAIN,
       },
     },
   },
