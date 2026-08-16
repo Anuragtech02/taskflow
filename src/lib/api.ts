@@ -261,10 +261,43 @@ export interface FetchTasksResponse {
   hasMore?: boolean
 }
 
+// The server caps a single /lists/:id/tasks response (default 1000, max 5000),
+// so a big list used to come back silently truncated — and because grouping,
+// sorting and filtering all run client-side over the loaded set, a truncated
+// fetch quietly produced wrong groups, wrong sort order and wrong counts.
+// Page through until the server reports hasMore=false so callers always get
+// the complete list. PAGE_SIZE stays under the server's max.
+const TASKS_PAGE_SIZE = 500
+// Safety valve: stop runaway paging if the server ever reports hasMore
+// incorrectly. 100k tasks in one list is far beyond any real use.
+const TASKS_MAX_PAGES = 200
+
 export async function fetchTasks(listId: string, includeClosed = false): Promise<FetchTasksResponse> {
-  const params = includeClosed ? '?includeClosed=true' : ''
-  const data = await fetchJSON<FetchTasksResponse>(`/lists/${listId}/tasks${params}`)
-  return data
+  const all: TaskResponse[] = []
+  let offset = 0
+  let first: FetchTasksResponse | null = null
+
+  for (let page = 0; page < TASKS_MAX_PAGES; page++) {
+    const qs = new URLSearchParams({ limit: String(TASKS_PAGE_SIZE), offset: String(offset) })
+    if (includeClosed) qs.set('includeClosed', 'true')
+    const data = await fetchJSON<FetchTasksResponse>(`/lists/${listId}/tasks?${qs}`)
+
+    first ??= data
+    all.push(...data.tasks)
+    offset += data.tasks.length
+
+    // Stop when the server says there's nothing left, or it returned an empty
+    // page (guards against a hasMore that never flips false).
+    if (!data.hasMore || data.tasks.length === 0) break
+  }
+
+  return {
+    tasks: all,
+    closedCount: first?.closedCount ?? 0,
+    total: first?.total ?? all.length,
+    // We fetched everything we were told exists, so nothing is withheld.
+    hasMore: false,
+  }
 }
 
 export async function createTask(
