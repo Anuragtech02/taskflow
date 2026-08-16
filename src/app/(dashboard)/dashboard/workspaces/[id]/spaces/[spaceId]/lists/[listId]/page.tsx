@@ -1,6 +1,7 @@
 "use client"
 
 import React, { use, useState, useCallback, useMemo, useEffect, useRef } from "react"
+import { useVirtualizer } from "@tanstack/react-virtual"
 import Link from "next/link"
 import {
   Plus,
@@ -593,6 +594,26 @@ export default function ListPage({
     }
   }, [tasks, updateTaskMutation])
 
+  // ── Virtualized rendering for large lists ─────────────────────────────────
+  // Rendering thousands of rows at once is what makes a big list crawl. Above
+  // this many rows we window the flat (ungrouped) view instead.
+  //
+  // Drag-to-nest is dnd-kit based and needs its items mounted, so it can't
+  // survive windowing — that's the tradeoff, and why the threshold sits above
+  // today's lists: normal behaviour is untouched at current sizes. Override
+  // per-tab with ?virtualize=1 / ?virtualize=0 to test or to bail out.
+  const VIRTUALIZE_THRESHOLD = 300
+  const scrollElRef = useRef<HTMLDivElement>(null)
+  const virtualStartRef = useRef<HTMLDivElement>(null)
+  const [virtualizeOverride, setVirtualizeOverride] = useState<boolean | null>(null)
+  const [listOffset, setListOffset] = useState(0)
+
+  useEffect(() => {
+    const v = new URLSearchParams(window.location.search).get("virtualize")
+    if (v === "1") setVirtualizeOverride(true)
+    else if (v === "0") setVirtualizeOverride(false)
+  }, [])
+
   // Column widths for resizable columns (in px, persisted via sessionStorage)
   const defaultColumnWidths = { status: 112, priority: 96, dueDate: 96, assignee: 96, list: 96, tags: 96, created: 80, updated: 80 }
   const [columnWidths, setColumnWidths] = useState(defaultColumnWidths)
@@ -796,6 +817,27 @@ export default function ListPage({
 
   // Flatten tree based on expanded state for rendering
   const flatTasks = useMemo(() => flattenTree(taskTree, expandedTasks), [taskTree, expandedTasks])
+
+  const shouldVirtualize =
+    virtualizeOverride !== null ? virtualizeOverride : flatTasks.length > VIRTUALIZE_THRESHOLD
+
+  // The rows live partway down a shared scroll container, so the virtualizer
+  // needs to know how far in they start — otherwise every row is offset by the
+  // height of the toolbar/header above them.
+  useEffect(() => {
+    if (shouldVirtualize && virtualStartRef.current) {
+      setListOffset(virtualStartRef.current.offsetTop)
+    }
+  }, [shouldVirtualize, flatTasks.length, groupBy])
+
+  const rowVirtualizer = useVirtualizer({
+    count: shouldVirtualize ? flatTasks.length : 0,
+    getScrollElement: () => scrollElRef.current,
+    estimateSize: () => 40,
+    overscan: 15,
+    scrollMargin: listOffset,
+    getItemKey: (i) => flatTasks[i]?.id ?? i,
+  })
 
   // For display count - use filtered tasks (not flatTasks which excludes collapsed subtasks)
   const displayTaskCount = filteredTasks.length
@@ -1345,7 +1387,7 @@ export default function ListPage({
       )}
 
       {/* Content */}
-      <div className={`flex-1 overflow-auto ${contentPaddingBottom}`}>
+      <div ref={scrollElRef} className={`flex-1 overflow-auto ${contentPaddingBottom}`}>
         {isLoading ? (
           <div className="p-6 space-y-3">
             {Array.from({ length: 5 }).map((_, i) => (
@@ -1481,6 +1523,63 @@ export default function ListPage({
                       )}
                     </div>
                   ))
+                ) : shouldVirtualize ? (
+                  // Large list: window the rows so we only mount what's on
+                  // screen. Drag-to-nest is unavailable here (dnd-kit needs its
+                  // items mounted); every other row interaction is identical.
+                  <div
+                    ref={virtualStartRef}
+                    style={{ height: rowVirtualizer.getTotalSize(), position: "relative", width: "100%" }}
+                  >
+                    {rowVirtualizer.getVirtualItems().map((vi) => {
+                      const task = flatTasks[vi.index]
+                      if (!task) return null
+                      return (
+                        <div
+                          key={vi.key}
+                          // Rows vary in height, so let the virtualizer measure
+                          // the real ones rather than trusting estimateSize.
+                          ref={rowVirtualizer.measureElement}
+                          data-index={vi.index}
+                          style={{
+                            position: "absolute",
+                            top: 0,
+                            left: 0,
+                            width: "100%",
+                            transform: `translateY(${vi.start - listOffset}px)`,
+                          }}
+                        >
+                          <TaskTableRowWrapper
+                            task={task}
+                            depth={task.depth}
+                            hasChildren={task.children.length > 0}
+                            childCount={task.children.length}
+                            isExpanded={expandedTasks.has(task.id)}
+                            onToggleExpand={toggleExpand}
+                            isSelected={selectedTasks.has(task.id)}
+                            onSelect={handleTaskSelect}
+                            onStatusChange={handleStatusChange}
+                            onClick={(taskId) => setSelectedTask(taskId)}
+                            workspaceId={workspaceId}
+                            workspaceMembers={workspaceMembers || []}
+                            onPriorityChange={handlePriorityChange}
+                            onDueDateChange={handleDueDateChange}
+                            onAssigneeAdd={handleAssigneeAdd}
+                            onAssigneeRemove={handleAssigneeRemove}
+                            onLabelAdd={handleLabelAdd}
+                            onLabelRemove={handleLabelRemove}
+                            availableLabels={availableLabelsForRows}
+                            onRename={handleRename}
+                            onAddSubtask={handleAddSubtask}
+                            onMoveToList={handleMoveToList}
+                            onDelete={handleDeleteTask}
+                            columnWidths={columnWidths}
+                            availableStatuses={availableStatuses}
+                          />
+                        </div>
+                      )
+                    })}
+                  </div>
                 ) : (
                   // Flat view with drag-and-drop for reparenting
                   (
