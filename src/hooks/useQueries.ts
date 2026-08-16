@@ -777,13 +777,40 @@ interface BulkTaskMetaResponse {
   comments: Record<string, number>
 }
 
+// The backend caps /tasks/bulk-meta at 200 ids per request. Sending more made
+// the WHOLE request 400, which blanked out assignees, labels, subtask and
+// comment counts for every task at once — a list silently fell off a cliff the
+// moment it grew past 200 tasks. Chunk well under the cap and merge instead, so
+// this scales to any list size.
+const BULK_META_CHUNK_SIZE = 100
+
 export function useBulkTaskMeta(taskIds: string[], workspaceId?: string) {
   const sortedKey = useMemo(() => [...taskIds].sort().join(","), [taskIds])
   return useQuery<BulkTaskMetaResponse>({
     queryKey: ["bulk-task-meta", sortedKey],
     queryFn: async () => {
-      const res = await api.post("/tasks/bulk-meta", { taskIds, workspaceId })
-      return res.data
+      const chunks: string[][] = []
+      for (let i = 0; i < taskIds.length; i += BULK_META_CHUNK_SIZE) {
+        chunks.push(taskIds.slice(i, i + BULK_META_CHUNK_SIZE))
+      }
+      const results = await Promise.all(
+        chunks.map((ids) =>
+          api
+            .post("/tasks/bulk-meta", { taskIds: ids, workspaceId })
+            .then((r) => r.data as BulkTaskMetaResponse)
+        )
+      )
+      // Every map is keyed by task id and the chunks are disjoint, so a shallow
+      // merge reassembles the full result exactly.
+      return results.reduce<BulkTaskMetaResponse>(
+        (acc, r) => ({
+          assignees: { ...acc.assignees, ...r.assignees },
+          labels: { ...acc.labels, ...r.labels },
+          subtasks: { ...acc.subtasks, ...r.subtasks },
+          comments: { ...acc.comments, ...r.comments },
+        }),
+        { assignees: {}, labels: {}, subtasks: {}, comments: {} }
+      )
     },
     enabled: taskIds.length > 0 && !!workspaceId,
     staleTime: 30000,
