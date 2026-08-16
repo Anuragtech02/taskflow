@@ -1,5 +1,5 @@
 import { useMemo } from "react"
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import api from "@/lib/axios"
 import {
   fetchWorkspaces,
@@ -20,6 +20,11 @@ import {
   updateList,
   deleteList,
   fetchTasks,
+  fetchTasksPaged,
+  fetchTaskGroups,
+  type ListQueryParams,
+  type PagedTasksResponse,
+  type TaskGroupsResponse,
   createTask,
   updateTask,
   deleteTask,
@@ -766,6 +771,47 @@ export function useTaskAssignees(taskId: string | undefined) {
     queryKey: ["task-assignees", taskId],
     queryFn: () => fetchTaskAssignees(taskId!),
     enabled: !!taskId,
+  })
+}
+
+// ── Server-side list querying ────────────────────────────────────────────────
+
+const LIST_PAGE_SIZE = 100
+
+/**
+ * Infinite (windowed) root tasks for a list, with sorting, filtering and
+ * grouping done in SQL. Pages are appended as the user scrolls, so the client
+ * holds a window instead of the whole list.
+ */
+export function useInfiniteListTasks(listId: string | undefined, params: ListQueryParams) {
+  return useInfiniteQuery({
+    // params are part of the key: changing sort/filter/group starts a fresh
+    // stream rather than appending rows ordered by the previous query.
+    queryKey: ["list-tasks-paged", listId, params],
+    queryFn: ({ pageParam = 0 }) =>
+      fetchTasksPaged(listId!, { ...params, rootsOnly: true }, LIST_PAGE_SIZE, pageParam as number),
+    initialPageParam: 0,
+    getNextPageParam: (last: PagedTasksResponse) =>
+      last.hasMore ? last.offset + last.tasks.length : undefined,
+    enabled: !!listId,
+  })
+}
+
+/** True per-group totals for the current filters (drives group headers). */
+export function useTaskGroups(listId: string | undefined, params: ListQueryParams) {
+  return useQuery<TaskGroupsResponse>({
+    queryKey: ["list-task-groups", listId, params],
+    queryFn: () => fetchTaskGroups(listId!, params),
+    enabled: !!listId && !!params.groupBy,
+  })
+}
+
+/** Children of one parent task, loaded when a row is expanded. */
+export function useSubtasksOf(listId: string | undefined, parentId: string | undefined) {
+  return useQuery<PagedTasksResponse>({
+    queryKey: ["list-subtasks", listId, parentId],
+    queryFn: () => fetchTasksPaged(listId!, { parentId, includeClosed: true }, 500, 0),
+    enabled: !!listId && !!parentId,
   })
 }
 

@@ -300,6 +300,80 @@ export async function fetchTasks(listId: string, includeClosed = false): Promise
   }
 }
 
+// ── Server-side list querying ────────────────────────────────────────────────
+// Mirrors GET /lists/:id/tasks/paged + /task-groups. Sorting, filtering,
+// grouping and paging all happen in SQL, so the client only ever holds a
+// window of rows while group headers still show true totals.
+
+export type ListSortBy = "order" | "dueDate" | "priority" | "name" | "createdAt" | "updatedAt"
+export type ListGroupBy = "status" | "priority" | "assignee" | "dueDate" | "label"
+
+export interface ListQueryParams {
+  sortBy?: ListSortBy
+  sortOrder?: "asc" | "desc"
+  groupBy?: ListGroupBy | null
+  status?: string[]
+  priority?: string[]
+  assigneeIds?: string[]
+  labels?: string[]
+  dueFrom?: string
+  dueTo?: string
+  includeClosed?: boolean
+  rootsOnly?: boolean
+  parentId?: string
+}
+
+export interface PagedTasksResponse {
+  tasks: (TaskResponse & { groupKey?: string })[]
+  total: number
+  limit: number
+  offset: number
+  hasMore: boolean
+}
+
+export interface TaskGroupsResponse {
+  groupBy?: ListGroupBy
+  groups: { key: string; count: number; sortKey: string | null }[]
+}
+
+/** Serialize list query params; arrays become CSV, empties are omitted. */
+export function listQueryToParams(p: ListQueryParams): URLSearchParams {
+  const qs = new URLSearchParams()
+  if (p.sortBy) qs.set("sortBy", p.sortBy)
+  if (p.sortOrder) qs.set("sortOrder", p.sortOrder)
+  if (p.groupBy) qs.set("groupBy", p.groupBy)
+  if (p.status?.length) qs.set("status", p.status.join(","))
+  if (p.priority?.length) qs.set("priority", p.priority.join(","))
+  if (p.assigneeIds?.length) qs.set("assigneeIds", p.assigneeIds.join(","))
+  if (p.labels?.length) qs.set("labels", p.labels.join(","))
+  if (p.dueFrom) qs.set("dueFrom", p.dueFrom)
+  if (p.dueTo) qs.set("dueTo", p.dueTo)
+  if (p.includeClosed) qs.set("includeClosed", "true")
+  if (p.rootsOnly) qs.set("rootsOnly", "true")
+  if (p.parentId) qs.set("parentId", p.parentId)
+  return qs
+}
+
+export async function fetchTasksPaged(
+  listId: string,
+  params: ListQueryParams,
+  limit: number,
+  offset: number
+): Promise<PagedTasksResponse> {
+  const qs = listQueryToParams(params)
+  qs.set("limit", String(limit))
+  qs.set("offset", String(offset))
+  return fetchJSON<PagedTasksResponse>(`/lists/${listId}/tasks/paged?${qs}`)
+}
+
+export async function fetchTaskGroups(
+  listId: string,
+  params: ListQueryParams
+): Promise<TaskGroupsResponse> {
+  const qs = listQueryToParams(params)
+  return fetchJSON<TaskGroupsResponse>(`/lists/${listId}/task-groups?${qs}`)
+}
+
 export async function createTask(
   listId: string,
   data: {
