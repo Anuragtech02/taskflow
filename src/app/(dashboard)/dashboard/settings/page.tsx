@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { signOut, useSession } from "next-auth/react"
-import { User, Lock, Building2, Loader2, LogOut, Palette, Key, Plus, Trash2, Copy, Check } from "lucide-react"
+import { User, Lock, Building2, Loader2, LogOut, Palette, Key, Plus, Trash2, Copy, Check, Plug } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -18,6 +18,8 @@ import { Badge } from "@/components/ui/badge"
 import { useWorkspaces, useUpdateUser, useUpdateUserPassword, useUpdateWorkspace, useApiKeys, useCreateApiKey, useDeleteApiKey } from "@/hooks/useSettings"
 import { toast } from "sonner"
 import { ThemeSwitcher } from "@/components/theme-switcher"
+import { DiscordIntegration } from "@/components/settings/discord-integration"
+import { useWorkspaceStore } from "@/store"
 
 export default function SettingsPage() {
   const router = useRouter()
@@ -36,6 +38,11 @@ export default function SettingsPage() {
   // Workspace state
   const [workspaceName, setWorkspaceName] = useState("")
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(null)
+
+  // Tabs are URL-addressable so OAuth redirects can land on ?tab=integrations.
+  const [tab, setTab] = useState("profile")
+  const [integrationWorkspaceId, setIntegrationWorkspaceId] = useState<string | null>(null)
+  const currentWorkspace = useWorkspaceStore((st) => st.currentWorkspace)
 
   // API Keys state
   const [createKeyDialogOpen, setCreateKeyDialogOpen] = useState(false)
@@ -59,6 +66,53 @@ export default function SettingsPage() {
       setAvatarUrl(session.user.image || "")
     }
   }, [session])
+
+  // Pick up ?tab=, ?workspace= and the Discord OAuth outcome once on load, then
+  // drop the one-shot Discord params so a refresh doesn't re-toast.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const t = params.get("tab")
+    if (t) setTab(t)
+    const w = params.get("workspace")
+    if (w) setIntegrationWorkspaceId(w)
+
+    const ok = params.get("discord")
+    const err = params.get("discord_error")
+    // <Toaster /> lives in the dashboard shell (our parent). React runs child
+    // effects before parent effects, so a toast fired synchronously here is
+    // published before the Toaster subscribes and is silently dropped. Defer
+    // one tick so the parent has mounted.
+    const notify = (fn: () => void) => setTimeout(fn, 0)
+    if (ok === "linked") notify(() => toast.success("Discord account linked"))
+    if (ok === "installed") notify(() => toast.success("TaskFlow bot added to your Discord server"))
+    if (err) {
+      const messages: Record<string, string> = {
+        not_configured: "Discord isn't set up on this TaskFlow server yet.",
+        expired: "That Discord sign-in expired. Please try again.",
+        cancelled: "Discord connection was cancelled.",
+        session_mismatch: "You were signed in as a different TaskFlow user. Please try again.",
+        oauth_failed: "Discord sign-in failed. Please try again.",
+        discord_in_use: "That Discord account is already linked to another TaskFlow user.",
+        forbidden: "Only workspace owners and admins can add the bot to a server.",
+        no_server: "No Discord server was selected.",
+        server_in_use: "That Discord server is already connected to another workspace.",
+      }
+      notify(() => toast.error(messages[err] ?? "Something went wrong connecting Discord."))
+    }
+    if (ok || err) {
+      params.delete("discord")
+      params.delete("discord_error")
+      const qs = params.toString()
+      window.history.replaceState(null, "", `${window.location.pathname}${qs ? `?${qs}` : ""}`)
+    }
+  }, [])
+
+  // Integrations default to the workspace you're currently in.
+  useEffect(() => {
+    if (integrationWorkspaceId || !workspaces?.length) return
+    const preferred = workspaces.find((w) => w.id === currentWorkspace?.id) ?? workspaces[0]
+    setIntegrationWorkspaceId(preferred.id)
+  }, [workspaces, currentWorkspace, integrationWorkspaceId])
 
   // Initialize workspace data
   useEffect(() => {
@@ -208,7 +262,7 @@ export default function SettingsPage() {
         <p className="text-muted-foreground mt-1">Manage your account and workspace settings</p>
       </div>
 
-      <Tabs defaultValue="profile" className="space-y-6">
+      <Tabs value={tab} onValueChange={setTab} className="space-y-6">
         <TabsList>
           <TabsTrigger value="profile" className="gap-2">
             <User className="h-4 w-4" />
@@ -229,6 +283,10 @@ export default function SettingsPage() {
           <TabsTrigger value="api-keys" className="gap-2">
             <Key className="h-4 w-4" />
             API Keys
+          </TabsTrigger>
+          <TabsTrigger value="integrations" className="gap-2">
+            <Plug className="h-4 w-4" />
+            Integrations
           </TabsTrigger>
         </TabsList>
 
@@ -664,6 +722,15 @@ export default function SettingsPage() {
               </p>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Integrations Tab */}
+        <TabsContent value="integrations">
+          <DiscordIntegration
+            workspaces={(workspaces ?? []).map((w) => ({ id: w.id, name: w.name }))}
+            workspaceId={integrationWorkspaceId}
+            onWorkspaceChange={setIntegrationWorkspaceId}
+          />
         </TabsContent>
       </Tabs>
 
