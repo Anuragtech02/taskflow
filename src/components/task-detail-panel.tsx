@@ -2350,7 +2350,7 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
                     multiple
                     className="hidden"
                     onChange={(e) => handleFileUpload(e.target.files)}
-                    accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,.zip"
+                    accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,.md,.markdown,.zip"
                   />
                   {isUploading ? (
                     <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
