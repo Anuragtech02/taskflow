@@ -2,7 +2,7 @@ import { defineConfig } from "vite";
 import vinext from "vinext";
 import tailwindcss from "@tailwindcss/vite";
 import { cloudflare } from "@cloudflare/vite-plugin";
-import { cdnAdapter } from "@vinext/cloudflare/cache/cdn-adapter";
+import { workersCacheCdnAdapter } from "@vinext/cloudflare/cache/workers-cache-cdn-adapter";
 
 export default defineConfig({
   // Ignore the project's postcss.config.mjs (which loads @tailwindcss/postcss
@@ -22,7 +22,7 @@ export default defineConfig({
   plugins: [
     tailwindcss(),
     vinext({
-      cache: { cdn: cdnAdapter() },
+      cache: { cdn: workersCacheCdnAdapter() },
     }),
     cloudflare({
       viteEnvironment: {
