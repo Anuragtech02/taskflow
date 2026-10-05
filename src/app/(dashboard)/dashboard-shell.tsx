@@ -6,6 +6,7 @@ import { ActiveUsers } from "@/components/active-users"
 import { KeyboardShortcuts } from "@/components/keyboard-shortcuts"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { Toaster } from "sonner"
+import { SubtaskCascadeProvider } from "@/components/subtask-cascade"
 import { useSSE } from "@/hooks/useSSE"
 import { usePathname } from "next/navigation"
 import { useSession } from "next-auth/react"
@@ -22,6 +23,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
   return (
     <TooltipProvider delayDuration={0}>
+      <SubtaskCascadeProvider>
       <div className="flex h-screen overflow-hidden bg-background">
         <Sidebar />
         <div className="flex-1 flex flex-col overflow-hidden">
@@ -35,6 +37,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       </div>
       <KeyboardShortcuts />
       <Toaster position="bottom-right" richColors closeButton />
+      </SubtaskCascadeProvider>
     </TooltipProvider>
   )
 }

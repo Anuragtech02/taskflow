@@ -9,7 +9,7 @@ import { useWorkspaceLists } from "@/hooks/useQueries"
 interface MoveToListPickerProps {
   workspaceId: string
   currentListId?: string
-  onSelect: (listId: string) => void
+  onSelect: (listId: string, listName: string) => void
   trigger: React.ReactNode
   align?: "start" | "center" | "end"
 }
@@ -49,7 +49,7 @@ export function MoveToListPicker({
                           value={`${space.name} ${list.name}`}
                           disabled={list.id === currentListId}
                           onSelect={() => {
-                            onSelect(list.id)
+                            onSelect(list.id, list.name)
                             setOpen(false)
                           }}
                           className="flex items-center gap-2"
@@ -85,7 +85,7 @@ export function MoveToListPicker({
                             value={`${space.name} ${folder.name} ${list.name}`}
                             disabled={list.id === currentListId}
                             onSelect={() => {
-                              onSelect(list.id)
+                              onSelect(list.id, list.name)
                               setOpen(false)
                             }}
                             className="flex items-center gap-2"

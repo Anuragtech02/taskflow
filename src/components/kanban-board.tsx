@@ -29,6 +29,7 @@ import { Input } from "@/components/ui/input"
 import { useUpdateTask, useDeleteTask, useCreateTask, useCreateStatus, useUpdateStatus, useDeleteStatus, useReorderStatuses, useBulkTaskMeta } from "@/hooks/useQueries"
 import { useTaskPanel } from "@/store/useTaskPanel"
 import { toast } from "sonner"
+import { useSubtaskCascade } from "@/components/subtask-cascade"
 import { cn } from "@/lib/utils"
 import type { TaskResponse, StatusResponse } from "@/lib/api"
 
@@ -72,6 +73,7 @@ const dropAnimation: DropAnimation = {
 export function KanbanBoard({ tasks, statuses, listId, workspaceId }: KanbanBoardProps) {
   const queryClient = useQueryClient()
   const updateTaskMutation = useUpdateTask()
+  const askCascade = useSubtaskCascade()
   const deleteTaskMutation = useDeleteTask()
   const createTaskMutation = useCreateTask()
   const createStatusMutation = useCreateStatus()
@@ -270,6 +272,29 @@ export function KanbanBoard({ tasks, statuses, listId, workspaceId }: KanbanBoar
     })
   }, [])
 
+  // Status change by dragging a card into another column. The card has
+  // already moved optimistically; ask about subtasks, then persist — or
+  // put the card back if the prompt is cancelled.
+  const commitColumnMove = async (task: TaskResponse, status: string, statusName: string, order: number) => {
+    const choice = await askCascade({ taskIds: [task.id], action: "status", targetLabel: statusName, taskTitle: task.title })
+    if (!choice) {
+      reorderPendingRef.current = false
+      setLocalTasks(tasks)
+      return
+    }
+    updateTaskMutation.mutate({
+      taskId: task.id,
+      status,
+      order,
+      applyToSubtasks: choice.applyToSubtasks,
+    }, {
+      onSettled: () => {
+        reorderPendingRef.current = false
+        queryClient.invalidateQueries({ queryKey: ["tasks", listId] })
+      },
+    })
+  }
+
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event
     const wasColumnDrag = !!activeColumn
@@ -336,22 +361,7 @@ export function KanbanBoard({ tasks, statuses, listId, workspaceId }: KanbanBoar
         // Optimistic update
         reorderPendingRef.current = true
         optimisticMoveTask(activeId, newStatusValue, newOrder)
-
-        updateTaskMutation.mutate({
-          taskId: activeId,
-          status: newStatusValue,
-          order: newOrder,
-        }, {
-          onSuccess: () => {
-            reorderPendingRef.current = false
-            queryClient.invalidateQueries({ queryKey: ["tasks", listId] })
-          },
-          onError: () => {
-            reorderPendingRef.current = false
-            // Revert on error by refetching
-            queryClient.invalidateQueries({ queryKey: ["tasks", listId] })
-          }
-        })
+        void commitColumnMove(draggedTask, newStatusValue, overStatus.name, newOrder)
       }
       return
     }
@@ -412,21 +422,7 @@ export function KanbanBoard({ tasks, statuses, listId, workspaceId }: KanbanBoar
         // Optimistic update
         reorderPendingRef.current = true
         optimisticMoveTask(activeId, newStatusValue, newOrder, overId)
-
-        updateTaskMutation.mutate({
-          taskId: activeId,
-          status: newStatusValue,
-          order: newOrder,
-        }, {
-          onSuccess: () => {
-            reorderPendingRef.current = false
-            queryClient.invalidateQueries({ queryKey: ["tasks", listId] })
-          },
-          onError: () => {
-            reorderPendingRef.current = false
-            queryClient.invalidateQueries({ queryKey: ["tasks", listId] })
-          }
-        })
+        void commitColumnMove(draggedTask, newStatusValue, overColumn.name, newOrder)
       }
     }
   }

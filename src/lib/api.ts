@@ -406,12 +406,23 @@ export async function updateTask(
     customFields: Record<string, unknown>
     listId: string
     parentTaskId: string | null
+    /** Also apply a status / list change to every subtask, at any depth. */
+    applyToSubtasks: boolean
   }>
-): Promise<{ task: TaskResponse }> {
+): Promise<{ task: TaskResponse; subtasksUpdated?: number }> {
   return fetchJSON(`/tasks/${taskId}`, {
     method: "PATCH",
     body: JSON.stringify(data),
   })
+}
+
+/** Distinct subtasks (every level) under these tasks, excluding the tasks themselves. */
+export async function fetchSubtreeCount(taskIds: string[]): Promise<number> {
+  const res = await fetchJSON<{ total: number }>(`/tasks/subtree-count`, {
+    method: "POST",
+    body: JSON.stringify({ taskIds }),
+  })
+  return res.total
 }
 
 export async function deleteTask(taskId: string): Promise<void> {

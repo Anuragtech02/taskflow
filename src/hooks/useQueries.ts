@@ -408,10 +408,18 @@ export function useUpdateTask() {
       customFields?: Record<string, unknown>
       listId?: string
       parentTaskId?: string | null
+      applyToSubtasks?: boolean
     }) => updateTask(taskId, data),
-    onSuccess: (_data, variables) => {
+    onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["tasks"] })
       queryClient.invalidateQueries({ queryKey: ["task", variables.taskId] })
+      // A cascade changed other tasks too; any open panel, subtask list or
+      // list view may be showing one of them.
+      if (data?.subtasksUpdated) {
+        for (const key of ["task", "subtasks", "list-tasks-paged", "list-subtasks", "bulk-task-meta"]) {
+          queryClient.invalidateQueries({ queryKey: [key] })
+        }
+      }
     },
   })
 }

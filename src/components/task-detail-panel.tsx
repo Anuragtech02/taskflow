@@ -94,6 +94,7 @@ import { useQueryClient } from "@tanstack/react-query"
 import { useSession } from "next-auth/react"
 import { CUSTOM_FIELD_TYPES, type CustomFieldType } from "@/lib/api"
 import { toast } from "sonner"
+import { useSubtaskCascade } from "@/components/subtask-cascade"
 import { cn } from "@/lib/utils"
 import { extractTextFromTiptap } from "@/lib/tiptap"
 import { compressImage } from "@/lib/image-compression"
@@ -318,6 +319,7 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
   const currentUserId = session?.user?.id
 
   const updateTaskMutation = useUpdateTask()
+  const askCascade = useSubtaskCascade()
   const deleteTaskMutation = useDeleteTask()
 
   const queryClient = useQueryClient()
@@ -836,13 +838,22 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
     setNewSubtask("")
   }
 
-  const handleToggleSubtask = (subtask: SubtaskResponse) => {
+  const handleToggleSubtask = async (subtask: SubtaskResponse) => {
     if (!task && !currentTask) return
     // Subtasks are full tasks - toggle between todo and done
     const newStatus = subtask.status === "done" ? "todo" : "done"
+    // A subtask can have its own subtasks — offer to carry them along.
+    const choice = await askCascade({
+      taskIds: [subtask.id],
+      action: "status",
+      targetLabel: newStatus === "done" ? "Done" : "To Do",
+      taskTitle: subtask.title,
+    })
+    if (!choice) return
     updateTaskMutation.mutate({
       taskId: subtask?.id,
       status: newStatus,
+      applyToSubtasks: choice.applyToSubtasks,
     })
   }
 
@@ -1061,17 +1072,27 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
                   </span>
                   <Select
                     value={status}
-                    onValueChange={(value) => {
-                      setStatus(value)
+                    onValueChange={async (value) => {
                       const effectiveId = currentTask?.id || task?.id
-                      if (effectiveId) {
-                        updateTaskMutation.mutate({
-                          taskId: effectiveId,
-                          status: value,
-                        }, {
-                          onSuccess: () => toast.success("Status updated"),
-                        })
-                      }
+                      if (!effectiveId) return
+                      const choice = await askCascade({
+                        taskIds: [effectiveId],
+                        action: "status",
+                        targetLabel: displayStatuses.find((s) => normalizeStatusName(s.name) === value)?.name ?? value,
+                        taskTitle: currentTask?.title,
+                      })
+                      if (!choice) return
+                      setStatus(value)
+                      updateTaskMutation.mutate({
+                        taskId: effectiveId,
+                        status: value,
+                        applyToSubtasks: choice.applyToSubtasks,
+                      }, {
+                        onSuccess: (data) => {
+                          const n = data?.subtasksUpdated ?? 0
+                          toast.success(n ? `Status updated on this task and ${n} subtask${n === 1 ? "" : "s"}` : "Status updated")
+                        },
+                      })
                     }}
                   >
                     <SelectTrigger className="h-8 flex-1">
@@ -1516,16 +1537,24 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
                   <MoveToListPicker
                     workspaceId={workspaceId}
                     currentListId={currentTask?.listId}
-                    onSelect={(listId) => {
+                    onSelect={async (listId, listName) => {
                       const effectiveId = currentTask?.id || task?.id
                       if (!effectiveId) return
+                      const choice = await askCascade({
+                        taskIds: [effectiveId],
+                        action: "move",
+                        targetLabel: listName,
+                        taskTitle: currentTask?.title,
+                      })
+                      if (!choice) return
                       updateTaskMutation.mutate(
-                        { taskId: effectiveId, listId },
+                        { taskId: effectiveId, listId, applyToSubtasks: choice.applyToSubtasks },
                         {
-                          onSuccess: () => {
+                          onSuccess: (data) => {
                             queryClient.invalidateQueries({ queryKey: ["task", effectiveId] })
                             queryClient.invalidateQueries({ queryKey: ["list"] })
-                            toast.success("Task moved to another list")
+                            const n = data?.subtasksUpdated ?? 0
+                            toast.success(n ? `Task and ${n} subtask${n === 1 ? "" : "s"} moved` : "Task moved to another list")
                           },
                         }
                       )
@@ -2350,7 +2379,6 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
                     multiple
                     className="hidden"
                     onChange={(e) => handleFileUpload(e.target.files)}
-                    accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,.md,.markdown,.zip"
                   />
                   {isUploading ? (
                     <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">

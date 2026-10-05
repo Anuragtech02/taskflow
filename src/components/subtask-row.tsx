@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { SubtaskResponse } from "@/lib/api"
 import { useToggleSubtask, useUpdateTask } from "@/hooks/useQueries"
+import { useSubtaskCascade } from "@/components/subtask-cascade"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
@@ -40,6 +41,7 @@ export function SubtaskRow({ subtask, onClick, statuses }: SubtaskRowProps) {
   
   const toggleMutation = useToggleSubtask()
   const updateMutation = useUpdateTask()
+  const askCascade = useSubtaskCascade()
   
   const handleToggle = () => {
     toggleMutation.mutate({ 
@@ -56,9 +58,16 @@ export function SubtaskRow({ subtask, onClick, statuses }: SubtaskRowProps) {
     setIsEditing(false)
   }
 
-  const handleStatusChange = (statusId: string) => {
-    updateMutation.mutate({ taskId: subtask.id, status: statusId })
+  const handleStatusChange = async (statusId: string) => {
     setShowStatusMenu(false)
+    const choice = await askCascade({
+      taskIds: [subtask.id],
+      action: "status",
+      targetLabel: statuses.find((s) => s.id === statusId)?.name ?? statusId,
+      taskTitle: subtask.title,
+    })
+    if (!choice) return
+    updateMutation.mutate({ taskId: subtask.id, status: statusId, applyToSubtasks: choice.applyToSubtasks })
   }
   
   const getCurrentStatus = () => {
