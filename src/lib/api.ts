@@ -417,10 +417,10 @@ export async function updateTask(
 }
 
 /** Distinct subtasks (every level) under these tasks, excluding the tasks themselves. */
-export async function fetchSubtreeCount(taskIds: string[]): Promise<number> {
+export async function fetchSubtreeCount(taskIds: string[], sprintId?: string): Promise<number> {
   const res = await fetchJSON<{ total: number }>(`/tasks/subtree-count`, {
     method: "POST",
-    body: JSON.stringify({ taskIds }),
+    body: JSON.stringify({ taskIds, sprintId }),
   })
   return res.total
 }
@@ -550,8 +550,12 @@ export async function addTaskToSprint(sprintId: string, taskId: string): Promise
   })
 }
 
-export async function removeTaskFromSprint(sprintId: string, taskId: string): Promise<void> {
-  await fetchJSON(`/sprints/${sprintId}/tasks/${taskId}`, {
+export async function removeTaskFromSprint(
+  sprintId: string,
+  taskId: string,
+  applyToSubtasks = false
+): Promise<{ success: boolean; subtasksUpdated?: number }> {
+  return fetchJSON(`/sprints/${sprintId}/tasks/${taskId}${applyToSubtasks ? "?applyToSubtasks=true" : ""}`, {
     method: "DELETE",
   })
 }
@@ -559,11 +563,12 @@ export async function removeTaskFromSprint(sprintId: string, taskId: string): Pr
 export async function moveTaskBetweenSprints(
   fromSprintId: string,
   toSprintId: string,
-  taskId: string
-): Promise<void> {
-  await fetchJSON(`/sprint-tasks`, {
+  taskId: string,
+  applyToSubtasks = false
+): Promise<{ success: boolean; subtasksUpdated?: number }> {
+  return fetchJSON(`/sprint-tasks`, {
     method: "PUT",
-    body: JSON.stringify({ fromSprintId, toSprintId, taskId }),
+    body: JSON.stringify({ fromSprintId, toSprintId, taskId, applyToSubtasks }),
   })
 }
 

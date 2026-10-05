@@ -58,12 +58,20 @@ import { TimelineView } from "@/components/timeline-view/TimelineView"
 import { CalendarView } from "@/components/calendar-view"
 import { toast } from "sonner"
 import { useSubtaskCascade } from "@/components/subtask-cascade"
+import { whilePending } from "@/store/usePendingTasks"
 import { useSession } from "next-auth/react"
 
 type ViewMode = "list" | "board" | "gantt" | "calendar"
 type GroupByOption = "status" | "priority" | "assignee" | "dueDate" | "label" | null
 type SortByOption = "dueDate" | "priority" | "name" | "createdAt" | "updatedAt"
 type SortOrder = "asc" | "desc"
+
+/** Run every call to completion (no early exit), then fail if any did. */
+async function allOrThrow(calls: Promise<unknown>[]) {
+  const results = await Promise.allSettled(calls)
+  const failed = results.find((r): r is PromiseRejectedResult => r.status === "rejected")
+  if (failed) throw failed.reason
+}
 
 // Default status options (fallback when no custom statuses)
 const DEFAULT_STATUSES = [
@@ -956,14 +964,16 @@ export default function ListPage({
 
   const handleStatusChange = useCallback(
     async (taskId: string, status: string) => {
-      const choice = await askCascade({
-        taskIds: [taskId],
-        action: "status",
-        targetLabel: statusLabel(status),
-        taskTitle: allTasksData?.tasks.find((t) => t.id === taskId)?.title,
-      })
-      if (!choice) return
-      updateTaskMutation.mutate({ taskId, status, applyToSubtasks: choice.applyToSubtasks })
+      await askCascade(
+        {
+          taskIds: [taskId],
+          action: "status",
+          targetLabel: statusLabel(status),
+          taskTitle: allTasksData?.tasks.find((t) => t.id === taskId)?.title,
+          errorMessage: "Failed to update status",
+        },
+        (applyToSubtasks) => updateTaskMutation.mutateAsync({ taskId, status, applyToSubtasks })
+      )
     },
     [updateTaskMutation, askCascade, statusLabel, allTasksData]
   )
@@ -1052,18 +1062,13 @@ export default function ListPage({
   // TanStack Query v5 — only some of the calls actually round-trip.
   const handleBulkStatusChange = useCallback(
     async (taskIds: string[], status: string) => {
-      const choice = await askCascade({ taskIds, action: "status", targetLabel: statusLabel(status) })
-      if (!choice) return
-      try {
-        await Promise.all(
-          taskIds.map((taskId) =>
-            updateTaskMutation.mutateAsync({ taskId, status, applyToSubtasks: choice.applyToSubtasks })
-          )
-        )
-        toast.success(`Status updated on ${taskIds.length} task${taskIds.length !== 1 ? "s" : ""}`)
-      } catch {
-        toast.error("Failed to update some tasks")
-      }
+      const result = await askCascade(
+        { taskIds, action: "status", targetLabel: statusLabel(status), errorMessage: "Failed to update some tasks" },
+        (applyToSubtasks) =>
+          allOrThrow(taskIds.map((taskId) => updateTaskMutation.mutateAsync({ taskId, status, applyToSubtasks })))
+      )
+      if (result === "cancelled") return
+      if (result === "done") toast.success(`Status updated on ${taskIds.length} task${taskIds.length !== 1 ? "s" : ""}`)
       setSelectedTasks(new Set())
     },
     [updateTaskMutation, askCascade, statusLabel]
@@ -1072,8 +1077,8 @@ export default function ListPage({
   const handleBulkPriorityChange = useCallback(
     async (taskIds: string[], priority: string) => {
       try {
-        await Promise.all(
-          taskIds.map((taskId) => updateTaskMutation.mutateAsync({ taskId, priority }))
+        await whilePending(taskIds, () =>
+          allOrThrow(taskIds.map((taskId) => updateTaskMutation.mutateAsync({ taskId, priority })))
         )
         toast.success(`Priority updated on ${taskIds.length} task${taskIds.length !== 1 ? "s" : ""}`)
       } catch {
@@ -1087,8 +1092,8 @@ export default function ListPage({
   const handleBulkDelete = useCallback(
     async (taskIds: string[]) => {
       try {
-        await Promise.all(
-          taskIds.map((taskId) => deleteTaskMutation.mutateAsync(taskId))
+        await whilePending(taskIds, () =>
+          allOrThrow(taskIds.map((taskId) => deleteTaskMutation.mutateAsync(taskId)))
         )
         toast.success(`Deleted ${taskIds.length} task${taskIds.length !== 1 ? "s" : ""}`)
       } catch {
@@ -1101,40 +1106,38 @@ export default function ListPage({
 
   const handleMoveToList = useCallback(
     async (taskId: string, targetListId: string) => {
-      const choice = await askCascade({
-        taskIds: [taskId],
-        action: "move",
-        targetLabel: listName(targetListId),
-        taskTitle: allTasksData?.tasks.find((t) => t.id === taskId)?.title,
-      })
-      if (!choice) return
-      updateTaskMutation.mutate(
-        { taskId, listId: targetListId, applyToSubtasks: choice.applyToSubtasks },
+      let moved = 0
+      const result = await askCascade(
         {
-          onSuccess: (data) => {
-            const n = data?.subtasksUpdated ?? 0
-            toast.success(n ? `Task and ${n} subtask${n === 1 ? "" : "s"} moved` : "Task moved to another list")
-          },
+          taskIds: [taskId],
+          action: "move",
+          targetLabel: listName(targetListId),
+          taskTitle: allTasksData?.tasks.find((t) => t.id === taskId)?.title,
+          errorMessage: "Failed to move task",
+        },
+        async (applyToSubtasks) => {
+          const data = await updateTaskMutation.mutateAsync({ taskId, listId: targetListId, applyToSubtasks })
+          moved = data?.subtasksUpdated ?? 0
         }
       )
+      if (result === "done") {
+        toast.success(moved ? `Task and ${moved} subtask${moved === 1 ? "" : "s"} moved` : "Task moved to another list")
+      }
     },
     [updateTaskMutation, askCascade, listName, allTasksData]
   )
 
   const handleBulkMoveToList = useCallback(
     async (taskIds: string[], targetListId: string) => {
-      const choice = await askCascade({ taskIds, action: "move", targetLabel: listName(targetListId) })
-      if (!choice) return
-      try {
-        await Promise.all(
-          taskIds.map((taskId) =>
-            updateTaskMutation.mutateAsync({ taskId, listId: targetListId, applyToSubtasks: choice.applyToSubtasks })
-          )
-        )
-        toast.success(`${taskIds.length} task${taskIds.length !== 1 ? "s" : ""} moved`)
-      } catch {
-        toast.error("Failed to move some tasks")
-      }
+      const result = await askCascade(
+        { taskIds, action: "move", targetLabel: listName(targetListId), errorMessage: "Failed to move some tasks" },
+        (applyToSubtasks) =>
+          allOrThrow(taskIds.map((taskId) =>
+            updateTaskMutation.mutateAsync({ taskId, listId: targetListId, applyToSubtasks })
+          ))
+      )
+      if (result === "cancelled") return
+      if (result === "done") toast.success(`${taskIds.length} task${taskIds.length !== 1 ? "s" : ""} moved`)
       setSelectedTasks(new Set())
     },
     [updateTaskMutation, askCascade, listName]
@@ -1820,14 +1823,10 @@ export default function ListPage({
                     className="h-6 px-2 text-xs opacity-0 group-hover:opacity-100 transition-opacity"
                     onClick={(e) => {
                       e.stopPropagation()
-                      void (async () => {
-                        const choice = await askCascade({ taskIds: [task.id], action: "status", targetLabel: statusLabel("todo"), taskTitle: task.title })
-                        if (!choice) return
-                        updateTaskMutation.mutate(
-                          { taskId: task.id, status: "todo", applyToSubtasks: choice.applyToSubtasks },
-                          { onSuccess: () => toast.success("Task reopened") }
-                        )
-                      })()
+                      void askCascade(
+                        { taskIds: [task.id], action: "status", targetLabel: statusLabel("todo"), taskTitle: task.title, errorMessage: "Failed to reopen task" },
+                        (applyToSubtasks) => updateTaskMutation.mutateAsync({ taskId: task.id, status: "todo", applyToSubtasks })
+                      ).then((r) => { if (r === "done") toast.success("Task reopened") })
                     }}
                   >
                     <RotateCcw className="h-3 w-3 mr-1" />

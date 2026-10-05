@@ -13,7 +13,8 @@ import { cn } from "@/lib/utils"
 import type { TaskResponse, WorkspaceSpaceWithLists } from "@/lib/api"
 import { Input } from "@/components/ui/input"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { Calendar as CalendarIcon, Plus, ChevronRight, ChevronDown, Pencil, ListPlus, Link2, Lock, Check, Trash2, ArrowRightLeft, ExternalLink, Circle, Flag, List as ListIcon } from "lucide-react"
+import { Calendar as CalendarIcon, Plus, ChevronRight, ChevronDown, Pencil, ListPlus, Link2, Lock, Check, Trash2, ArrowRightLeft, ExternalLink, Circle, Flag, List as ListIcon, Loader2 } from "lucide-react"
+import { useIsTaskPending } from "@/store/usePendingTasks"
 import {
   ContextMenu,
   ContextMenuContent,
@@ -125,6 +126,8 @@ export function TaskTableRow({
 }: TaskTableRowProps) {
   const status = task.status || "todo"
   const priority = task.priority || "none"
+  // Fade + block input while a change to this task is saving.
+  const isSaving = useIsTaskPending(task.id)
   const canHaveChildren = (depth || 0) < MAX_NESTING_DEPTH
   const [assigneeSearch, setAssigneeSearch] = React.useState("")
   const [pendingAssignees, setPendingAssignees] = React.useState<Set<string>>(new Set())
@@ -222,10 +225,12 @@ export function TaskTableRow({
     <ContextMenu>
       <ContextMenuTrigger asChild>
     <div
+      aria-busy={isSaving || undefined}
       className={cn(
-        "flex items-center gap-2 px-4 py-2 border-b border-border/50 hover:bg-accent/30 transition-colors group",
+        "flex items-center gap-2 px-4 py-2 border-b border-border/50 hover:bg-accent/30 transition-[colors,opacity] group",
         isSelected && "bg-accent/50",
-        depth > 0 && "bg-muted/20"
+        depth > 0 && "bg-muted/20",
+        isSaving && "opacity-50 pointer-events-none select-none"
       )}
     >
       {/* Indentation spacer — pushes all content including columns */}
@@ -322,6 +327,7 @@ export function TaskTableRow({
             {task.title}
           </button>
         )}
+        {isSaving && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground flex-shrink-0 ml-1.5" aria-label="Saving" />}
         {/* Dependency indicator */}
         {isBlocked && (
           <TooltipProvider delayDuration={200}>

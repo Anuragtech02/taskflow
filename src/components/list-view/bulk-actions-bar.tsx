@@ -16,12 +16,13 @@ interface BulkActionsBarProps {
   selectedCount: number
   selectedTasks: Set<string>
   onClearSelection: () => void
-  onStatusChange: (taskIds: string[], status: string) => void
-  onPriorityChange: (taskIds: string[], priority: string) => void
-  onAssigneeAdd: (taskIds: string[], userId: string) => void
-  onLabelAdd: (taskIds: string[], labelId: string) => void
-  onDelete: (taskIds: string[]) => void
-  onMoveToList?: (taskIds: string[], listId: string) => void
+  onStatusChange: (taskIds: string[], status: string) => void | Promise<unknown>
+  onPriorityChange: (taskIds: string[], priority: string) => void | Promise<unknown>
+  onAssigneeAdd: (taskIds: string[], userId: string) => void | Promise<unknown>
+  onLabelAdd: (taskIds: string[], labelId: string) => void | Promise<unknown>
+  onDelete: (taskIds: string[]) => void | Promise<unknown>
+  /** Handlers may return a promise; the bar shows its spinner until it settles. */
+  onMoveToList?: (taskIds: string[], listId: string) => void | Promise<unknown>
   isPending?: boolean
   workspaceId?: string
   currentListId?: string
@@ -66,28 +67,22 @@ export function BulkActionsBar({
 }: BulkActionsBarProps) {
   const taskIds = Array.from(selectedTasks)
   const [pendingAction, setPendingAction] = React.useState<string | null>(null)
-  const timeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const isBusy = externalPending || pendingAction !== null
 
+  // Keep the spinner (and block a second click) until the handler's promise
+  // settles — including any "apply to subtasks?" prompt and the save itself.
   const startAction = React.useCallback(
-    (actionName: string, action: () => void) => {
+    (actionName: string, action: () => void | Promise<unknown>) => {
       if (isBusy) return
       setPendingAction(actionName)
-      action()
-      // Clear after 1.5s since we don't get mutation callbacks
-      if (timeoutRef.current) clearTimeout(timeoutRef.current)
-      timeoutRef.current = setTimeout(() => setPendingAction(null), 1500)
+      Promise.resolve()
+        .then(action)
+        .catch(() => {}) // handlers report their own errors
+        .finally(() => setPendingAction(null))
     },
     [isBusy]
   )
-
-  // Clean up timeout on unmount
-  React.useEffect(() => {
-    return () => {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current)
-    }
-  }, [])
 
   if (selectedCount === 0) return null
 

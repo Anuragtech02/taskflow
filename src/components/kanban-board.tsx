@@ -273,26 +273,17 @@ export function KanbanBoard({ tasks, statuses, listId, workspaceId }: KanbanBoar
   }, [])
 
   // Status change by dragging a card into another column. The card has
-  // already moved optimistically; ask about subtasks, then persist — or
-  // put the card back if the prompt is cancelled.
+  // already moved optimistically (and fades while saving); ask about
+  // subtasks, then persist — or put the card back if the prompt is
+  // cancelled or the save fails.
   const commitColumnMove = async (task: TaskResponse, status: string, statusName: string, order: number) => {
-    const choice = await askCascade({ taskIds: [task.id], action: "status", targetLabel: statusName, taskTitle: task.title })
-    if (!choice) {
-      reorderPendingRef.current = false
-      setLocalTasks(tasks)
-      return
-    }
-    updateTaskMutation.mutate({
-      taskId: task.id,
-      status,
-      order,
-      applyToSubtasks: choice.applyToSubtasks,
-    }, {
-      onSettled: () => {
-        reorderPendingRef.current = false
-        queryClient.invalidateQueries({ queryKey: ["tasks", listId] })
-      },
-    })
+    const result = await askCascade(
+      { taskIds: [task.id], action: "status", targetLabel: statusName, taskTitle: task.title, errorMessage: "Failed to update status" },
+      (applyToSubtasks) => updateTaskMutation.mutateAsync({ taskId: task.id, status, order, applyToSubtasks })
+    )
+    reorderPendingRef.current = false
+    if (result !== "done") setLocalTasks(tasks)
+    queryClient.invalidateQueries({ queryKey: ["tasks", listId] })
   }
 
   const handleDragEnd = (event: DragEndEvent) => {

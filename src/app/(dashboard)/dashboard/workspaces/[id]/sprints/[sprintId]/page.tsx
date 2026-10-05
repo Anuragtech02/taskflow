@@ -15,6 +15,7 @@ import {
   ArrowRight,
   FolderKanban,
   MessageSquare,
+  Loader2,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -54,6 +55,9 @@ import { TaskDetailPanel } from "@/components/task-detail-panel"
 import { SprintRetroBoard } from "@/components/sprint-retro-board"
 import { cn } from "@/lib/utils"
 import type { TaskResponse, SprintResponse } from "@/lib/api"
+import { toast } from "sonner"
+import { useSubtaskCascade } from "@/components/subtask-cascade"
+import { useIsTaskPending, whilePending } from "@/store/usePendingTasks"
 import { format, differenceInDays, eachDayOfInterval, isAfter, isBefore, isToday } from "date-fns"
 import {
   LineChart,
@@ -191,6 +195,22 @@ function SprintTaskCard({
   onClick?: () => void
 }) {
   const removeFromSprint = useRemoveTaskFromSprint()
+  const askCascade = useSubtaskCascade()
+  const isSaving = useIsTaskPending(task.id)
+
+  const handleRemove = async () => {
+    let moved = 0
+    const result = await askCascade(
+      { taskIds: [task.id], action: "unsprint", taskTitle: task.title, sprintId, errorMessage: "Failed to remove task from sprint" },
+      async (applyToSubtasks) => {
+        const data = await removeFromSprint.mutateAsync({ sprintId, taskId: task.id, applyToSubtasks })
+        moved = data?.subtasksUpdated ?? 0
+      }
+    )
+    if (result === "done") {
+      toast.success(moved ? `Task and ${moved} subtask${moved === 1 ? "" : "s"} moved to Backlog` : "Task moved to Backlog")
+    }
+  }
 
   const priorityColors: Record<string, string> = {
     urgent: "bg-red-200 text-red-800 border-red-300",
@@ -200,17 +220,29 @@ function SprintTaskCard({
   }
 
   return (
-    <div className="group rounded-lg border bg-card p-3 shadow-sm hover:shadow-md transition-shadow cursor-pointer" onClick={onClick}>
+    <div
+      aria-busy={isSaving || undefined}
+      className={cn(
+        "group rounded-lg border bg-card p-3 shadow-sm hover:shadow-md transition-[box-shadow,opacity] cursor-pointer",
+        isSaving && "opacity-50 pointer-events-none select-none"
+      )}
+      onClick={onClick}
+    >
       <div className="flex items-start justify-between">
         <h4 className="text-sm font-medium leading-tight hover:text-primary transition-colors">{task.title}</h4>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-          onClick={(e) => { e.stopPropagation(); removeFromSprint.mutate({ sprintId, taskId: task.id }) }}
-        >
-          <X className="h-3 w-3" />
-        </Button>
+        {isSaving ? (
+          <Loader2 className="h-3.5 w-3.5 m-1 animate-spin text-muted-foreground" aria-label="Saving" />
+        ) : (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+            title="Remove from sprint"
+            onClick={(e) => { e.stopPropagation(); void handleRemove() }}
+          >
+            <X className="h-3 w-3" />
+          </Button>
+        )}
       </div>
       <div className="flex items-center gap-2 mt-2">
         {task.priority && (
@@ -377,26 +409,36 @@ export default function SprintDetailPage() {
     setShowCloseDialog(true)
   }
 
-  const confirmCloseSprint = () => {
-    if (closeOption === "move" && targetSprintId && incompleteTasks.length > 0) {
-      // Move incomplete tasks to target sprint
-      incompleteTasks.forEach((task: TaskResponse) => {
-        moveTaskBetweenSprintsMutation.mutate({
-          fromSprintId: sprintId,
-          toSprintId: targetSprintId,
-          taskId: task.id,
-        })
-      })
-    } else {
-      // Just remove incomplete tasks from sprint (keep in backlog)
-      incompleteTasks.forEach((task: TaskResponse) => {
-        removeTaskFromSprintMutation.mutate({ sprintId, taskId: task.id })
-      })
+  // Every incomplete task moves — subtasks included, since they're in the
+  // sprint too — so there's no "also subtasks?" prompt here. Done tasks
+  // stay behind as the sprint's record.
+  const [isClosing, setIsClosing] = useState(false)
+  const confirmCloseSprint = async () => {
+    if (isClosing) return
+    setIsClosing(true)
+    const ids = incompleteTasks.map((t: TaskResponse) => t.id)
+    try {
+      const results = await whilePending(ids, () => Promise.allSettled(
+        incompleteTasks.map((task: TaskResponse) =>
+          closeOption === "move" && targetSprintId
+            ? moveTaskBetweenSprintsMutation.mutateAsync({ fromSprintId: sprintId, toSprintId: targetSprintId, taskId: task.id })
+            : removeTaskFromSprintMutation.mutateAsync({ sprintId, taskId: task.id })
+        )
+      ))
+      const failed = results.filter((r) => r.status === "rejected").length
+      if (failed > 0) {
+        // Don't freeze the sprint with tasks still stuck in it — let them retry.
+        toast.error(`${failed} task${failed === 1 ? "" : "s"} couldn't be moved. The sprint is still open; try again.`)
+        return
+      }
+      await updateSprintMutation.mutateAsync({ sprintId, status: "completed" })
+      setShowCloseDialog(false)
+      toast.success(ids.length ? `Sprint completed · ${ids.length} task${ids.length === 1 ? "" : "s"} moved` : "Sprint completed")
+    } catch {
+      toast.error("Failed to complete the sprint")
+    } finally {
+      setIsClosing(false)
     }
-    
-    // Mark sprint as completed
-    updateSprintMutation.mutate({ sprintId, status: "completed" })
-    setShowCloseDialog(false)
   }
 
   const moveTaskBetweenSprintsMutation = useMoveTaskBetweenSprints()
@@ -633,8 +675,8 @@ export default function SprintDetailPage() {
       </div>
 
       {/* Close Sprint Dialog */}
-      <Dialog open={showCloseDialog} onOpenChange={setShowCloseDialog}>
-        <DialogContent>
+      <Dialog open={showCloseDialog} onOpenChange={(open) => { if (!isClosing) setShowCloseDialog(open) }}>
+        <DialogContent onEscapeKeyDown={(e) => { if (isClosing) e.preventDefault() }} onInteractOutside={(e) => { if (isClosing) e.preventDefault() }}>
           <DialogHeader>
             <DialogTitle>Complete Sprint</DialogTitle>
             <DialogDescription>
@@ -712,14 +754,20 @@ export default function SprintDetailPage() {
           )}
           
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCloseDialog(false)}>
+            <Button variant="outline" disabled={isClosing} onClick={() => setShowCloseDialog(false)}>
               Cancel
             </Button>
             <Button
               onClick={confirmCloseSprint}
-              disabled={closeOption === "move" && !targetSprintId && incompleteTasks.length > 0}
+              disabled={isClosing || (closeOption === "move" && !targetSprintId && incompleteTasks.length > 0)}
+              aria-busy={isClosing}
             >
-              {incompleteTasks.length > 0 && closeOption === "move" ? (
+              {isClosing ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                  {incompleteTasks.length > 0 ? `Moving ${incompleteTasks.length} task${incompleteTasks.length === 1 ? "" : "s"}…` : "Completing…"}
+                </>
+              ) : incompleteTasks.length > 0 && closeOption === "move" ? (
                 <>
                   <ArrowRight className="h-4 w-4 mr-1" />
                   Move & Complete

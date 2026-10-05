@@ -410,16 +410,17 @@ export function useUpdateTask() {
       parentTaskId?: string | null
       applyToSubtasks?: boolean
     }) => updateTask(taskId, data),
+    // Returning the refetch promise makes mutateAsync (and per-call onSuccess)
+    // wait until the fresh data is on screen, so "saving" indicators stay up
+    // until the change is actually visible.
     onSuccess: (data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["tasks"] })
-      queryClient.invalidateQueries({ queryKey: ["task", variables.taskId] })
+      const keys: unknown[][] = [["tasks"], ["task", variables.taskId]]
       // A cascade changed other tasks too; any open panel, subtask list or
       // list view may be showing one of them.
       if (data?.subtasksUpdated) {
-        for (const key of ["task", "subtasks", "list-tasks-paged", "list-subtasks", "bulk-task-meta"]) {
-          queryClient.invalidateQueries({ queryKey: [key] })
-        }
+        for (const key of ["task", "subtasks", "list-tasks-paged", "list-subtasks", "bulk-task-meta"]) keys.push([key])
       }
+      return Promise.all(keys.map((queryKey) => queryClient.invalidateQueries({ queryKey })))
     },
   })
 }
@@ -595,24 +596,26 @@ export function useAddTaskToSprint() {
 export function useRemoveTaskFromSprint() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ sprintId, taskId }: { sprintId: string; taskId: string }) =>
-      removeTaskFromSprint(sprintId, taskId),
-    onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["sprint", variables.sprintId] })
-      queryClient.invalidateQueries({ queryKey: ["tasks"] })
-    },
+    mutationFn: ({ sprintId, taskId, applyToSubtasks }: { sprintId: string; taskId: string; applyToSubtasks?: boolean }) =>
+      removeTaskFromSprint(sprintId, taskId, applyToSubtasks),
+    onSuccess: (_data, variables) => Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["sprint", variables.sprintId] }),
+      queryClient.invalidateQueries({ queryKey: ["tasks"] }),
+    ]),
   })
 }
 
 export function useMoveTaskBetweenSprints() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ fromSprintId, toSprintId, taskId }: { fromSprintId: string; toSprintId: string; taskId: string }) =>
-      moveTaskBetweenSprints(fromSprintId, toSprintId, taskId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["sprints"] })
-      queryClient.invalidateQueries({ queryKey: ["tasks"] })
-    },
+    mutationFn: ({ fromSprintId, toSprintId, taskId, applyToSubtasks }: { fromSprintId: string; toSprintId: string; taskId: string; applyToSubtasks?: boolean }) =>
+      moveTaskBetweenSprints(fromSprintId, toSprintId, taskId, applyToSubtasks),
+    onSuccess: (_data, variables) => Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["sprints"] }),
+      queryClient.invalidateQueries({ queryKey: ["sprint", variables.fromSprintId] }),
+      queryClient.invalidateQueries({ queryKey: ["sprint", variables.toSprintId] }),
+      queryClient.invalidateQueries({ queryKey: ["tasks"] }),
+    ]),
   })
 }
 

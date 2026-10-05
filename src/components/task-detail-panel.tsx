@@ -2,7 +2,7 @@
 
 import api from "@/lib/axios"
 import { useState, useEffect, useCallback, useMemo, useRef } from "react"
-import { X, Calendar, Clock, CheckSquare, MessageSquare, Play, Pause, Square, Trash2, Plus, Check, Search, Link2, ChevronRight, Tag, Paperclip, AlertCircle, ArrowUpRight, MoreHorizontal, CircleCheckBig, Flag, Users, Timer, Gauge, ChevronDown, FolderKanban, FileText, Film, Edit3, Lock, ExternalLink, List as ListIcon, Maximize, Minimize, Download } from "lucide-react"
+import { X, Calendar, Clock, CheckSquare, MessageSquare, Play, Pause, Square, Trash2, Plus, Check, Search, Link2, ChevronRight, Tag, Paperclip, AlertCircle, ArrowUpRight, MoreHorizontal, CircleCheckBig, Flag, Users, Timer, Gauge, ChevronDown, FolderKanban, FileText, Film, Edit3, Lock, ExternalLink, List as ListIcon, Maximize, Minimize, Download, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -95,6 +95,7 @@ import { useSession } from "next-auth/react"
 import { CUSTOM_FIELD_TYPES, type CustomFieldType } from "@/lib/api"
 import { toast } from "sonner"
 import { useSubtaskCascade } from "@/components/subtask-cascade"
+import { useIsTaskPending } from "@/store/usePendingTasks"
 import { cn } from "@/lib/utils"
 import { extractTextFromTiptap } from "@/lib/tiptap"
 import { compressImage } from "@/lib/image-compression"
@@ -320,6 +321,8 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
 
   const updateTaskMutation = useUpdateTask()
   const askCascade = useSubtaskCascade()
+  // A status change / move on this task is in flight (from here or elsewhere).
+  const isSaving = useIsTaskPending(currentTask?.id || task?.id || "")
   const deleteTaskMutation = useDeleteTask()
 
   const queryClient = useQueryClient()
@@ -843,18 +846,16 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
     // Subtasks are full tasks - toggle between todo and done
     const newStatus = subtask.status === "done" ? "todo" : "done"
     // A subtask can have its own subtasks — offer to carry them along.
-    const choice = await askCascade({
-      taskIds: [subtask.id],
-      action: "status",
-      targetLabel: newStatus === "done" ? "Done" : "To Do",
-      taskTitle: subtask.title,
-    })
-    if (!choice) return
-    updateTaskMutation.mutate({
-      taskId: subtask?.id,
-      status: newStatus,
-      applyToSubtasks: choice.applyToSubtasks,
-    })
+    await askCascade(
+      {
+        taskIds: [subtask.id],
+        action: "status",
+        targetLabel: newStatus === "done" ? "Done" : "To Do",
+        taskTitle: subtask.title,
+        errorMessage: "Failed to update subtask",
+      },
+      (applyToSubtasks) => updateTaskMutation.mutateAsync({ taskId: subtask.id, status: newStatus, applyToSubtasks })
+    )
   }
 
   const handleDeleteSubtask = (subtaskId: string) => {
@@ -1072,30 +1073,34 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
                   </span>
                   <Select
                     value={status}
+                    disabled={isSaving}
                     onValueChange={async (value) => {
                       const effectiveId = currentTask?.id || task?.id
                       if (!effectiveId) return
-                      const choice = await askCascade({
-                        taskIds: [effectiveId],
-                        action: "status",
-                        targetLabel: displayStatuses.find((s) => normalizeStatusName(s.name) === value)?.name ?? value,
-                        taskTitle: currentTask?.title,
-                      })
-                      if (!choice) return
-                      setStatus(value)
-                      updateTaskMutation.mutate({
-                        taskId: effectiveId,
-                        status: value,
-                        applyToSubtasks: choice.applyToSubtasks,
-                      }, {
-                        onSuccess: (data) => {
-                          const n = data?.subtasksUpdated ?? 0
-                          toast.success(n ? `Status updated on this task and ${n} subtask${n === 1 ? "" : "s"}` : "Status updated")
+                      const previous = status
+                      let changed = 0
+                      const result = await askCascade(
+                        {
+                          taskIds: [effectiveId],
+                          action: "status",
+                          targetLabel: displayStatuses.find((s) => normalizeStatusName(s.name) === value)?.name ?? value,
+                          taskTitle: currentTask?.title,
+                          errorMessage: "Failed to update status",
                         },
-                      })
+                        async (applyToSubtasks) => {
+                          setStatus(value)
+                          const data = await updateTaskMutation.mutateAsync({ taskId: effectiveId, status: value, applyToSubtasks })
+                          changed = data?.subtasksUpdated ?? 0
+                        }
+                      )
+                      if (result === "failed") setStatus(previous)
+                      if (result === "done") {
+                        toast.success(changed ? `Status updated on this task and ${changed} subtask${changed === 1 ? "" : "s"}` : "Status updated")
+                      }
                     }}
                   >
                     <SelectTrigger className="h-8 flex-1">
+                      {isSaving && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground mr-1 flex-shrink-0" />}
                       <SelectValue placeholder="Select status">
                         {currentStatus && (
                           <div className="flex items-center gap-2">
@@ -1540,28 +1545,35 @@ export function TaskDetailPanel({ task, taskId: taskIdProp, open, onClose, onTas
                     onSelect={async (listId, listName) => {
                       const effectiveId = currentTask?.id || task?.id
                       if (!effectiveId) return
-                      const choice = await askCascade({
-                        taskIds: [effectiveId],
-                        action: "move",
-                        targetLabel: listName,
-                        taskTitle: currentTask?.title,
-                      })
-                      if (!choice) return
-                      updateTaskMutation.mutate(
-                        { taskId: effectiveId, listId, applyToSubtasks: choice.applyToSubtasks },
+                      let moved = 0
+                      const result = await askCascade(
                         {
-                          onSuccess: (data) => {
-                            queryClient.invalidateQueries({ queryKey: ["task", effectiveId] })
-                            queryClient.invalidateQueries({ queryKey: ["list"] })
-                            const n = data?.subtasksUpdated ?? 0
-                            toast.success(n ? `Task and ${n} subtask${n === 1 ? "" : "s"} moved` : "Task moved to another list")
-                          },
+                          taskIds: [effectiveId],
+                          action: "move",
+                          targetLabel: listName,
+                          taskTitle: currentTask?.title,
+                          errorMessage: "Failed to move task",
+                        },
+                        async (applyToSubtasks) => {
+                          const data = await updateTaskMutation.mutateAsync({ taskId: effectiveId, listId, applyToSubtasks })
+                          moved = data?.subtasksUpdated ?? 0
+                          await Promise.all([
+                            queryClient.invalidateQueries({ queryKey: ["task", effectiveId] }),
+                            queryClient.invalidateQueries({ queryKey: ["list"] }),
+                          ])
                         }
                       )
+                      if (result === "done") {
+                        toast.success(moved ? `Task and ${moved} subtask${moved === 1 ? "" : "s"} moved` : "Task moved to another list")
+                      }
                     }}
                     trigger={
-                      <button className="h-8 px-3 text-sm text-left rounded-md border border-input bg-background hover:bg-accent hover:text-accent-foreground transition-colors flex-1 truncate">
-                        {currentList?.name || "Select list"}
+                      <button
+                        disabled={isSaving}
+                        className="h-8 px-3 text-sm text-left rounded-md border border-input bg-background hover:bg-accent hover:text-accent-foreground transition-colors flex-1 truncate flex items-center gap-1.5 disabled:opacity-60 disabled:pointer-events-none"
+                      >
+                        {isSaving && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground flex-shrink-0" />}
+                        <span className="truncate">{currentList?.name || "Select list"}</span>
                       </button>
                     }
                   />

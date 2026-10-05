@@ -7,7 +7,8 @@ import { useSubtaskCascade } from "@/components/subtask-cascade"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
-import { MoreHorizontal, Calendar } from "lucide-react"
+import { MoreHorizontal, Calendar, Loader2 } from "lucide-react"
+import { useIsTaskPending } from "@/store/usePendingTasks"
 import { cn } from "@/lib/utils"
 
 function getInitials(name: string): string {
@@ -42,6 +43,7 @@ export function SubtaskRow({ subtask, onClick, statuses }: SubtaskRowProps) {
   const toggleMutation = useToggleSubtask()
   const updateMutation = useUpdateTask()
   const askCascade = useSubtaskCascade()
+  const isSaving = useIsTaskPending(subtask.id)
   
   const handleToggle = () => {
     toggleMutation.mutate({ 
@@ -60,22 +62,31 @@ export function SubtaskRow({ subtask, onClick, statuses }: SubtaskRowProps) {
 
   const handleStatusChange = async (statusId: string) => {
     setShowStatusMenu(false)
-    const choice = await askCascade({
-      taskIds: [subtask.id],
-      action: "status",
-      targetLabel: statuses.find((s) => s.id === statusId)?.name ?? statusId,
-      taskTitle: subtask.title,
-    })
-    if (!choice) return
-    updateMutation.mutate({ taskId: subtask.id, status: statusId, applyToSubtasks: choice.applyToSubtasks })
+    await askCascade(
+      {
+        taskIds: [subtask.id],
+        action: "status",
+        targetLabel: statuses.find((s) => s.id === statusId)?.name ?? statusId,
+        taskTitle: subtask.title,
+        errorMessage: "Failed to update status",
+      },
+      (applyToSubtasks) => updateMutation.mutateAsync({ taskId: subtask.id, status: statusId, applyToSubtasks })
+    )
   }
-  
+
   const getCurrentStatus = () => {
     return statuses.find(s => s.id === subtask.status) || statuses[0]
   }
   
   return (
-    <div className="flex items-center gap-2 p-2 rounded-md hover:bg-muted/50 group border border-transparent hover:border-border/50 transition-all">
+    <div
+      aria-busy={isSaving || undefined}
+      className={cn(
+        "flex items-center gap-2 p-2 rounded-md hover:bg-muted/50 group border border-transparent hover:border-border/50 transition-all",
+        isSaving && "opacity-50 pointer-events-none select-none"
+      )}
+    >
+      {isSaving && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground flex-shrink-0" aria-label="Saving" />}
       {/* Status checkbox / status indicator */}
       <div className="relative">
         <button

@@ -3,7 +3,8 @@
 import { useState } from "react"
 import { useSortable } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
-import { Calendar, Clock, Trash2, UserPlus, MessageSquare, CheckSquare, Flag, Link2, Lock } from "lucide-react"
+import { Calendar, Clock, Trash2, UserPlus, MessageSquare, CheckSquare, Flag, Link2, Lock, Loader2 } from "lucide-react"
+import { useIsTaskPending } from "@/store/usePendingTasks"
 import { StatusBadge } from "@/components/status-badge"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -48,6 +49,8 @@ export interface TaskCardProps {
 }
 
 export function TaskCard({ task, onClick, onDelete, onAssign, className, bulkSubtasks, bulkComments }: TaskCardProps) {
+  // Fade + block input (including dragging) while a change is saving.
+  const isSaving = useIsTaskPending(task.id)
   const {
     attributes,
     listeners,
@@ -55,7 +58,7 @@ export function TaskCard({ task, onClick, onDelete, onAssign, className, bulkSub
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: task.id })
+  } = useSortable({ id: task.id, disabled: isSaving })
 
   const [isHovered, setIsHovered] = useState(false)
 
@@ -135,9 +138,14 @@ export function TaskCard({ task, onClick, onDelete, onAssign, className, bulkSub
           priorityBorder && `border-l-[3px] ${priorityBorder}`,
           isDragging && "opacity-50 shadow-lg",
           isBlocked && "opacity-60 ring-1 ring-orange-300/50 dark:ring-orange-700/50",
-          className
+          className,
+          isSaving && "opacity-50 pointer-events-none select-none"
         )}
+        aria-busy={isSaving || undefined}
       >
+        {isSaving && (
+          <Loader2 className="absolute right-2 top-2 h-3.5 w-3.5 animate-spin text-muted-foreground" aria-label="Saving" />
+        )}
         {/* Hover Actions */}
         <div className={cn(
           "absolute top-2 right-2 flex items-center gap-1 transition-opacity duration-150",
