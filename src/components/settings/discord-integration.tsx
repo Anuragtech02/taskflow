@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { Loader2, MessageSquare, Pencil, Plus, Send, Trash2 } from "lucide-react"
+import { Loader2, Lock, MessageSquare, Pencil, Plus, Send, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
@@ -16,7 +16,7 @@ import { Switch } from "@/components/ui/switch"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import {
-  discordErrorMessage, discordInstallUrl, discordLinkUrl,
+  botCanPost, discordErrorMessage, discordInstallUrl, discordLinkUrl,
   useDeleteDiscordReminder, useDisconnectDiscordServer, useDiscordAccount, useDiscordChannels,
   useDiscordMembers, useDiscordReminders, useDiscordRoles, useSaveDiscordReminder,
   useTestDiscordReminder, useUnlinkDiscord, useUpdateDiscordTimezone, useWorkspaceDiscord,
@@ -80,6 +80,7 @@ export function DiscordIntegration({ workspaces, workspaceId, onWorkspaceChange 
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<DiscordReminder | null>(null)
   const channelName = useMemo(() => new Map((channels.data ?? []).map((c) => [c.id, c.name])), [channels.data])
+  const channelById = useMemo(() => new Map((channels.data ?? []).map((c) => [c.id, c])), [channels.data])
   const memberName = useMemo(() => new Map((members.data ?? []).map((m) => [m.userId, m.name])), [members.data])
   // The browser's zone list can omit "UTC" and uses its own canonical names
   // (e.g. Asia/Calcutta for Asia/Kolkata). A Select whose value isn't among
@@ -267,7 +268,22 @@ export function DiscordIntegration({ workspaces, workspaceId, onWorkspaceChange 
                             <div className="font-medium">{r.name}</div>
                             <div className="text-xs text-muted-foreground">{r.scheduleSummary}</div>
                           </TableCell>
-                          <TableCell className="text-sm">#{channelName.get(r.channelId) ?? "unknown"}</TableCell>
+                          <TableCell className="text-sm">
+                            <span className="inline-flex items-center gap-1.5">
+                              #{channelName.get(r.channelId) ?? "unknown"}
+                              {channelById.has(r.channelId) && !botCanPost(channelById.get(r.channelId)) && (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Lock className="h-3.5 w-3.5 text-destructive" aria-label="The bot can't post here" />
+                                  </TooltipTrigger>
+                                  <TooltipContent className="max-w-xs">
+                                    The TaskFlow bot can&apos;t post in this private channel. In Discord: channel settings → Permissions →
+                                    Add members or roles → TaskFlow, then allow View Channel and Send Messages.
+                                  </TooltipContent>
+                                </Tooltip>
+                              )}
+                            </span>
+                          </TableCell>
                           <TableCell><NextRun r={r} /></TableCell>
                           <TableCell><LastRun r={r} /></TableCell>
                           <TableCell>
@@ -347,6 +363,8 @@ export function DiscordIntegration({ workspaces, workspaceId, onWorkspaceChange 
             reminder={editing}
             channels={channels.data ?? []}
             channelsError={channels.isError}
+            onRefreshChannels={() => { void channels.refetch() }}
+            channelsRefreshing={channels.isFetching}
             roles={roles.data ?? []}
             members={members.data ?? []}
           />

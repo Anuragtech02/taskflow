@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { Check, ChevronsUpDown, Loader2, Plus, X } from "lucide-react"
+import { AlertTriangle, Check, ChevronsUpDown, Loader2, Lock, Plus, RefreshCw, X } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -15,8 +15,10 @@ import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
 import {
+  botCanPost,
   discordErrorMessage,
   useSaveDiscordReminder,
+  type DiscordChannel,
   type DiscordMember,
   type DiscordReminder,
   type ReminderSchedule,
@@ -66,13 +68,26 @@ interface Props {
   workspaceId: string
   appUrl: string
   reminder: DiscordReminder | null // null → create
-  channels: { id: string; name: string }[]
+  channels: DiscordChannel[]
   channelsError: boolean
+  /** Re-read channels from Discord (after adding the bot to a private one). */
+  onRefreshChannels?: () => void
+  channelsRefreshing?: boolean
   roles: { id: string; name: string }[]
   members: DiscordMember[]
 }
 
-export function DiscordReminderDialog({ open, onOpenChange, workspaceId, appUrl, reminder, channels, channelsError, roles, members }: Props) {
+function RefreshChannels({ onClick, busy }: { onClick: () => void; busy?: boolean }) {
+  return (
+    <button type="button" onClick={onClick} disabled={busy}
+      className="inline-flex items-center gap-1 font-medium text-foreground underline-offset-2 hover:underline disabled:opacity-60">
+      <RefreshCw className={cn("h-3 w-3", busy && "animate-spin")} />
+      {busy ? "Refreshing…" : "Refresh channels"}
+    </button>
+  )
+}
+
+export function DiscordReminderDialog({ open, onOpenChange, workspaceId, appUrl, reminder, channels, channelsError, onRefreshChannels, channelsRefreshing, roles, members }: Props) {
   const save = useSaveDiscordReminder(workspaceId)
   const zones = useMemo(() => {
     const z = allZones()
@@ -139,6 +154,10 @@ export function DiscordReminderDialog({ open, onOpenChange, workspaceId, appUrl,
     setError(null)
     if (!name.trim()) return setError("Give the reminder a name")
     if (!channelId) return setError("Pick a channel")
+    const picked = channels.find((c) => c.id === channelId)
+    if (enabled && picked && !botCanPost(picked)) {
+      return setError(`Add the TaskFlow bot to #${picked.name} first (or save it paused)`)
+    }
     if (!message.trim()) return setError("Write a message")
     if (taskLinkInvalid) return setError("That task link isn't a TaskFlow task link")
     if (repeat !== "once" && schedule.kind !== "once" && schedule.times.length === 0) return setError("Add at least one time")
@@ -177,11 +196,62 @@ export function DiscordReminderDialog({ open, onOpenChange, workspaceId, appUrl,
               <Select value={channelId} onValueChange={setChannelId}>
                 <SelectTrigger><SelectValue placeholder={channelsError ? "Couldn't load channels" : "Pick a channel"} /></SelectTrigger>
                 <SelectContent>
-                  {channels.map((c) => <SelectItem key={c.id} value={c.id}>#{c.name}</SelectItem>)}
+                  {channels.map((c) => (
+                    <SelectItem key={c.id} value={c.id} disabled={!botCanPost(c) && c.id !== channelId}>
+                      <span className="flex items-center gap-1.5">
+                        {!botCanPost(c) && <Lock className="h-3 w-3 text-muted-foreground" />}
+                        #{c.name}
+                        {!botCanPost(c) && <span className="text-xs text-muted-foreground">· bot not added</span>}
+                      </span>
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
           </div>
+
+          {(() => {
+            const selected = channels.find((c) => c.id === channelId)
+            const locked = channels.some((c) => !botCanPost(c))
+            const softMissing = selected && botCanPost(selected) ? (selected.missing ?? []) : []
+            if (selected && !botCanPost(selected)) {
+              return (
+                <div className="flex gap-2 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-xs">
+                  <AlertTriangle className="h-4 w-4 flex-shrink-0 text-destructive" />
+                  <div className="space-y-1">
+                    <p className="font-medium">The TaskFlow bot can&apos;t post in #{selected.name}.</p>
+                    <p className="text-muted-foreground">
+                      It&apos;s private (or read-only) and the bot hasn&apos;t been added. In Discord, open the channel&apos;s
+                      settings → <b>Permissions</b> → <b>Add members or roles</b> → <b>TaskFlow</b>, and allow View Channel and
+                      Send Messages. Then refresh the channels here.
+                    </p>
+                    {onRefreshChannels && <RefreshChannels onClick={onRefreshChannels} busy={channelsRefreshing} />}
+                  </div>
+                </div>
+              )
+            }
+            return (
+              <>
+                {softMissing.length > 0 && (
+                  <p className="flex items-start gap-1.5 text-xs text-amber-600 dark:text-amber-400">
+                    <AlertTriangle className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" />
+                    The bot can post in #{selected!.name} but is missing {softMissing.join(" and ")} there
+                    {softMissing.includes("Embed Links") && " (the linked task card won't show)"}
+                    {softMissing.includes("Mention Everyone") && " (@here and role tags won't ping)"}.
+                  </p>
+                )}
+                {locked && (
+                  <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
+                    <Lock className="mt-0.5 h-3 w-3 flex-shrink-0" />
+                    <span>
+                      Private channels need the TaskFlow bot added first: channel settings → Permissions → Add members or roles → TaskFlow.
+                      {onRefreshChannels && <> <RefreshChannels onClick={onRefreshChannels} busy={channelsRefreshing} /></>}
+                    </span>
+                  </p>
+                )}
+              </>
+            )
+          })()}
 
           <div className="space-y-2">
             <div className="flex items-center justify-between">

@@ -84,9 +84,21 @@ export function useWorkspaceDiscord(workspaceId: string | null) {
   })
 }
 
+export interface DiscordChannel {
+  id: string
+  name: string
+  /** False for private channels the bot hasn't been added to (or read-only ones). */
+  canPost?: boolean
+  /** Permissions the bot lacks there, e.g. "View Channel", "Embed Links". */
+  missing?: string[]
+}
+
+/** The bot can post here (older servers didn't report access: assume yes). */
+export const botCanPost = (c?: DiscordChannel) => c?.canPost !== false
+
 /** Channels/roles come live from Discord, so only fetch once a server is connected. */
 export function useDiscordChannels(workspaceId: string | null, enabled: boolean) {
-  return useQuery<{ id: string; name: string }[]>({
+  return useQuery<DiscordChannel[]>({
     queryKey: ["discord", "channels", workspaceId],
     queryFn: async () => (await api.get(`/workspaces/${workspaceId}/discord/channels`)).data.channels,
     enabled: !!workspaceId && enabled,
