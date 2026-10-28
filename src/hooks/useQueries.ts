@@ -894,6 +894,10 @@ export function useAddTaskAssignee() {
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["task-assignees", variables.taskId] })
       queryClient.invalidateQueries({ queryKey: ["bulk-task-meta"] })
+      // The board and sprint views read assignees inline from these.
+      queryClient.invalidateQueries({ queryKey: ["tasks"] })
+      queryClient.invalidateQueries({ queryKey: ["task", variables.taskId] })
+      queryClient.invalidateQueries({ queryKey: ["sprint"] })
     },
   })
 }
@@ -906,6 +910,10 @@ export function useRemoveTaskAssignee() {
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["task-assignees", variables.taskId] })
       queryClient.invalidateQueries({ queryKey: ["bulk-task-meta"] })
+      // The board and sprint views read assignees inline from these.
+      queryClient.invalidateQueries({ queryKey: ["tasks"] })
+      queryClient.invalidateQueries({ queryKey: ["task", variables.taskId] })
+      queryClient.invalidateQueries({ queryKey: ["sprint"] })
     },
   })
 }

@@ -1279,6 +1279,34 @@ export default function ListPage({
     return keys.sort()
   }
 
+  // Props every task row gets, whichever layout renders it (grouped, flat,
+  // virtualized). Keep these in one place: the layouts used to list them
+  // separately and drifted — the flat views lost assignees, labels and
+  // "Move to list".
+  const sharedRowProps = {
+    onSelect: handleTaskSelect,
+    onStatusChange: handleStatusChange,
+    onClick: (taskId: string) => setSelectedTask(taskId),
+    workspaceId,
+    workspaceMembers: workspaceMembers || [],
+    onPriorityChange: handlePriorityChange,
+    onDueDateChange: handleDueDateChange,
+    onAssigneeAdd: handleAssigneeAdd,
+    onAssigneeRemove: handleAssigneeRemove,
+    onLabelAdd: handleLabelAdd,
+    onLabelRemove: handleLabelRemove,
+    availableLabels: availableLabelsForRows,
+    onRename: handleRename,
+    onAddSubtask: handleAddSubtask,
+    onMoveToList: handleMoveToList,
+    workspaceLists,
+    onDelete: handleDeleteTask,
+    columnWidths,
+    availableStatuses,
+    bulkAssignees: allTaskAssignees,
+    bulkLabels: allTaskLabels,
+  }
+
   // Calculate if we need padding for the bulk actions bar
   const hasSelectedTasks = selectedTasks.size > 0
   const contentPaddingBottom = hasSelectedTasks ? "pb-20" : ""
@@ -1522,27 +1550,7 @@ export default function ListPage({
                                   isExpanded={expandedTasks.has(task.id)}
                                   onToggleExpand={toggleExpand}
                                   isSelected={selectedTasks.has(task.id)}
-                                  onSelect={handleTaskSelect}
-                                  onStatusChange={handleStatusChange}
-                                  onClick={(taskId) => setSelectedTask(taskId)}
-                                  workspaceId={workspaceId}
-                                  workspaceMembers={workspaceMembers || []}
-                                  onPriorityChange={handlePriorityChange}
-                                  onDueDateChange={handleDueDateChange}
-                                  onAssigneeAdd={handleAssigneeAdd}
-                                  onAssigneeRemove={handleAssigneeRemove}
-                                  onLabelAdd={handleLabelAdd}
-                                  onLabelRemove={handleLabelRemove}
-                                  availableLabels={availableLabelsForRows}
-                                  onRename={handleRename}
-                                  onAddSubtask={handleAddSubtask}
-                                  onMoveToList={handleMoveToList}
-                                  workspaceLists={workspaceLists}
-                                  onDelete={handleDeleteTask}
-                                  columnWidths={columnWidths}
-                                  availableStatuses={availableStatuses}
-                                  bulkAssignees={allTaskAssignees}
-                                  bulkLabels={allTaskLabels}
+                                  {...sharedRowProps}
                                 />
                                 {addingSubtaskFor === task.id && (
                                   <InlineSubtaskInput
@@ -1599,24 +1607,7 @@ export default function ListPage({
                             isExpanded={expandedTasks.has(task.id)}
                             onToggleExpand={toggleExpand}
                             isSelected={selectedTasks.has(task.id)}
-                            onSelect={handleTaskSelect}
-                            onStatusChange={handleStatusChange}
-                            onClick={(taskId) => setSelectedTask(taskId)}
-                            workspaceId={workspaceId}
-                            workspaceMembers={workspaceMembers || []}
-                            onPriorityChange={handlePriorityChange}
-                            onDueDateChange={handleDueDateChange}
-                            onAssigneeAdd={handleAssigneeAdd}
-                            onAssigneeRemove={handleAssigneeRemove}
-                            onLabelAdd={handleLabelAdd}
-                            onLabelRemove={handleLabelRemove}
-                            availableLabels={availableLabelsForRows}
-                            onRename={handleRename}
-                            onAddSubtask={handleAddSubtask}
-                            onMoveToList={handleMoveToList}
-                            onDelete={handleDeleteTask}
-                            columnWidths={columnWidths}
-                            availableStatuses={availableStatuses}
+                            {...sharedRowProps}
                           />
                         </div>
                       )
@@ -1645,24 +1636,7 @@ export default function ListPage({
                                 isExpanded={expandedTasks.has(task.id)}
                                 onToggleExpand={toggleExpand}
                                 isSelected={selectedTasks.has(task.id)}
-                                onSelect={handleTaskSelect}
-                                onStatusChange={handleStatusChange}
-                                onClick={(taskId) => setSelectedTask(taskId)}
-                                workspaceId={workspaceId}
-                                workspaceMembers={workspaceMembers || []}
-                                onPriorityChange={handlePriorityChange}
-                                onDueDateChange={handleDueDateChange}
-                                onAssigneeAdd={handleAssigneeAdd}
-                                onAssigneeRemove={handleAssigneeRemove}
-                                onLabelAdd={handleLabelAdd}
-                                onLabelRemove={handleLabelRemove}
-                                availableLabels={availableLabelsForRows}
-                                onRename={handleRename}
-                                onAddSubtask={handleAddSubtask}
-                                onMoveToList={handleMoveToList}
-                                onDelete={handleDeleteTask}
-                                columnWidths={columnWidths}
-                                availableStatuses={availableStatuses}
+                                {...sharedRowProps}
                               />
                             </SortableTaskRow>
                             {addingSubtaskFor === task.id && (
