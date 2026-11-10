@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils"
 import type { TaskResponse, WorkspaceSpaceWithLists } from "@/lib/api"
 import { Input } from "@/components/ui/input"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { Calendar as CalendarIcon, Plus, ChevronRight, ChevronDown, Pencil, ListPlus, Link2, Lock, Check, Trash2, ArrowRightLeft, ExternalLink, Circle, Flag, List as ListIcon, Loader2 } from "lucide-react"
+import { Calendar as CalendarIcon, Plus, ChevronRight, ChevronDown, Pencil, ListPlus, Link2, Lock, Check, Trash2, ArrowRightLeft, ExternalLink, Circle, Flag, List as ListIcon, Loader2, CornerDownRight } from "lucide-react"
 import { useIsTaskPending } from "@/store/usePendingTasks"
 import {
   ContextMenu,
@@ -26,8 +26,25 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu"
 
+/**
+ * Set when a subtask is shown on its own, away from its parent — e.g. under
+ * its assignee's group while the parent sits under someone else, or when a
+ * filter hid the parent. The row is drawn as a "borrowed" row so it's obvious
+ * it isn't one of this person's own top-level tasks.
+ */
+export interface ParentContext {
+  parentId: string
+  /** Undefined when the parent isn't loaded (other list, or closed). */
+  parentTitle?: string
+  /** Root → parent titles, for the tooltip. */
+  path: string[]
+  /** Who owns the parent: its assignees, else its creator. */
+  owners: { id: string; name: string; avatarUrl?: string | null }[]
+}
+
 export interface TaskTableRowProps {
   task: TaskResponse
+  parentContext?: ParentContext
   isSelected: boolean
   onSelect: (taskId: string, selected: boolean) => void
   onStatusChange?: (taskId: string, status: string) => void
@@ -94,6 +111,7 @@ const PRIORITY_ORDER: Record<string, number> = {
 
 export function TaskTableRow({
   task,
+  parentContext,
   isSelected,
   onSelect,
   onStatusChange,
@@ -226,13 +244,17 @@ export function TaskTableRow({
       <ContextMenuTrigger asChild>
     <div
       aria-busy={isSaving || undefined}
+      data-borrowed={parentContext ? "" : undefined}
       className={cn(
-        "flex items-center gap-2 px-4 py-2 border-b border-border/50 hover:bg-accent/30 transition-[colors,opacity] group",
+        "relative flex items-center gap-2 px-4 py-2 border-b border-border/50 hover:bg-accent/30 transition-[colors,opacity] group",
         isSelected && "bg-accent/50",
-        depth > 0 && "bg-muted/20",
+        depth > 0 && !parentContext && "bg-muted/20",
+        parentContext && !isSelected && "bg-sky-500/[0.05] dark:bg-sky-400/[0.07]",
         isSaving && "opacity-50 pointer-events-none select-none"
       )}
     >
+      {/* Accent bar marking a subtask that belongs to someone else's task */}
+      {parentContext && <span aria-hidden className="absolute left-0 inset-y-0 w-[3px] bg-sky-500/70 dark:bg-sky-400/70" />}
       {/* Indentation spacer — pushes all content including columns */}
       <div style={{ width: `${indentWidth}px` }} className="flex-shrink-0" />
 
@@ -286,6 +308,9 @@ export function TaskTableRow({
 
       {/* Name */}
       <div className="flex-1 min-w-[200px] flex items-center gap-1">
+        {parentContext && !isEditing && (
+          <CornerDownRight className="h-3.5 w-3.5 text-sky-600 dark:text-sky-400 flex-shrink-0" aria-label="Subtask" />
+        )}
         {isEditing ? (
           <Input
             ref={inputRef}
@@ -319,7 +344,8 @@ export function TaskTableRow({
           <button
             onClick={() => onClick?.(task.id)}
             className={cn(
-              "text-sm truncate block text-left hover:text-primary hover:underline transition-colors cursor-pointer",
+              "text-sm truncate block min-w-0 text-left hover:text-primary hover:underline transition-colors cursor-pointer",
+              parentContext && "flex-shrink-0 max-w-[60%]",
               status === "done" && "line-through text-muted-foreground",
               isBlocked && "opacity-60"
             )}
@@ -327,6 +353,7 @@ export function TaskTableRow({
             {task.title}
           </button>
         )}
+        {parentContext && !isEditing && <ParentChip ctx={parentContext} onOpen={onClick} />}
         {isSaving && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground flex-shrink-0 ml-1.5" aria-label="Saving" />}
         {/* Dependency indicator */}
         {isBlocked && (
@@ -856,3 +883,59 @@ export function TaskTableRow({
 }
 
 export { STATUS_ORDER, STATUS_COLORS, PRIORITY_ORDER }
+
+/**
+ * "↳ in <parent> · <owner>" pill on a borrowed subtask row. Clicking it opens
+ * the parent task.
+ */
+function ParentChip({ ctx, onOpen }: { ctx: ParentContext; onOpen?: (taskId: string) => void }) {
+  const ownerNames = ctx.owners.map((o) => o.name)
+  // First names keep the pill short; the tooltip has the full names.
+  const firstName = (n: string) => (n.includes("@") ? n.split("@")[0] : n.split(" ")[0])
+  const ownerLabel =
+    ownerNames.length === 0
+      ? null
+      : ownerNames.length === 1
+        ? firstName(ownerNames[0])
+        : `${firstName(ownerNames[0])} +${ownerNames.length - 1}`
+  const where = ctx.path.length ? ctx.path.join(" › ") : ctx.parentTitle
+  return (
+    <TooltipProvider delayDuration={200}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              if (ctx.parentTitle) onOpen?.(ctx.parentId)
+            }}
+            className="ml-1.5 inline-flex min-w-0 flex-shrink items-center gap-1 rounded-full border border-sky-500/30 bg-sky-500/10 px-1.5 py-0.5 text-[11px] leading-none text-sky-800 hover:bg-sky-500/20 dark:text-sky-200 transition-colors"
+          >
+            {ctx.owners.length > 0 && (
+              <span className="flex -space-x-1 flex-shrink-0">
+                {ctx.owners.slice(0, 2).map((o) => (
+                  <Avatar key={o.id} className="h-4 w-4 border border-background">
+                    {o.avatarUrl && <AvatarImage src={o.avatarUrl} />}
+                    <AvatarFallback className="text-[8px]">{o.name.charAt(0).toUpperCase()}</AvatarFallback>
+                  </Avatar>
+                ))}
+              </span>
+            )}
+            <span className="truncate">
+              {ownerLabel && <span className="font-medium">{ownerLabel}</span>}
+              {ownerLabel && " · "}
+              {ctx.parentTitle ?? "Parent task not in this view"}
+            </span>
+          </button>
+        </TooltipTrigger>
+        <TooltipContent className="max-w-xs">
+          <p>
+            Subtask of <span className="font-medium">{where ?? "another task"}</span>
+            {ownerLabel && <> (owned by {ownerNames.join(", ")})</>}.
+          </p>
+          <p className="text-muted-foreground">Same task as in the parent, so changes show up in both places.</p>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  )
+}

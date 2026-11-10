@@ -1,10 +1,11 @@
 "use client"
 
-import { TaskTableRow } from "./task-table-row"
+import { TaskTableRow, type ParentContext } from "./task-table-row"
 import type { TaskResponse, TaskAssigneeResponse, LabelResponse, WorkspaceSpaceWithLists } from "@/lib/api"
 
 interface TaskTableRowWrapperProps {
   task: TaskResponse
+  parentContext?: ParentContext
   isSelected: boolean
   onSelect: (taskId: string, selected: boolean) => void
   onStatusChange: (taskId: string, status: string) => void

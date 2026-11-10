@@ -1,4 +1,4 @@
-import { TaskResponse } from "./api"
+import type { TaskResponse } from "./api"
 
 export interface TaskTreeNode extends TaskResponse {
   children: TaskTreeNode[]
@@ -64,4 +64,52 @@ export function getSubtasks(node: TaskTreeNode, expandedIds: Set<string>): TaskT
     return []
   }
   return flattenTree(node.children, expandedIds)
+}
+
+/**
+ * Group a task tree by assignee so a subtask shows under the person it is
+ * assigned to, even when its parent belongs to someone else.
+ *
+ * Every group entry is a node that is drawn at the top of that group, with its
+ * own subtasks nested under it as usual:
+ *  - A root task is listed under EACH of its assignees (or "unassigned").
+ *  - A subtask is also listed under each of its assignees for whom none of its
+ *    ancestors is already listed. When an ancestor is already in that person's
+ *    group, the subtask is reachable nested under it, so listing it again
+ *    would only duplicate it.
+ *
+ * It is the same task object in every place, so edits show up everywhere.
+ * Entries keep the order of `orderIndex` (the list's current sort); a
+ * subtask entry has depth > 0, which is how callers tell it apart.
+ */
+export function groupTreeByAssignee(
+  roots: TaskTreeNode[],
+  assigneeIdsOf: (taskId: string) => string[],
+  orderIndex?: Map<string, number>
+): Record<string, TaskTreeNode[]> {
+  const groups: Record<string, TaskTreeNode[]> = {}
+  const add = (key: string, node: TaskTreeNode) => {
+    ;(groups[key] ??= []).push(node)
+  }
+
+  const walk = (node: TaskTreeNode, shownFor: Set<string>) => {
+    for (const child of node.children) {
+      const ids = new Set(assigneeIdsOf(child.id))
+      for (const id of ids) if (!shownFor.has(id)) add(id, child)
+      walk(child, ids.size ? new Set([...shownFor, ...ids]) : shownFor)
+    }
+  }
+
+  for (const root of roots) {
+    const ids = new Set(assigneeIdsOf(root.id))
+    if (ids.size === 0) add("unassigned", root)
+    for (const id of ids) add(id, root)
+    walk(root, ids)
+  }
+
+  if (orderIndex) {
+    const rank = (n: TaskTreeNode) => orderIndex.get(n.id) ?? Number.MAX_SAFE_INTEGER
+    for (const key of Object.keys(groups)) groups[key].sort((a, b) => rank(a) - rank(b))
+  }
+  return groups
 }

@@ -31,7 +31,8 @@ import { useTaskPanel } from "@/store/useTaskPanel"
 import { useTasks, useCreateTask, useUpdateTask, useDeleteTask, useStatuses, useWorkspaceMembers, useAddTaskAssignee, useRemoveTaskAssignee, useAddTaskLabel, useRemoveTaskLabel, useList, useLabels, useAllTaskAssignees, useAllTaskLabels, useWorkspaceLists } from "@/hooks/useQueries"
 import { cn } from "@/lib/utils"
 import type { TaskResponse } from "@/lib/api"
-import { buildTaskTree, flattenTree, type TaskTreeNode } from "@/lib/task-tree"
+import { buildTaskTree, flattenTree, groupTreeByAssignee, type TaskTreeNode } from "@/lib/task-tree"
+import type { ParentContext } from "@/components/list-view/task-table-row"
 
 // Import new list view components
 import { GroupByDropdown } from "@/components/list-view/group-by-dropdown"
@@ -868,6 +869,32 @@ export default function ListPage({
   // For display count - use filtered tasks (not flatTasks which excludes collapsed subtasks)
   const displayTaskCount = filteredTasks.length
 
+  // For a subtask drawn away from its parent (under its own assignee, or when a
+  // filter hid the parent): which task it belongs to and whose that task is.
+  // Looks up the unfiltered task set so the parent is found even when hidden.
+  const taskById = useMemo(() => new Map((tasks || []).map((t) => [t.id, t])), [tasks])
+  const parentContextFor = useCallback(
+    (task: TaskResponse): ParentContext | undefined => {
+      if (!task.parentTaskId) return undefined
+      const parent = taskById.get(task.parentTaskId)
+      const path: string[] = []
+      for (let p = parent, guard = 0; p && guard < 10; p = p.parentTaskId ? taskById.get(p.parentTaskId) : undefined, guard++) {
+        path.unshift(p.title)
+      }
+      let owners: ParentContext["owners"] = (allTaskAssignees?.[task.parentTaskId] || []).map((a) => ({
+        id: a.userId,
+        name: a.user.name || a.user.email,
+        avatarUrl: a.user.avatarUrl,
+      }))
+      if (owners.length === 0 && parent) {
+        const creator = workspaceMembers?.find((m) => m.id === parent.creatorId)
+        if (creator) owners = [{ id: creator.id, name: creator.name || creator.email, avatarUrl: creator.avatarUrl }]
+      }
+      return { parentId: task.parentTaskId, parentTitle: parent?.title, path, owners }
+    },
+    [taskById, allTaskAssignees, workspaceMembers]
+  )
+
   // Group root tasks if grouping is enabled (subtasks are nested under their parent)
   const groupedTasks = useMemo(() => {
     // Use flatTasks to respect expanded/collapsed state
@@ -875,6 +902,18 @@ export default function ListPage({
     const rootTasks = taskTree.filter(t => t.depth === 0)
     
     if (!groupBy) return { ungrouped: rootTasks }
+
+    // By assignee, a subtask also shows under its own assignee when its parent
+    // belongs to someone else (and a task with several assignees shows under
+    // each of them). Same task object everywhere, so edits sync.
+    if (groupBy === "assignee") {
+      const order = new Map(sortedTasks.map((t, i) => [t.id, i]))
+      return groupTreeByAssignee(
+        rootTasks,
+        (id) => (allTaskAssignees?.[id] || []).map((a) => a.userId),
+        order
+      )
+    }
 
     const groups: Record<string, TaskTreeNode[]> = {}
 
@@ -906,16 +945,6 @@ export default function ListPage({
             else groupKey = "later"
           }
           break
-        case "assignee": {
-          const assignees = allTaskAssignees?.[task.id] || []
-          if (assignees.length === 0) {
-            groupKey = "unassigned"
-          } else {
-            // Group by first assignee
-            groupKey = assignees[0].userId
-          }
-          break
-        }
         case "label": {
           const taskLabels = allTaskLabels?.[task.id] || []
           if (taskLabels.length === 0) {
@@ -931,7 +960,7 @@ export default function ListPage({
     })
 
     return groups
-  }, [taskTree, groupBy, allTaskAssignees, allTaskLabels])
+  }, [taskTree, sortedTasks, groupBy, allTaskAssignees, allTaskLabels])
 
   // Handlers
   const handleCreateTask = useCallback((data: {
@@ -1538,13 +1567,18 @@ export default function ListPage({
                       {!collapsedGroups.has(groupKey) && (
                         <div>
                           {groupedTasks[groupKey].map((rootTask) => {
-                            // Get the root task + its expanded subtasks
+                            // Get the entry + its expanded subtasks. An entry can
+                            // be a subtask shown under its own assignee; it's
+                            // drawn at the top of the group, with its parent
+                            // named on the row.
                             const taskWithSubtasks = flattenTree([rootTask], expandedTasks)
+                            const baseDepth = rootTask.depth
                             return taskWithSubtasks.map((task) => (
                               <React.Fragment key={task.id}>
                                 <TaskTableRowWrapper
                                   task={task}
-                                  depth={task.depth}
+                                  parentContext={task === rootTask ? parentContextFor(task) : undefined}
+                                  depth={task.depth - baseDepth}
                                   hasChildren={task.children.length > 0}
                                   childCount={task.children.length}
                                   isExpanded={expandedTasks.has(task.id)}
@@ -1554,7 +1588,7 @@ export default function ListPage({
                                 />
                                 {addingSubtaskFor === task.id && (
                                   <InlineSubtaskInput
-                                    depth={(task.depth || 0) + 1}
+                                    depth={(task.depth || 0) - baseDepth + 1}
                                     onSubmit={(title) => handleCreateSubtask(task.id, title)}
                                     onCancel={() => setAddingSubtaskFor(null)}
                                   />
@@ -1601,6 +1635,7 @@ export default function ListPage({
                         >
                           <TaskTableRowWrapper
                             task={task}
+                            parentContext={task.depth === 0 ? parentContextFor(task) : undefined}
                             depth={task.depth}
                             hasChildren={task.children.length > 0}
                             childCount={task.children.length}
@@ -1630,6 +1665,7 @@ export default function ListPage({
                             <SortableTaskRow id={task.id}>
                               <TaskTableRowWrapper
                                 task={task}
+                                parentContext={task.depth === 0 ? parentContextFor(task) : undefined}
                                 depth={task.depth}
                                 hasChildren={task.children.length > 0}
                                 childCount={task.children.length}
