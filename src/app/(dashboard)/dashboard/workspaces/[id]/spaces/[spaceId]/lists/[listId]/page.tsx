@@ -19,8 +19,10 @@ import {
   User,
   CheckCircle2,
   RotateCcw,
+  CornerDownRight,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Breadcrumb } from "@/components/breadcrumb"
@@ -524,6 +526,25 @@ export default function ListPage({
   // "My Tasks" toggle
   const [showMyTasks, setShowMyTasks] = useState(false)
 
+  // Group by assignee: also list subtasks under their assignee when the parent
+  // belongs to someone else. Off by default — on a big sprint it adds a lot of
+  // rows. Remembered per browser for every list, as a personal preference.
+  const OTHERS_SUBTASKS_KEY = "listView:showOthersSubtasks"
+  const [showOthersSubtasks, setShowOthersSubtasks] = useState(false)
+  useEffect(() => {
+    try {
+      setShowOthersSubtasks(localStorage.getItem(OTHERS_SUBTASKS_KEY) === "1")
+    } catch { /* storage unavailable: keep the default */ }
+  }, [])
+  const toggleOthersSubtasks = () => {
+    setShowOthersSubtasks((on) => {
+      try {
+        localStorage.setItem(OTHERS_SUBTASKS_KEY, on ? "0" : "1")
+      } catch { /* not persisted; still applies for this visit */ }
+      return !on
+    })
+  }
+
   // Closed tasks section
   const [showClosed, setShowClosed] = useState(false)
 
@@ -895,6 +916,16 @@ export default function ListPage({
     [taskById, allTaskAssignees, workspaceMembers]
   )
 
+  // How many subtask rows "Subtasks from others" adds, shown on the button.
+  const othersSubtaskCount = useMemo(() => {
+    if (groupBy !== "assignee") return 0
+    const groups = groupTreeByAssignee(
+      taskTree.filter((t) => t.depth === 0),
+      (id) => (allTaskAssignees?.[id] || []).map((a) => a.userId)
+    )
+    return Object.values(groups).reduce((n, entries) => n + entries.filter((e) => e.depth > 0).length, 0)
+  }, [taskTree, groupBy, allTaskAssignees])
+
   // Group root tasks if grouping is enabled (subtasks are nested under their parent)
   const groupedTasks = useMemo(() => {
     // Use flatTasks to respect expanded/collapsed state
@@ -908,11 +939,20 @@ export default function ListPage({
     // each of them). Same task object everywhere, so edits sync.
     if (groupBy === "assignee") {
       const order = new Map(sortedTasks.map((t, i) => [t.id, i]))
-      return groupTreeByAssignee(
+      const groups = groupTreeByAssignee(
         rootTasks,
         (id) => (allTaskAssignees?.[id] || []).map((a) => a.userId),
         order
       )
+      if (showOthersSubtasks) return groups
+      // Toggle off: keep only top-level entries (subtask entries have depth > 0)
+      // and drop people who were only there because of a borrowed subtask.
+      const own: Record<string, TaskTreeNode[]> = {}
+      for (const [key, entries] of Object.entries(groups)) {
+        const kept = entries.filter((n) => n.depth === 0)
+        if (kept.length) own[key] = kept
+      }
+      return own
     }
 
     const groups: Record<string, TaskTreeNode[]> = {}
@@ -960,7 +1000,7 @@ export default function ListPage({
     })
 
     return groups
-  }, [taskTree, sortedTasks, groupBy, allTaskAssignees, allTaskLabels])
+  }, [taskTree, sortedTasks, groupBy, allTaskAssignees, allTaskLabels, showOthersSubtasks])
 
   // Handlers
   const handleCreateTask = useCallback((data: {
@@ -1432,6 +1472,40 @@ export default function ListPage({
             {viewMode === "list" && (
               <>
                 <GroupByDropdown value={groupBy} onChange={setGroupBy} />
+                {groupBy === "assignee" && (
+                  <TooltipProvider delayDuration={300}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant={showOthersSubtasks ? "default" : "outline"}
+                          size="sm"
+                          className="gap-1.5"
+                          aria-pressed={showOthersSubtasks}
+                          onClick={toggleOthersSubtasks}
+                        >
+                          <CornerDownRight className="h-3.5 w-3.5" />
+                          Subtasks from others
+                          {othersSubtaskCount > 0 && (
+                            <span
+                              className={cn(
+                                "ml-0.5 rounded-full px-1.5 text-[10px] leading-4 tabular-nums",
+                                showOthersSubtasks ? "bg-primary-foreground/20" : "bg-muted text-muted-foreground"
+                              )}
+                            >
+                              {othersSubtaskCount}
+                            </span>
+                          )}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">
+                        <p>
+                          Also list a subtask under the person it&apos;s assigned to when its parent task belongs to someone
+                          else. Off: subtasks only appear nested under their parent.
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
                 <SortDropdown
                   sortBy={sortBy}
                   sortOrder={sortOrder}
