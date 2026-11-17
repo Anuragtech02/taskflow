@@ -31,6 +31,10 @@ export function useSSE(workspaceId?: string, currentUserId?: string) {
   const stableTimerRef = useRef<NodeJS.Timeout | null>(null)
   const [isConnected, setIsConnected] = useState(false)
   const [activeUsers, setActiveUsers] = useState<{ id: string; name: string; avatarUrl?: string | null }[]>([])
+  // Task updates that concern me, waiting to be shown as ONE toast. A cascade
+  // (status change on a parent with 20 subtasks) arrives as 20 events.
+  const pendingUpdatesRef = useRef<{ title?: string; spaceId?: string; listId?: string }[]>([])
+  const updateToastTimerRef = useRef<NodeJS.Timeout | null>(null)
 
   const MAX_RECONNECT_ATTEMPTS = 5
 
@@ -83,48 +87,57 @@ export function useSSE(workspaceId?: string, currentUserId?: string) {
         }
       })
 
+      // Task events reach everyone in the workspace so open views refresh,
+      // but that is all they do for most people. A toast is shown only to the
+      // users the server says the change concerns (the task's assignees and
+      // creator, never whoever made the change). Everything else that should
+      // alert someone — assigned, mentioned, commented — arrives as a
+      // "notification" event addressed to that one user.
       eventSource.addEventListener("task_updated", (event) => {
         try {
           const data = JSON.parse(event.data)
           queryClient.invalidateQueries({ queryKey: ["tasks"] })
           queryClient.invalidateQueries({ queryKey: ["task"] })
-          // Only show toast for changes made by OTHER users
-          if (!currentUserId || data.userId !== currentUserId) {
-            const canNavigate = workspaceId && data.spaceId && data.listId
-            toast.info("Task updated", {
-              description: data.task?.title || "A task was updated",
+          const concernsMe =
+            !!currentUserId && Array.isArray(data.concerns) && data.concerns.includes(currentUserId)
+          if (!concernsMe) return
+
+          pendingUpdatesRef.current.push({ title: data.task?.title, spaceId: data.spaceId, listId: data.listId })
+          if (updateToastTimerRef.current) return
+          updateToastTimerRef.current = setTimeout(() => {
+            const items = pendingUpdatesRef.current
+            pendingUpdatesRef.current = []
+            updateToastTimerRef.current = null
+            if (items.length === 0) return
+            const first = items[0]
+            const canNavigate = workspaceId && first.spaceId && first.listId
+            const titles = items.map((i) => i.title).filter(Boolean) as string[]
+            toast.info(items.length === 1 ? "Your task was updated" : `${items.length} of your tasks were updated`, {
+              description:
+                items.length === 1
+                  ? first.title || "A task you're on was updated"
+                  : titles.slice(0, 3).join(", ") + (titles.length > 3 ? ` and ${titles.length - 3} more` : ""),
               ...(canNavigate && {
                 action: {
                   label: "View",
-                  onClick: () => routerRef.current.push(`/dashboard/workspaces/${workspaceId}/spaces/${data.spaceId}/lists/${data.listId}`),
+                  onClick: () => routerRef.current.push(`/dashboard/workspaces/${workspaceId}/spaces/${first.spaceId}/lists/${first.listId}`),
                 },
               }),
             })
-          }
+          }, 800)
         } catch (error) {
           console.error("Error parsing task_updated event:", error)
         }
       })
 
-      eventSource.addEventListener("task_created", (event) => {
-        try {
-          const data = JSON.parse(event.data)
-          queryClient.invalidateQueries({ queryKey: ["tasks"] })
-          if (!currentUserId || data.userId !== currentUserId) {
-            const canNavigate = workspaceId && data.spaceId && data.listId
-            toast.success("Task created", {
-              description: data.task?.title || "A new task was created",
-              ...(canNavigate && {
-                action: {
-                  label: "View",
-                  onClick: () => routerRef.current.push(`/dashboard/workspaces/${workspaceId}/spaces/${data.spaceId}/lists/${data.listId}`),
-                },
-              }),
-            })
-          }
-        } catch (error) {
-          console.error("Error parsing task_created event:", error)
-        }
+      // Refresh only. A new task concerns nobody yet; whoever gets assigned
+      // to it receives their own "assigned" notification.
+      eventSource.addEventListener("task_created", () => {
+        queryClient.invalidateQueries({ queryKey: ["tasks"] })
+      })
+
+      eventSource.addEventListener("task_deleted", () => {
+        queryClient.invalidateQueries({ queryKey: ["tasks"] })
       })
 
       eventSource.addEventListener("notification", (event) => {
@@ -204,6 +217,11 @@ export function useSSE(workspaceId?: string, currentUserId?: string) {
         clearTimeout(stableTimerRef.current)
         stableTimerRef.current = null
       }
+      if (updateToastTimerRef.current) {
+        clearTimeout(updateToastTimerRef.current)
+        updateToastTimerRef.current = null
+      }
+      pendingUpdatesRef.current = []
     }
   }, [connect, workspaceId])
 
