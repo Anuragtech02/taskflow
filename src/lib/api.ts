@@ -572,6 +572,20 @@ export async function moveTaskBetweenSprints(
   })
 }
 
+/**
+ * Complete a sprint and move ALL its incomplete tasks in one request: to the
+ * space's Backlog, or into another sprint. All-or-nothing on the server.
+ */
+export async function completeSprint(
+  sprintId: string,
+  incomplete: { incompleteTasks: "backlog" } | { incompleteTasks: "rollover"; targetSprintId: string }
+): Promise<{ sprint: SprintResponse; moved: number; destinationListId: string | null }> {
+  return fetchJSON(`/sprints/${sprintId}/complete`, {
+    method: "POST",
+    body: JSON.stringify(incomplete),
+  })
+}
+
 // ── Sprint Retrospective ──────────────────────────────────────────────────
 export interface RetroItemResponse {
   id: string

@@ -41,6 +41,7 @@ import {
   addTaskToSprint,
   removeTaskFromSprint,
   moveTaskBetweenSprints,
+  completeSprint,
   fetchSprintRetro,
   createRetroItem,
   deleteRetroItem,
@@ -615,6 +616,26 @@ export function useMoveTaskBetweenSprints() {
       queryClient.invalidateQueries({ queryKey: ["sprint", variables.fromSprintId] }),
       queryClient.invalidateQueries({ queryKey: ["sprint", variables.toSprintId] }),
       queryClient.invalidateQueries({ queryKey: ["tasks"] }),
+    ]),
+  })
+}
+
+export function useCompleteSprint() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ sprintId, targetSprintId }: { sprintId: string; targetSprintId?: string }) =>
+      completeSprint(sprintId, targetSprintId ? { incompleteTasks: "rollover", targetSprintId } : { incompleteTasks: "backlog" }),
+    // One refresh after the single request (the old per-task loop refetched
+    // the whole sprint once per task).
+    onSuccess: (_data, variables) => Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["sprints"] }),
+      queryClient.invalidateQueries({ queryKey: ["sprint", variables.sprintId] }),
+      ...(variables.targetSprintId ? [queryClient.invalidateQueries({ queryKey: ["sprint", variables.targetSprintId] })] : []),
+      queryClient.invalidateQueries({ queryKey: ["tasks"] }),
+      // The sprint's list is archived (sidebar: "Past sprints").
+      queryClient.invalidateQueries({ queryKey: ["spaces"] }),
+      queryClient.invalidateQueries({ queryKey: ["folders"] }),
+      queryClient.invalidateQueries({ queryKey: ["lists"] }),
     ]),
   })
 }

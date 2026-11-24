@@ -46,9 +46,9 @@ import {
   useSprint,
   useSprints,
   useUpdateSprint,
+  useCompleteSprint,
   useDeleteSprint,
   useRemoveTaskFromSprint,
-  useMoveTaskBetweenSprints,
   useStatuses,
 } from "@/hooks/useQueries"
 import { TaskDetailPanel } from "@/components/task-detail-panel"
@@ -418,31 +418,26 @@ export default function SprintDetailPage() {
     setIsClosing(true)
     const ids = incompleteTasks.map((t: TaskResponse) => t.id)
     try {
-      const results = await whilePending(ids, () => Promise.allSettled(
-        incompleteTasks.map((task: TaskResponse) =>
-          closeOption === "move" && targetSprintId
-            ? moveTaskBetweenSprintsMutation.mutateAsync({ fromSprintId: sprintId, toSprintId: targetSprintId, taskId: task.id })
-            : removeTaskFromSprintMutation.mutateAsync({ sprintId, taskId: task.id })
-        )
-      ))
-      const failed = results.filter((r) => r.status === "rejected").length
-      if (failed > 0) {
-        // Don't freeze the sprint with tasks still stuck in it — let them retry.
-        toast.error(`${failed} task${failed === 1 ? "" : "s"} couldn't be moved. The sprint is still open; try again.`)
-        return
-      }
-      await updateSprintMutation.mutateAsync({ sprintId, status: "completed" })
+      // One request: the server moves every incomplete task and completes the
+      // sprint in a single transaction, so it either all happens or none of
+      // it does. (This used to be one request per task.)
+      const { moved } = await whilePending(ids, () =>
+        completeSprintMutation.mutateAsync({
+          sprintId,
+          targetSprintId: closeOption === "move" && targetSprintId ? targetSprintId : undefined,
+        })
+      )
       setShowCloseDialog(false)
-      toast.success(ids.length ? `Sprint completed · ${ids.length} task${ids.length === 1 ? "" : "s"} moved` : "Sprint completed")
-    } catch {
-      toast.error("Failed to complete the sprint")
+      toast.success(moved ? `Sprint completed · ${moved} task${moved === 1 ? "" : "s"} moved` : "Sprint completed")
+    } catch (err) {
+      const message = err instanceof Error && err.message ? err.message : null
+      toast.error(message ? `Couldn't complete the sprint: ${message}` : "Couldn't complete the sprint. Nothing was moved; try again.")
     } finally {
       setIsClosing(false)
     }
   }
 
-  const moveTaskBetweenSprintsMutation = useMoveTaskBetweenSprints()
-  const removeTaskFromSprintMutation = useRemoveTaskFromSprint()
+  const completeSprintMutation = useCompleteSprint()
 
   const handleDeleteSprint = () => {
     deleteSprintMutation.mutate(sprintId, {
